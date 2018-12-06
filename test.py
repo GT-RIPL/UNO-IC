@@ -34,9 +34,12 @@ def test(args):
     # Setup image
     print("Read Input Image from : {}".format(args.img_path))
     img = misc.imread(args.img_path)
+    img = img[:,:,:3]
 
     data_loader = get_loader(args.dataset)
-    data_path = get_data_path(args.dataset)
+    # data_path = get_data_path(args.dataset)
+    data_path = "/home/n8k9/ripl/ros/data/airsim"
+
     loader = data_loader(data_path, is_transform=True, img_norm=args.img_norm)
     n_classes = loader.n_classes
 
@@ -63,7 +66,9 @@ def test(args):
     img = torch.from_numpy(img).float()
 
     # Setup Model
-    model = get_model(model_name, n_classes, version=args.dataset)
+    model_name_dict = {}
+    model_name_dict['arch'] = model_name
+    model = get_model(model_name_dict, n_classes, version=args.dataset)
     state = convert_state_dict(torch.load(args.model_path)["model_state"])
     model.load_state_dict(state)
     model.eval()

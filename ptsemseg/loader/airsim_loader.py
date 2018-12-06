@@ -148,20 +148,24 @@ class airsimLoader(data.Dataset):
 
         return img, lbl
 
-    # def decode_segmap(self, temp):
-    #     r = temp.copy()
-    #     g = temp.copy()
-    #     b = temp.copy()
-    #     for l in range(0, self.n_classes):
-    #         r[temp == l] = self.label_colours[l][0]
-    #         g[temp == l] = self.label_colours[l][1]
-    #         b[temp == l] = self.label_colours[l][2]
+    def decode_segmap(self, temp):
+        r = temp.copy()
+        g = temp.copy()
+        b = temp.copy()
+        for i,name in self.id2name.items():
+            r[(temp==i)] = self.name2color[name][0][0]
+            g[(temp==i)] = self.name2color[name][0][1]
+            b[(temp==i)] = self.name2color[name][0][2]
 
-    #     rgb = np.zeros((temp.shape[0], temp.shape[1], 3))
-    #     rgb[:, :, 0] = r / 255.0
-    #     rgb[:, :, 1] = g / 255.0
-    #     rgb[:, :, 2] = b / 255.0
-    #     return rgb
+                # r[temp == l] = self.label_colours[l][0]
+                # g[temp == l] = self.label_colours[l][1]
+                # b[temp == l] = self.label_colours[l][2]
+
+        rgb = np.zeros((temp.shape[0], temp.shape[1], 3))
+        rgb[:, :, 0] = r / 255.0
+        rgb[:, :, 1] = g / 255.0
+        rgb[:, :, 2] = b / 255.0
+        return rgb
 
     # def encode_segmap(self, mask):
     #     # Put all void classes to zero

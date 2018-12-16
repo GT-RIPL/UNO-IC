@@ -15,21 +15,24 @@ import matplotlib.pyplot as plt
 class airsimLoader(data.Dataset):
     
     name2color = {"person":  [[153, 108, 6  ]],
-                  "road":    [[53,  32,  65 ], [115, 176, 195]],
-                  "building":[[84,  226, 87 ]], 
+                  "road":    [[53,  32,  65 ], [115, 176, 195], [82, 239, 232], [37,  128, 125], [170, 179, 42]],
+                  "building":[[84,  226, 87 ], [55,  181, 57],  [22,  61, 247], [230, 136, 198]], 
                   "vehicle": [[161, 171, 27 ], [89,  121, 72 ]],
-                  "tree":    [[147, 144, 233]],
-                  "sidewalk":[[178, 221, 213]] }
+                  "tree":    [[147, 144, 233], [112, 105, 191]],
+                  "sidewalk":[[178, 221, 213], [27,  8,   38]],
+                  "grass":   [[81,  13,  36 ]],
+                  "sky":     [[209, 247, 202]]  }
 
-    name2id = {"person": 1, "vehicle": 2, "road": 3, "building": 4, "sidewalk": 5, "tree": 6}
+    name2id = {"person": 1, "vehicle": 2, "road": 3, "building": 4, "sidewalk": 5, "tree": 6, "grass": 7, "sky": 8}
     id2name = {i:name for name,i in name2id.items()}
 
     splits = ['train','val']
     image_modes = ['scene','depth','segmentation']
 
     split_subdirs = {}
-    split_subdirs['train'] = ['clear']
-    split_subdirs['val'] = ['fall','fog_1','fog_2','fog_3','rain','snow']
+    split_subdirs['train'] = ['0_0__-221_-173', '0_0__176_-256', '0_0__-209_-22', '-209_-22__-48_-193', '112_-272__115_-21']
+    split_subdirs['val'] = ['-48_-193__112_-272']
+        
 
     ignore_index = 0
 
@@ -60,7 +63,7 @@ class airsimLoader(data.Dataset):
         self.is_transform = is_transform
         self.augmentations = augmentations
         self.img_norm = img_norm
-        self.n_classes = 7
+        self.n_classes = 9
         self.img_size = (
             img_size if isinstance(img_size, tuple) else (img_size, img_size)
         )
@@ -69,7 +72,7 @@ class airsimLoader(data.Dataset):
         self.imgs = {s:{image_mode:[] for image_mode in self.image_modes} for s in self.splits}
         for split in self.splits:
             for subdir in self.split_subdirs[split]:
-                for file_path in glob.glob(os.path.join(root,'scene',subdir,"*.png")):
+                for file_path in glob.glob(os.path.join(root,'scene/**',subdir,"**/*.png"),recursive=True):
                     ext = file_path.replace(root+"/scene/",'')
                     if all([os.path.exists(os.path.join(root,image_mode,ext)) for image_mode in self.image_modes]):
                         [self.imgs[split][image_mode].append(os.path.join(root,image_mode,ext)) for image_mode in self.image_modes]

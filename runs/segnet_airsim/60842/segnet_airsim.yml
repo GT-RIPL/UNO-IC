@@ -1,12 +1,12 @@
 model:
-    arch: fcn8s
+    arch: segnet
 data:
-    dataset: pascal
-    train_split: train_aug
+    dataset: airsim
+    train_split: train
     val_split: val
     img_rows: 'same'
     img_cols: 'same'
-    path: /private/home/meetshah/datasets/VOC/060817/VOCdevkit/VOC2012/
+    path: /home/n8k9/ripl/ros/data/airsim
 training:
     train_iters: 300000
     batch_size: 1
@@ -22,4 +22,4 @@ training:
         name: 'cross_entropy'
         size_average: False
     lr_schedule:
-    resume: fcn8s_pascal_best_model.pkl
+    resume: segnet_airsim_best_model.pkl

@@ -117,7 +117,9 @@ class conv2DBatchNormRelu(nn.Module):
             self.cbr_unit = nn.Sequential(conv_mod, nn.ReLU(inplace=True))
 
     def forward(self, inputs):
+        print(inputs[0].shape)
         outputs = self.cbr_unit(inputs)
+        print(outputs[0].shape)
         return outputs
 
 
@@ -214,8 +216,9 @@ class unetUp(nn.Module):
     def forward(self, inputs1, inputs2):
         outputs2 = self.up(inputs2)
         offset = outputs2.size()[2] - inputs1.size()[2]
-        padding = 2 * [offset // 2, offset // 2]
+        padding = 2 * [offset // 2, offset // 2 + offset % 2]
         outputs1 = F.pad(inputs1, padding)
+        # print(inputs1[0].shape,outputs1[0].shape,inputs2[0].shape,outputs2[0].shape,padding)
         return self.conv(torch.cat([outputs1, outputs2], 1))
 
 
@@ -570,7 +573,8 @@ class pyramidPooling(nn.Module):
                 # out = F.adaptive_avg_pool2d(x, output_size=(pool_size, pool_size))
                 if self.model_name != "icnet":
                     out = module(out)
-                out = F.interpolate(out, size=(h, w), mode="bilinear", align_corners=True)
+                # out = F.interpolate(out, size=(h, w), mode="bilinear", align_corners=True)
+                out = F.upsample(out, size=(h, w), mode="bilinear", align_corners=True)
                 output_slices.append(out)
 
             return torch.cat(output_slices, dim=1)
@@ -584,7 +588,8 @@ class pyramidPooling(nn.Module):
                 # out = F.adaptive_avg_pool2d(x, output_size=(pool_size, pool_size))
                 if self.model_name != "icnet":
                     out = module(out)
-                out = F.interpolate(out, size=(h, w), mode="bilinear", align_corners=True)
+                # out = F.interpolate(out, size=(h, w), mode="bilinear", align_corners=True)
+                out = F.upsample(out, size=(h, w), mode="bilinear", align_corners=True)
                 pp_sum = pp_sum + out
 
             return pp_sum

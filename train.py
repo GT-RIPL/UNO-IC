@@ -224,7 +224,7 @@ if __name__ == "__main__":
         "--config",
         nargs="?",
         type=str,
-        default="configs/fcn8s_pascal.yml",
+        default="configs/fcn8s_airsim.yml",
         help="Configuration file to use"
     )
 
@@ -233,7 +233,7 @@ if __name__ == "__main__":
     with open(args.config) as fp:
         cfg = yaml.load(fp)
 
-    run_id = random.randint(1,100000)
+    run_id = "3_Trajectory_Dataset" #random.randint(1,100000)
     logdir = os.path.join('runs', os.path.basename(args.config)[:-4] , str(run_id))
     writer = SummaryWriter(log_dir=logdir)
 

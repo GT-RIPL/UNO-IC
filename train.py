@@ -45,7 +45,7 @@ def train(cfg, writer, logger):
     # data_loader = get_loader(cfg['data']['dataset'])
     # data_path = cfg['data']['path']
     data_loader = get_loader('airsim')
-    data_path = "../../ros/airsim"
+    data_path = "../../ros/data/airsim"
 
 
 

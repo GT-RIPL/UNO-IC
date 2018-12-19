@@ -14,20 +14,21 @@ class Compose(object):
         self.augmentations = augmentations
         self.PIL2Numpy = False
 
-    def __call__(self, img, mask):
+    def __call__(self, img, mask, aux):
         if isinstance(img, np.ndarray):
             img = Image.fromarray(img, mode="RGB")
             mask = Image.fromarray(mask, mode="L")
+            aux = Image.fromarray(aux, mode="L")
             self.PIL2Numpy = True
 
         assert img.size == mask.size
         for a in self.augmentations:
-            img, mask = a(img, mask)
+            img, mask, aux = a(img, mask, aux)
 
         if self.PIL2Numpy:
-            img, mask = np.array(img), np.array(mask, dtype=np.uint8) 
+            img, mask, aux = np.array(img), np.array(mask, dtype=np.uint8), np.array(aux, dtype=np.uint8)  
 
-        return img, mask
+        return img, mask, aux
 
 
 class RandomCrop(object):
@@ -42,6 +43,7 @@ class RandomCrop(object):
         if self.padding > 0:
             img = ImageOps.expand(img, border=self.padding, fill=0)
             mask = ImageOps.expand(mask, border=self.padding, fill=0)
+            aux = ImageOps.expand(aux, border=self.padding, fill=0)
 
         assert img.size == mask.size
         w, h = img.size
@@ -52,6 +54,7 @@ class RandomCrop(object):
             return (
                 img.resize((tw, th), Image.BILINEAR),
                 mask.resize((tw, th), Image.NEAREST),
+                aux.resize((tw, th), Image.NEAREST),
             )
 
         x1 = random.randint(0, w - tw)
@@ -59,6 +62,7 @@ class RandomCrop(object):
         return (
             img.crop((x1, y1, x1 + tw, y1 + th)),
             mask.crop((x1, y1, x1 + tw, y1 + th)),
+            aux.crop((x1, y1, x1 + tw, y1 + th)),
         )
 
 
@@ -66,51 +70,51 @@ class AdjustGamma(object):
     def __init__(self, gamma):
         self.gamma = gamma
 
-    def __call__(self, img, mask):
+    def __call__(self, img, mask, aux):
         assert img.size == mask.size
-        return tf.adjust_gamma(img, random.uniform(1, 1 + self.gamma)), mask
+        return tf.adjust_gamma(img, random.uniform(1, 1 + self.gamma)), mask, aux
 
 
 class AdjustSaturation(object):
     def __init__(self, saturation):
         self.saturation = saturation
 
-    def __call__(self, img, mask):
+    def __call__(self, img, mask, aux):
         assert img.size == mask.size
         return tf.adjust_saturation(img, 
                                     random.uniform(1 - self.saturation, 
-                                                   1 + self.saturation)), mask
+                                                   1 + self.saturation)), mask, aux
 
 
 class AdjustHue(object):
     def __init__(self, hue):
         self.hue = hue
 
-    def __call__(self, img, mask):
+    def __call__(self, img, mask, aux):
         assert img.size == mask.size
         return tf.adjust_hue(img, random.uniform(-self.hue, 
-                                                  self.hue)), mask
+                                                  self.hue)), mask, aux
 
 
 class AdjustBrightness(object):
     def __init__(self, bf):
         self.bf = bf
 
-    def __call__(self, img, mask):
+    def __call__(self, img, mask, aux):
         assert img.size == mask.size
         return tf.adjust_brightness(img, 
                                     random.uniform(1 - self.bf, 
-                                                   1 + self.bf)), mask
+                                                   1 + self.bf)), mask, aux
 
 class AdjustContrast(object):
     def __init__(self, cf):
         self.cf = cf
 
-    def __call__(self, img, mask):
+    def __call__(self, img, mask, aux):
         assert img.size == mask.size
         return tf.adjust_contrast(img, 
                                   random.uniform(1 - self.cf, 
-                                                 1 + self.cf)), mask
+                                                 1 + self.cf)), mask, aux
 
 class CenterCrop(object):
     def __init__(self, size):
@@ -119,7 +123,7 @@ class CenterCrop(object):
         else:
             self.size = size
 
-    def __call__(self, img, mask):
+    def __call__(self, img, mask, aux):
         assert img.size == mask.size
         w, h = img.size
         th, tw = self.size
@@ -128,6 +132,7 @@ class CenterCrop(object):
         return (
             img.crop((x1, y1, x1 + tw, y1 + th)),
             mask.crop((x1, y1, x1 + tw, y1 + th)),
+            aux.crop((x1, y1, x1 + tw, y1 + th)),
         )
 
 
@@ -135,37 +140,40 @@ class RandomHorizontallyFlip(object):
     def __init__(self, p):
         self.p = p
 
-    def __call__(self, img, mask):
+    def __call__(self, img, mask, aux):
         if random.random() < self.p:
             return (
                 img.transpose(Image.FLIP_LEFT_RIGHT),
                 mask.transpose(Image.FLIP_LEFT_RIGHT),
+                aux.transpose(Image.FLIP_LEFT_RIGHT),
             )
-        return img, mask
+        return img, mask, aux
 
 
 class RandomVerticallyFlip(object):
     def __init__(self, p):
         self.p = p
 
-    def __call__(self, img, mask):
+    def __call__(self, img, mask, aux):
         if random.random() < self.p:
             return (
                 img.transpose(Image.FLIP_TOP_BOTTOM),
                 mask.transpose(Image.FLIP_TOP_BOTTOM),
+                aux.transpose(Image.FLIP_TOP_BOTTOM),
             )
-        return img, mask
+        return img, mask, aux
 
 
 class FreeScale(object):
     def __init__(self, size):
         self.size = tuple(reversed(size))  # size: (h, w)
 
-    def __call__(self, img, mask):
+    def __call__(self, img, mask, aux):
         assert img.size == mask.size
         return (
             img.resize(self.size, Image.BILINEAR),
             mask.resize(self.size, Image.NEAREST),
+            aux.resize(self.size, Image.NEAREST),
         )
 
 
@@ -173,7 +181,7 @@ class RandomTranslate(object):
     def __init__(self, offset):
         self.offset = offset # tuple (delta_x, delta_y)
 
-    def __call__(self, img, mask):
+    def __call__(self, img, mask, aux):
         assert img.size == mask.size
         x_offset = int(2 * (random.random() - 0.5) * self.offset[0])
         y_offset = int(2 * (random.random() - 0.5) * self.offset[1])
@@ -212,14 +220,21 @@ class RandomTranslate(object):
                         scale=1.0,
                         angle=0.0,
                         shear=0.0,
+                        fillcolor=250),
+              tf.affine(aux,
+                        translate=(-x_offset, -y_offset),
+                        scale=1.0,
+                        angle=0.0,
+                        shear=0.0,
                         fillcolor=250))
+                
 
 
 class RandomRotate(object):
     def __init__(self, degree):
         self.degree = degree
 
-    def __call__(self, img, mask):
+    def __call__(self, img, mask, aux):
         rotate_degree = random.random() * 2 * self.degree - self.degree
         return (
             tf.affine(img, 
@@ -235,6 +250,13 @@ class RandomRotate(object):
                       angle=rotate_degree, 
                       resample=Image.NEAREST,
                       fillcolor=250,
+                      shear=0.0),
+            tf.affine(aux, 
+                      translate=(0, 0), 
+                      scale=1.0, 
+                      angle=rotate_degree, 
+                      resample=Image.NEAREST,
+                      fillcolor=250,
                       shear=0.0))
 
 
@@ -243,17 +265,18 @@ class Scale(object):
     def __init__(self, size):
         self.size = size
 
-    def __call__(self, img, mask):
+    def __call__(self, img, mask, aux):
         assert img.size == mask.size
         w, h = img.size
         if (w >= h and w == self.size) or (h >= w and h == self.size):
-            return img, mask
+            return img, mask, aux
         if w > h:
             ow = self.size
             oh = int(self.size * h / w)
             return (
                 img.resize((ow, oh), Image.BILINEAR),
                 mask.resize((ow, oh), Image.NEAREST),
+                aux.resize((ow, oh), Image.NEAREST),
             )
         else:
             oh = self.size
@@ -261,6 +284,7 @@ class Scale(object):
             return (
                 img.resize((ow, oh), Image.BILINEAR),
                 mask.resize((ow, oh), Image.NEAREST),
+                aux.resize((ow, oh), Image.NEAREST),
             )
 
 
@@ -268,7 +292,7 @@ class RandomSizedCrop(object):
     def __init__(self, size):
         self.size = size
 
-    def __call__(self, img, mask):
+    def __call__(self, img, mask, aux):
         assert img.size == mask.size
         for attempt in range(10):
             area = img.size[0] * img.size[1]
@@ -287,17 +311,19 @@ class RandomSizedCrop(object):
 
                 img = img.crop((x1, y1, x1 + w, y1 + h))
                 mask = mask.crop((x1, y1, x1 + w, y1 + h))
+                aux = aux.crop((x1, y1, x1 + w, y1 + h))
                 assert img.size == (w, h)
 
                 return (
                     img.resize((self.size, self.size), Image.BILINEAR),
                     mask.resize((self.size, self.size), Image.NEAREST),
+                    aux.resize((self.size, self.size), Image.NEAREST),
                 )
 
         # Fallback
         scale = Scale(self.size)
         crop = CenterCrop(self.size)
-        return crop(*scale(img, mask))
+        return crop(*scale(img, mask, aux))
 
 
 class RandomSized(object):
@@ -306,15 +332,16 @@ class RandomSized(object):
         self.scale = Scale(self.size)
         self.crop = RandomCrop(self.size)
 
-    def __call__(self, img, mask):
+    def __call__(self, img, mask, aux):
         assert img.size == mask.size
 
         w = int(random.uniform(0.5, 2) * img.size[0])
         h = int(random.uniform(0.5, 2) * img.size[1])
 
-        img, mask = (
+        img, mask, aux = (
             img.resize((w, h), Image.BILINEAR),
             mask.resize((w, h), Image.NEAREST),
+            aux.resize((w, h), Image.NEAREST),
         )
 
-        return self.crop(*self.scale(img, mask))
+        return self.crop(*self.scale(img, mask, aux))

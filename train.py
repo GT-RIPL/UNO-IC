@@ -45,7 +45,7 @@ def train(cfg, writer, logger):
     # data_loader = get_loader(cfg['data']['dataset'])
     # data_path = cfg['data']['path']
     data_loader = get_loader('airsim')
-    data_path = "/home/n8k9/ripl/ros/data/airsim"
+    data_path = "../../ros/airsim"
 
 
 
@@ -134,13 +134,14 @@ def train(cfg, writer, logger):
     flag = True
 
     while i <= cfg['training']['train_iters'] and flag:
-        for (images, labels) in trainloader:
+        for (images, labels, aux) in trainloader:
             i += 1
             start_ts = time.time()
             scheduler.step()
             model.train()
             images = images.to(device)
             labels = labels.to(device)
+            aux = aux.to(device)
 
             optimizer.zero_grad()
             outputs = model(images)

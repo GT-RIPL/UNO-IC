@@ -8,8 +8,8 @@ from torch.utils import data
 
 import matplotlib.pyplot as plt
 
-# from ptsemseg.utils import recursive_glob
-# from ptsemseg.augmentations import *
+from ptsemseg.utils import recursive_glob
+from ptsemseg.augmentations import *
 
 
 class airsimLoader(data.Dataset):
@@ -98,8 +98,14 @@ class airsimLoader(data.Dataset):
         img_path, mask_path = self.imgs[self.split]['scene'][index], self.imgs[self.split]['segmentation'][index]
         img, mask = np.array(m.imread(img_path),dtype=np.uint8)[:,:,:3], np.array(m.imread(mask_path),dtype=np.uint8)[:,:,:3]
 
+        depth_path = self.imgs[self.split]['depth'][index]
+        depth = np.array(m.imread(depth_path),dtype=np.uint8)[:,:,0]
+
+        # aux = np.dstack((depth,depth))
+        aux = depth
+
         # plt.figure()
-        # plt.imshow(mask)
+        # plt.imshow(depth)
         # plt.show()
 
         lbl = self.ignore_index*np.ones((img.shape[0],img.shape[1]),dtype=np.uint8)
@@ -108,14 +114,14 @@ class airsimLoader(data.Dataset):
                 lbl[(mask==color).all(-1)] = i
 
         if self.augmentations is not None:
-            img, lbl = self.augmentations(img, lbl)
+            img, lbl, aux = self.augmentations(img, lbl, aux)
 
         if self.is_transform:
-            img, lbl = self.transform(img, lbl)
+            img, lbl, aux = self.transform(img, lbl, aux)
 
-        return img, lbl
+        return img, lbl, aux
 
-    def transform(self, img, lbl):
+    def transform(self, img, lbl, aux):
         """transform
 
         :param img:
@@ -139,6 +145,10 @@ class airsimLoader(data.Dataset):
         lbl = m.imresize(lbl, (self.img_size[0], self.img_size[1]), "nearest", mode="F")
         lbl = lbl.astype(int)
 
+        aux = aux.astype(float)
+        aux = m.imresize(aux, (self.img_size[0], self.img_size[1]), "nearest", mode="F")
+        aux = aux.astype(int)
+
         if not np.all(classes == np.unique(lbl)):
             print("WARN: resizing labels yielded fewer classes")
 
@@ -148,8 +158,9 @@ class airsimLoader(data.Dataset):
 
         img = torch.from_numpy(img).float()
         lbl = torch.from_numpy(lbl).long()
+        aux = torch.from_numpy(aux).long()
 
-        return img, lbl
+        return img, lbl, aux
 
     def decode_segmap(self, temp):
         r = temp.copy()

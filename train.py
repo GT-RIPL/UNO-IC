@@ -169,7 +169,7 @@ def train(cfg, writer, logger):
                (i + 1) == cfg['training']['train_iters']:
                 model.eval()
                 with torch.no_grad():
-                    for i_val, (images_val, labels_val) in tqdm(enumerate(valloader)):
+                    for i_val, (images_val, labels_val, aux_val) in tqdm(enumerate(valloader)):
                         images_val = images_val.to(device)
                         labels_val = labels_val.to(device)
 
@@ -234,7 +234,7 @@ if __name__ == "__main__":
     with open(args.config) as fp:
         cfg = yaml.load(fp)
 
-    run_id = "3_Trajectory_Dataset" #random.randint(1,100000)
+    run_id = "default_01-09-2019" #random.randint(1,100000)
     logdir = os.path.join('runs', os.path.basename(args.config)[:-4] , str(run_id))
     writer = SummaryWriter(log_dir=logdir)
 

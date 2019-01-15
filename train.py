@@ -45,7 +45,7 @@ def train(cfg, writer, logger):
     # data_loader = get_loader(cfg['data']['dataset'])
     # data_path = cfg['data']['path']
     data_loader = get_loader('airsim')
-    data_path = "../../ros/data/airsim"
+    data_path = "../../ros/data/airsim_01-14-2019"
 
 
 
@@ -241,7 +241,7 @@ if __name__ == "__main__":
     with open(args.config) as fp:
         cfg = yaml.load(fp)
 
-    run_id = "default_fixed_segmentation_01-11-2019" #random.randint(1,100000)
+    run_id = "epistimic_01-15-2019" #random.randint(1,100000)
     logdir = os.path.join('runs', os.path.basename(args.config)[:-4] , str(run_id))
     writer = SummaryWriter(log_dir=logdir)
 

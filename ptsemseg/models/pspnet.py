@@ -300,8 +300,8 @@ class pspnet(nn.Module):
             _transfer_conv_bn(k, v)
 
         # Transfer weights for final non-bn conv layer
-        _transfer_conv("conv6", self.classification)
-        _transfer_conv("conv6_1", self.aux_cls)
+        # _transfer_conv("conv6", self.classification)
+        # _transfer_conv("conv6_1", self.aux_cls)
 
         # Transfer weights for all residual layers
         for k, v in residual_layers.items():

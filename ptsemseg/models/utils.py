@@ -117,9 +117,9 @@ class conv2DBatchNormRelu(nn.Module):
             self.cbr_unit = nn.Sequential(conv_mod, nn.ReLU(inplace=True))
 
     def forward(self, inputs):
-        print(inputs[0].shape)
+        # print(inputs[0].shape)
         outputs = self.cbr_unit(inputs)
-        print(outputs[0].shape)
+        # print(outputs[0].shape)
         return outputs
 
 

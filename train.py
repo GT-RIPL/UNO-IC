@@ -92,6 +92,13 @@ def train(cfg, writer, logger):
     # Setup Model
     model = get_model(cfg['model'], n_classes).to(device)
 
+    # Load Pretrained PSPNet
+    if cfg['model'] == 'pspnet':
+        caffemodel_dir_path = "./models"
+        model.load_pretrained_model(
+            model_path=os.path.join(caffemodel_dir_path, "pspnet101_cityscapes.caffemodel")
+        )  
+
     model = torch.nn.DataParallel(model, device_ids=range(torch.cuda.device_count()))
 
     # Setup optimizer, lr_scheduler and loss function
@@ -234,7 +241,7 @@ if __name__ == "__main__":
     with open(args.config) as fp:
         cfg = yaml.load(fp)
 
-    run_id = "default_01-09-2019" #random.randint(1,100000)
+    run_id = "default_fixed_segmentation_01-11-2019" #random.randint(1,100000)
     logdir = os.path.join('runs', os.path.basename(args.config)[:-4] , str(run_id))
     writer = SummaryWriter(log_dir=logdir)
 

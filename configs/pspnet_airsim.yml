@@ -22,4 +22,4 @@ training:
         name: 'multi_scale_cross_entropy'
         size_average: False
     lr_schedule:
-    resume: runs/pspnet_airsim/default_fixed_segmentation_01-11-2019/pspnet_airsim_best_model.pkl
+    resume: None #runs/pspnet_airsim/default_fixed_segmentation_01-11-2019/pspnet_airsim_best_model.pkl

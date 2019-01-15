@@ -30,9 +30,27 @@ class airsimLoader(data.Dataset):
     image_modes = ['scene','depth','segmentation']
 
     split_subdirs = {}
-    split_subdirs['train'] = ['0_0__-209_-22', '-130_-255__-148_-130', '-219_68__-302_-24', '-302_-24__-309_-172', '112_-272__115_-21', '-209_-22__-48_-193', '-309_-172__-219_-264', '115_-21__62_76', '-219_-264__-130_-255', '-48_-193__112_-272']
-    split_subdirs['val'] = ['-94_58__-143_39', '0_0__-94_58', '-143_39__-219_68']
+    # split_subdirs['train'] = ['0_0__-209_-22', '-130_-255__-148_-130', '-219_68__-302_-24', '-302_-24__-309_-172', '112_-272__115_-21', '-209_-22__-48_-193', '-309_-172__-219_-264', '115_-21__62_76', '-219_-264__-130_-255', '-48_-193__112_-272']
+    # split_subdirs['val'] = ['-94_58__-143_39', '0_0__-94_58', '-143_39__-219_68']
         
+    split_subdirs['train'] = [ 
+                            "0_0__-94_58",
+                            "123_-135__216_-26",
+                            "-130_-255__-57_-255",
+                            "-143_39__-219_68",
+                            "176_-355__250_-180",
+                            "-302_-24__-309_-172",
+                            "-309_-172__-219_-264",
+                            "-57_-255__88_-202",
+                            "88_-202__20_-355",
+                            "-94_58__-143_39",]
+
+    split_subdirs['val'] = [
+                            "20_-355__176_-355",
+                            "-219_-264__-130_-255",
+                            "-219_68__-302_-24",
+                            "250_-180__123_-135",]
+
 
     ignore_index = 0
 
@@ -44,6 +62,7 @@ class airsimLoader(data.Dataset):
         self,
         root,
         split="train",
+        subsplit=None,
         is_transform=False,
         img_size=(512, 512),
         augmentations=None,
@@ -74,8 +93,11 @@ class airsimLoader(data.Dataset):
             for subdir in self.split_subdirs[split]:
                 for file_path in glob.glob(os.path.join(root,'scene/**',subdir,"**/*.png"),recursive=True):
                     ext = file_path.replace(root+"/scene/",'')
+                    env = ext.split("/")[1]
+
                     if all([os.path.exists(os.path.join(root,image_mode,ext)) for image_mode in self.image_modes]):
-                        [self.imgs[split][image_mode].append(os.path.join(root,image_mode,ext)) for image_mode in self.image_modes]
+                        if subsplit is None or (not subsplit is None and subsplit==env):
+                            [self.imgs[split][image_mode].append(os.path.join(root,image_mode,ext)) for image_mode in self.image_modes]
 
 
         if not self.imgs[self.split][self.image_modes[0]]:

@@ -69,11 +69,11 @@ def train(cfg, writer, logger):
         img_size=(512,512),
         augmentations=data_aug)
 
-    v_loader = data_loader(
+    v_loader = {env:data_loader(
         data_path,
         is_transform=True,
-        split='val',
-        img_size=(512,512),)
+        split="val", subsplit=env,
+        img_size=(512,512),) for env in ["fog_000","fog_005","fog_010","fog_020","fog_025"]}
 
 
     n_classes = t_loader.n_classes
@@ -82,12 +82,12 @@ def train(cfg, writer, logger):
                                   num_workers=cfg['training']['n_workers'], 
                                   shuffle=True)
 
-    valloader = data.DataLoader(v_loader, 
+    valloaders = {key:data.DataLoader(v_loader[key], 
                                 batch_size=cfg['training']['batch_size'], 
-                                num_workers=cfg['training']['n_workers'])
+                                num_workers=cfg['training']['n_workers']) for key in v_loader.keys()}
 
     # Setup Metrics
-    running_metrics_val = runningScore(n_classes)
+    running_metrics_val = {env:runningScore(n_classes) for env in ["fog_000","fog_005","fog_010","fog_020","fog_025"]}
 
     # Setup Model
     model = get_model(cfg['model'], n_classes).to(device)
@@ -176,35 +176,38 @@ def train(cfg, writer, logger):
                (i + 1) == cfg['training']['train_iters']:
                 model.eval()
                 with torch.no_grad():
-                    for i_val, (images_val, labels_val, aux_val) in tqdm(enumerate(valloader)):
-                        images_val = images_val.to(device)
-                        labels_val = labels_val.to(device)
+                    for k,valloader in valloaders.items():
+                        for i_val, (images_val, labels_val, aux_val) in tqdm(enumerate(valloader)):
+                            images_val = images_val.to(device)
+                            labels_val = labels_val.to(device)
 
-                        outputs = model(images_val)
-                        val_loss = loss_fn(input=outputs, target=labels_val)
+                            outputs = model(images_val)
+                            val_loss = loss_fn(input=outputs, target=labels_val)
 
-                        pred = outputs.data.max(1)[1].cpu().numpy()
-                        gt = labels_val.data.cpu().numpy()
+                            pred = outputs.data.max(1)[1].cpu().numpy()
+                            gt = labels_val.data.cpu().numpy()
 
 
-                        running_metrics_val.update(gt, pred)
-                        val_loss_meter.update(val_loss.item())
+                            running_metrics_val[k].update(gt, pred)
+                            val_loss_meter.update(val_loss.item())
 
                 writer.add_scalar('loss/val_loss', val_loss_meter.avg, i+1)
                 logger.info("Iter %d Loss: %.4f" % (i + 1, val_loss_meter.avg))
 
-                score, class_iou = running_metrics_val.get_scores()
-                for k, v in score.items():
-                    print(k, v)
-                    logger.info('{}: {}'.format(k, v))
-                    writer.add_scalar('val_metrics/{}'.format(k), v, i+1)
+                for env,valloader in valloaders.items():
 
-                for k, v in class_iou.items():
-                    logger.info('{}: {}'.format(k, v))
-                    writer.add_scalar('val_metrics/cls_{}'.format(k), v, i+1)
+                    score, class_iou = running_metrics_val[env].get_scores()
+                    for k, v in score.items():
+                        print(k, v)
+                        logger.info('{}: {}'.format(k, v))
+                        writer.add_scalar('val_metrics/{}/{}'.format(env,k), v, i+1)
 
-                val_loss_meter.reset()
-                running_metrics_val.reset()
+                    for k, v in class_iou.items():
+                        logger.info('{}: {}'.format(k, v))
+                        writer.add_scalar('val_metrics/{}/cls_{}'.format(env,k), v, i+1)
+
+                    val_loss_meter.reset()
+                    running_metrics_val[env].reset()
 
                 if score["Mean IoU : \t"] >= best_iou:
                     best_iou = score["Mean IoU : \t"]
@@ -241,7 +244,7 @@ if __name__ == "__main__":
     with open(args.config) as fp:
         cfg = yaml.load(fp)
 
-    run_id = "default_fixed_segmentation_01-11-2019" #random.randint(1,100000)
+    run_id = "fog_all_01-15-2019" #random.randint(1,100000)
     logdir = os.path.join('runs', os.path.basename(args.config)[:-4] , str(run_id))
     writer = SummaryWriter(log_dir=logdir)
 

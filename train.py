@@ -45,7 +45,7 @@ def train(cfg, writer, logger):
     # data_loader = get_loader(cfg['data']['dataset'])
     # data_path = cfg['data']['path']
     data_loader = get_loader('airsim')
-    data_path = "../../ros/data/airsim_01-14-2019"
+    data_path = "../../ros/data/airsim"
 
 
 
@@ -73,7 +73,7 @@ def train(cfg, writer, logger):
         data_path,
         is_transform=True,
         split="val", subsplit=env,
-        img_size=(512,512),) for env in ["fog_000","fog_005","fog_010","fog_020","fog_025"]}
+        img_size=(512,512),) for env in ["fog_000","fog_005","fog_010","fog_020","fog_025","fog_050","fog_100"]}
 
 
     n_classes = t_loader.n_classes
@@ -87,7 +87,7 @@ def train(cfg, writer, logger):
                                 num_workers=cfg['training']['n_workers']) for key in v_loader.keys()}
 
     # Setup Metrics
-    running_metrics_val = {env:runningScore(n_classes) for env in ["fog_000","fog_005","fog_010","fog_020","fog_025"]}
+    running_metrics_val = {env:runningScore(n_classes) for env in v_loader.keys()}
 
     # Setup Model
     model = get_model(cfg['model'], n_classes).to(device)
@@ -148,10 +148,17 @@ def train(cfg, writer, logger):
             model.train()
             images = images.to(device)
             labels = labels.to(device)
-            aux = aux.to(device)
+            aux = aux.unsqueeze(1).to(device)
+
+            # fused = torch.cat((images,aux),1)
+            fused = torch.cat((aux,aux,aux,aux),1)
+
+            if fused.shape[0]<=1:
+                continue
 
             optimizer.zero_grad()
-            outputs = model(images)
+            # outputs = model(images)
+            outputs = model(fused)
 
             loss = loss_fn(input=outputs, target=labels)
 
@@ -180,8 +187,16 @@ def train(cfg, writer, logger):
                         for i_val, (images_val, labels_val, aux_val) in tqdm(enumerate(valloader)):
                             images_val = images_val.to(device)
                             labels_val = labels_val.to(device)
+                            aux_val = aux_val.unsqueeze(1).to(device)
 
-                            outputs = model(images_val)
+                            # fused_val = torch.cat((images_val,aux_val),1)
+                            fused_val = torch.cat((aux_val,aux_val,aux_val,aux_val),1)
+
+                            if fused_val.shape[0]<=1:
+                                continue
+
+                            # outputs = model(images_val)
+                            outputs = model(fused_val)
                             val_loss = loss_fn(input=outputs, target=labels_val)
 
                             pred = outputs.data.max(1)[1].cpu().numpy()
@@ -244,7 +259,7 @@ if __name__ == "__main__":
     with open(args.config) as fp:
         cfg = yaml.load(fp)
 
-    run_id = "fog_all_01-15-2019" #random.randint(1,100000)
+    run_id = "depth_fog_all_01-16-2019" #random.randint(1,100000)
     logdir = os.path.join('runs', os.path.basename(args.config)[:-4] , str(run_id))
     writer = SummaryWriter(log_dir=logdir)
 

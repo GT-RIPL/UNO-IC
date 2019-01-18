@@ -54,8 +54,8 @@ class airsimLoader(data.Dataset):
 
     ignore_index = 0
 
-    mean_rgb = {
-        "airsim": [103.939, 116.779, 123.68],
+    mean_rgbd = {
+        "airsim": [103.939, 116.779, 123.68, 120.00],
     }  # pascal mean for PSPNet and ICNet pre-trained model
 
     def __init__(
@@ -86,7 +86,7 @@ class airsimLoader(data.Dataset):
         self.img_size = (
             img_size if isinstance(img_size, tuple) else (img_size, img_size)
         )
-        self.mean = np.array(self.mean_rgb[version])
+        self.mean = np.array(self.mean_rgbd[version])
         
         self.imgs = {s:{image_mode:[] for image_mode in self.image_modes} for s in self.splits}
         for split in self.splits:
@@ -154,11 +154,14 @@ class airsimLoader(data.Dataset):
         )  # uint8 with RGB mode
         img = img[:, :, ::-1]  # RGB -> BGR
         img = img.astype(np.float64)
-        img -= self.mean
+        aux = aux.astype(np.float64)
+        img -= self.mean[:3]
+        aux -= self.mean[3:]
         if self.img_norm:
             # Resize scales images from 0 to 255, thus we need
             # to divide by 255.0
             img = img.astype(float) / 255.0
+            aux = aux.astype(float) / 255.0
         # NHWC -> NCHW
         img = img.transpose(2, 0, 1)
 
@@ -167,9 +170,9 @@ class airsimLoader(data.Dataset):
         lbl = m.imresize(lbl, (self.img_size[0], self.img_size[1]), "nearest", mode="F")
         lbl = lbl.astype(int)
 
-        aux = aux.astype(float)
-        aux = m.imresize(aux, (self.img_size[0], self.img_size[1]), "nearest", mode="F")
-        aux = aux.astype(int)
+        # aux = aux.astype(float)
+        # aux = m.imresize(aux, (self.img_size[0], self.img_size[1]), "nearest", mode="F")
+        # aux = aux.astype(int)
 
         if not np.all(classes == np.unique(lbl)):
             print("WARN: resizing labels yielded fewer classes")
@@ -179,8 +182,8 @@ class airsimLoader(data.Dataset):
             raise ValueError("Segmentation map contained invalid class values")
 
         img = torch.from_numpy(img).float()
+        aux = torch.from_numpy(aux).float()
         lbl = torch.from_numpy(lbl).long()
-        aux = torch.from_numpy(aux).long()
 
         return img, lbl, aux
 

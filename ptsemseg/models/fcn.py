@@ -250,7 +250,8 @@ class fcn8s(nn.Module):
                                       size_average=False)
 
         self.conv_block1 = nn.Sequential(
-            nn.Conv2d(3, 64, 3, padding=100),
+            # nn.Conv2d(3, 64, 3, padding=100),
+            nn.Conv2d(4, 64, 3, padding=100),
             nn.ReLU(inplace=True),
             nn.Conv2d(64, 64, 3, padding=1),
             nn.ReLU(inplace=True),

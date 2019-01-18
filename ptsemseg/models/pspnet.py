@@ -68,7 +68,8 @@ class pspnet(nn.Module):
 
         # Encoder
         self.convbnrelu1_1 = conv2DBatchNormRelu(
-            in_channels=3, k_size=3, n_filters=64, padding=1, stride=2, bias=False
+            # in_channels=3, k_size=3, n_filters=64, padding=1, stride=2, bias=False
+            in_channels=4, k_size=3, n_filters=64, padding=1, stride=2, bias=False
         )
         self.convbnrelu1_2 = conv2DBatchNormRelu(
             in_channels=64, k_size=3, n_filters=64, padding=1, stride=1, bias=False

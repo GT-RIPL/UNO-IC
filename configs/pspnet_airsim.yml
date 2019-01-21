@@ -1,5 +1,7 @@
 model:
-    arch: pspnet
+    arch: pspnet 
+gate:
+    arch: gatenet  
 data:
     dataset: airsim
     train_split: train
@@ -12,7 +14,7 @@ training:
     batch_size: 2
     val_interval: 1000
     n_workers: 16
-    print_interval: 50
+    print_interval: 5
     optimizer:
         name: 'sgd'
         lr: 1.0e-10
@@ -23,3 +25,5 @@ training:
         size_average: False
     lr_schedule:
     resume: None #runs/pspnet_airsim/default_fixed_segmentation_01-11-2019/pspnet_airsim_best_model.pkl
+    resumeRGB: models/pspnet_airsim_rgb_fog_all_01-16-2019.pkl
+    resumeD: models/pspnet_airsim_depth_fog_all_01-16-2019.pkl

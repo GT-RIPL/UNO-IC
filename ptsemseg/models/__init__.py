@@ -8,6 +8,7 @@ from ptsemseg.models.pspnet import *
 from ptsemseg.models.icnet import *
 from ptsemseg.models.linknet import *
 from ptsemseg.models.frrn import *
+from ptsemseg.models.gatenet import *
 
 
 def get_model(model_dict, n_classes, version=None):
@@ -33,13 +34,16 @@ def get_model(model_dict, n_classes, version=None):
         model = model(n_classes=n_classes, **param_dict)
 
     elif name == "pspnet":
-        model = model(n_classes=n_classes, **param_dict)
+        model = model(n_classes=n_classes, version=version, **param_dict)
 
     elif name == "icnet":
         model = model(n_classes=n_classes, **param_dict)
 
     elif name == "icnetBN":
         model = model(n_classes=n_classes, **param_dict)
+
+    elif name == "gatenet":
+        model = model(n_classes=n_classes, **param_dict)        
 
     else:
         model = model(n_classes=n_classes, **param_dict)
@@ -61,6 +65,7 @@ def _get_model_instance(name):
             "linknet": linknet,
             "frrnA": frrn,
             "frrnB": frrn,
+            "gatenet": gatenet,
         }[name]
     except:
         raise("Model {} not available".format(name))

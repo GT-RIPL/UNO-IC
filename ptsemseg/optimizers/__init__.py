@@ -21,6 +21,7 @@ key2opt =  {'sgd': SGD,
             'rmsprop': RMSprop,}
 
 def get_optimizer(cfg):
+
     if cfg['training']['optimizer'] is None:
         logger.info("Using SGD optimizer")
         return SGD

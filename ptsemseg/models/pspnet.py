@@ -25,6 +25,26 @@ pspnet_specs = {
         "input_size": (473, 473),
         "block_config": [3, 4, 6, 3],
     },
+    "airsim": {
+        "n_classes": 9,
+        "input_size": (512, 512),
+        "block_config": [3, 4, 23, 3],
+    },    
+    "airsim_rgb": {
+        "n_classes": 9,
+        "input_size": (512, 512),
+        "block_config": [3, 4, 23, 3],
+    },    
+    "airsim_depth": {
+        "n_classes": 9,
+        "input_size": (512, 512),
+        "block_config": [3, 4, 23, 3],
+    },            
+    "airsim_gate": {
+        "n_classes": 9,
+        "input_size": (512, 512),
+        "block_config": [3, 4, 23, 3],
+    },        
 }
 
 
@@ -67,10 +87,26 @@ class pspnet(nn.Module):
         )
 
         # Encoder
-        self.convbnrelu1_1 = conv2DBatchNormRelu(
-            # in_channels=3, k_size=3, n_filters=64, padding=1, stride=2, bias=False
-            in_channels=4, k_size=3, n_filters=64, padding=1, stride=2, bias=False
-        )
+        if version == "airsim_rgb":
+            self.convbnrelu1_1 = conv2DBatchNormRelu(
+                in_channels=4, k_size=3, n_filters=64, padding=1, stride=2, bias=False
+            )
+        elif version == "airsim_depth":
+            self.convbnrelu1_1 = conv2DBatchNormRelu(
+                # in_channels=3, k_size=3, n_filters=64, padding=1, stride=2, bias=False
+                in_channels=4, k_size=3, n_filters=64, padding=1, stride=2, bias=False
+            )
+        elif version == "airsim_gate":
+            self.convbnrelu1_1 = conv2DBatchNormRelu(
+                # in_channels=3, k_size=3, n_filters=64, padding=1, stride=2, bias=False
+                in_channels=4*n_classes, k_size=3, n_filters=64, padding=1, stride=2, bias=False
+            )                        
+        else:
+            self.convbnrelu1_1 = conv2DBatchNormRelu(
+                # in_channels=3, k_size=3, n_filters=64, padding=1, stride=2, bias=False
+                in_channels=4, k_size=3, n_filters=64, padding=1, stride=2, bias=False
+            )
+
         self.convbnrelu1_2 = conv2DBatchNormRelu(
             in_channels=64, k_size=3, n_filters=64, padding=1, stride=1, bias=False
         )
@@ -103,13 +139,24 @@ class pspnet(nn.Module):
         # Define auxiliary loss function
         self.loss = multi_scale_cross_entropy2d
 
-    def forward(self, x):
+
+
+    def forward(self, x, mode=None):
+
+        if mode=="dropout":
+            self.dropout.train(mode=True)
+
         inp_shape = x.shape[2:]
 
         # H, W -> H/2, W/2
         x = self.convbnrelu1_1(x)
+        x = self.dropout(x)
+        
         x = self.convbnrelu1_2(x)
+        x = self.dropout(x)
+
         x = self.convbnrelu1_3(x)
+        x = self.dropout(x)
 
         # H/2, W/2 -> H/4, W/4
         x = F.max_pool2d(x, 3, 2, 1)
@@ -138,6 +185,9 @@ class pspnet(nn.Module):
             return (x, x_aux)
         else:  # eval mode
             return x
+
+            
+
 
     def load_pretrained_model(self, model_path):
         """

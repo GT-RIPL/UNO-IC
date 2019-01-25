@@ -1,0 +1,29 @@
+model:
+    arch: pspnet 
+gate:
+    arch: gatenet  
+data:
+    dataset: airsim
+    train_split: train
+    val_split: val
+    img_rows: 'same'
+    img_cols: 'same'
+    path: /home/n8k9/ripl/ros/data/airsim
+training:
+    train_iters: 300000
+    batch_size: 2
+    val_interval: 500
+    n_workers: 16
+    print_interval: 5
+    optimizer:
+        name: 'sgd'
+        lr: 1.0e-10
+        weight_decay: 0.0005
+        momentum: 0.99
+    loss:
+        name: 'multi_scale_cross_entropy'
+        size_average: False
+    lr_schedule:
+    resume: None #runs/pspnet_airsim/default_fixed_segmentation_01-11-2019/pspnet_airsim_best_model.pkl
+    resumeRGB: models/pspnet_airsim_rgb_fog_all_01-16-2019.pkl
+    resumeD: models/pspnet_airsim_depth_fog_all_01-16-2019.pkl

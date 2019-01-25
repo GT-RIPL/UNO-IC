@@ -1,15 +1,15 @@
 model:
-    arch: fcn8s
+    arch: pspnet
 data:
     dataset: airsim
-    train_split: train_aug
+    train_split: train
     val_split: val
     img_rows: 'same'
     img_cols: 'same'
-    path: /private/home/meetshah/datasets/VOC/060817/VOCdevkit/VOC2012/
+    path: /home/n8k9/ripl/ros/data/airsim
 training:
     train_iters: 300000
-    batch_size: 1
+    batch_size: 2
     val_interval: 1000
     n_workers: 16
     print_interval: 50
@@ -19,7 +19,7 @@ training:
         weight_decay: 0.0005
         momentum: 0.99
     loss:
-        name: 'cross_entropy'
+        name: 'multi_scale_cross_entropy'
         size_average: False
     lr_schedule:
-    resume: fcn8s_airsim_best_model.pkl
+    resume: None #runs/pspnet_airsim/default_fixed_segmentation_01-11-2019/pspnet_airsim_best_model.pkl

@@ -99,7 +99,7 @@ class pspnet(nn.Module):
         elif version == "airsim_gate":
             self.convbnrelu1_1 = conv2DBatchNormRelu(
                 # in_channels=3, k_size=3, n_filters=64, padding=1, stride=2, bias=False
-                in_channels=4*n_classes, k_size=3, n_filters=64, padding=1, stride=2, bias=False
+                in_channels=2*n_classes, k_size=3, n_filters=64, padding=1, stride=2, bias=False
             )                        
         else:
             self.convbnrelu1_1 = conv2DBatchNormRelu(

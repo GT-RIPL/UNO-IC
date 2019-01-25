@@ -235,24 +235,33 @@ def train(cfg, writer, logger):
             loss2 = loss_fn(input=(x2,x2_aux), target=labels)
             loss2.backward()
 
+            # # Multiple Forward Passes
+            # with torch.no_grad():
+            #     model_rgb.eval()
+            #     model_depth.eval()
+            #     x1n = torch.zeros(list(x1.shape)+[0],device=device)
+            #     x2n = torch.zeros(list(x2.shape)+[0],device=device)
+            #     for ii in range(5):
+            #         x1 = model_rgb(rgb,mode="dropout")
+            #         x2 = model_depth(depth,mode="dropout")
+            #         x1n = torch.cat((x1n,x1.unsqueeze(-1)),-1)
+            #         x2n = torch.cat((x2n,x2.unsqueeze(-1)),-1)
+            #     outputs_rgb = x1n.mean(-1)
+            #     uncertainty_rgb = x1n.std(-1)
+               
+            #     outputs_depth = x2n.mean(-1)
+            #     uncertainty_depth = x2n.std(-1)
+
             # Multiple Forward Passes
             with torch.no_grad():
                 model_rgb.eval()
                 model_depth.eval()
-                x1n = torch.zeros(list(x1.shape)+[0],device=device)
-                x2n = torch.zeros(list(x2.shape)+[0],device=device)
-                for ii in range(5):
-                    x1 = model_rgb(rgb,mode="dropout")
-                    x2 = model_depth(depth,mode="dropout")
-                    x1n = torch.cat((x1n,x1.unsqueeze(-1)),-1)
-                    x2n = torch.cat((x2n,x2.unsqueeze(-1)),-1)
-                outputs_rgb = x1n.mean(-1)
-                uncertainty_rgb = x1n.std(-1)
-               
-                outputs_depth = x2n.mean(-1)
-                uncertainty_depth = x2n.std(-1)
+                x1 = model_rgb(rgb)
+                x2 = model_depth(depth)
 
-            fused = torch.cat((outputs_rgb,uncertainty_rgb,outputs_depth,uncertainty_depth),1)
+
+            # fused = torch.cat((outputs_rgb,uncertainty_rgb,outputs_depth,uncertainty_depth),1)
+            fused = torch.cat((x1,x2),1)
 
             outputs = model(fused)
             loss = loss_fn(input=outputs, target=labels)
@@ -312,25 +321,34 @@ def train(cfg, writer, logger):
                             val_loss_D = loss_fn(input=x2, target=labels_val)
 
 
+                            # # Multiple Forward Passes
+                            # with torch.no_grad():
+                            #     model_rgb.eval()
+                            #     model_depth.eval()
+                            #     x1n = torch.zeros(list(x1.shape)+[0],device=device)
+                            #     x2n = torch.zeros(list(x2.shape)+[0],device=device)
+                            #     for ii in range(4):
+                            #         x1 = model_rgb(rgb_val,mode="dropout")
+                            #         x2 = model_depth(depth_val,mode="dropout")
+                            #         x1n = torch.cat((x1n,x1.unsqueeze(-1)),-1)
+                            #         x2n = torch.cat((x2n,x2.unsqueeze(-1)),-1)
+                            #     outputs_rgb = x1n.mean(-1)
+                            #     uncertainty_rgb = x1n.std(-1)
+                               
+                            #     outputs_depth = x2n.mean(-1)
+                            #     uncertainty_depth = x2n.std(-1)
+
+
                             # Multiple Forward Passes
                             with torch.no_grad():
                                 model_rgb.eval()
                                 model_depth.eval()
-                                x1n = torch.zeros(list(x1.shape)+[0],device=device)
-                                x2n = torch.zeros(list(x2.shape)+[0],device=device)
-                                for ii in range(4):
-                                    x1 = model_rgb(rgb_val,mode="dropout")
-                                    x2 = model_depth(depth_val,mode="dropout")
-                                    x1n = torch.cat((x1n,x1.unsqueeze(-1)),-1)
-                                    x2n = torch.cat((x2n,x2.unsqueeze(-1)),-1)
-                                outputs_rgb = x1n.mean(-1)
-                                uncertainty_rgb = x1n.std(-1)
-                               
-                                outputs_depth = x2n.mean(-1)
-                                uncertainty_depth = x2n.std(-1)
+                                x1 = model_rgb(rgb_val)
+                                x2 = model_depth(depth_val)
 
 
-                            fused_val = torch.cat((outputs_rgb,uncertainty_rgb,outputs_depth,uncertainty_depth),1)
+                            # fused_val = torch.cat((outputs_rgb,uncertainty_rgb,outputs_depth,uncertainty_depth),1)
+                            fused_val = torch.cat((x1,x2),1)
                             outputs = model(fused_val)
 
                             val_loss = loss_fn(input=outputs, target=labels_val)
@@ -415,7 +433,7 @@ if __name__ == "__main__":
     with open(args.config) as fp:
         cfg = yaml.load(fp)
 
-    run_id = "mcdo_fused_fog_all_01-16-2019" #random.randint(1,100000)
+    run_id = "mcdo_1pass_fused_fog_all_01-16-2019" #random.randint(1,100000)
     logdir = os.path.join('runs', os.path.basename(args.config)[:-4] , str(run_id))
     writer = SummaryWriter(log_dir=logdir)
 

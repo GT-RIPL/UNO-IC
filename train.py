@@ -67,15 +67,26 @@ def train(cfg, writer, logger):
     t_loader = data_loader(
         data_path,
         is_transform=True,
-        split='train',
-        img_size=(512,512),
+        split=cfg['data']['train_split'],
+        subsplit=cfg['data']['train_subsplit'],
+        # img_size=(512,512),
+        img_size=(256,256),
         augmentations=data_aug)
 
     v_loader = {env:data_loader(
         data_path,
         is_transform=True,
         split="val", subsplit=env,
-        img_size=(512,512),) for env in ["fog_000","fog_005","fog_010","fog_020","fog_025","fog_050","fog_100"]}
+        img_size=(256,256),) for env in ["fog_000",
+        # img_size=(512,512),) for env in ["fog_000",
+                                         # "fog_005",
+                                         # "fog_010",
+                                         # "fog_020",
+                                         "fog_025",
+                                         "fog_050",
+                                         "fog_100",
+                                         "fog_100__depth_noise_mag20",
+                                         "fog_100__rgb_noise_mag20"]}
 
 
     n_classes = t_loader.n_classes
@@ -424,7 +435,7 @@ if __name__ == "__main__":
         "--config",
         nargs="?",
         type=str,
-        default="configs/fcn8s_airsim.yml",
+        default="configs/pspnet_airsim.yml",
         help="Configuration file to use"
     )
 
@@ -433,7 +444,8 @@ if __name__ == "__main__":
     with open(args.config) as fp:
         cfg = yaml.load(fp)
 
-    run_id = "mcdo_1pass_fused_fog_all_01-16-2019" #random.randint(1,100000)
+    run_id = cfg['id']
+    # run_id = "mcdo_1pass_pretrain_alignedclasses_fused_fog_all_01-16-2019" #random.randint(1,100000)
     logdir = os.path.join('runs', os.path.basename(args.config)[:-4] , str(run_id))
     writer = SummaryWriter(log_dir=logdir)
 

@@ -96,7 +96,7 @@ class airsimLoader(data.Dataset):
                     env = ext.split("/")[1]
 
                     if all([os.path.exists(os.path.join(root,image_mode,ext)) for image_mode in self.image_modes]):
-                        if subsplit is None or (not subsplit is None and subsplit==env):
+                        if subsplit is None or (not subsplit is None and subsplit==env) or (not subsplit is None and env in subsplit):
                             [self.imgs[split][image_mode].append(os.path.join(root,image_mode,ext)) for image_mode in self.image_modes]
 
 
@@ -152,6 +152,9 @@ class airsimLoader(data.Dataset):
         img = m.imresize(
             img, (self.img_size[0], self.img_size[1])
         )  # uint8 with RGB mode
+        aux = m.imresize(
+            aux, (self.img_size[0], self.img_size[1])
+        )  # uint8 with Depth mode
         img = img[:, :, ::-1]  # RGB -> BGR
         img = img.astype(np.float64)
         aux = aux.astype(np.float64)

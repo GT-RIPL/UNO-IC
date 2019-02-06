@@ -44,12 +44,12 @@ def train(cfg, writer, logger):
     data_aug = get_composed_augmentations(augmentations)
 
     # Setup Dataloader
-    # data_loader = get_loader(cfg['data']['dataset'])
-    # data_path = cfg['data']['path']
-    data_loader = get_loader('airsim')
-    data_path = "../../ros/data/airsim"
+    data_loader = get_loader(cfg['data']['dataset'])
+    data_path = cfg['data']['path']
+    # data_loader = get_loader('airsim')
+    # data_path = "../../ros/data/airsim"
 
-    mcdo = True
+    mcdo = cfg['mcdo']
 
     # t_loader = data_loader(
     #     data_path,
@@ -70,23 +70,22 @@ def train(cfg, writer, logger):
         split=cfg['data']['train_split'],
         subsplit=cfg['data']['train_subsplit'],
         # img_size=(512,512),
-        img_size=(256,256),
+        img_size=(cfg['data']['img_rows'],cfg['data']['img_cols']),
         augmentations=data_aug)
 
     v_loader = {env:data_loader(
         data_path,
         is_transform=True,
         split="val", subsplit=env,
-        img_size=(256,256),) for env in ["fog_000",
-        # img_size=(512,512),) for env in ["fog_000",
-                                         # "fog_005",
-                                         # "fog_010",
-                                         # "fog_020",
-                                         "fog_025",
-                                         "fog_050",
-                                         "fog_100",
-                                         "fog_100__depth_noise_mag20",
-                                         "fog_100__rgb_noise_mag20"]}
+        img_size=(cfg['data']['img_rows'],cfg['data']['img_cols']),) for env in ["fog_000",
+                                                                                 # "fog_005",
+                                                                                 # "fog_010",
+                                                                                 # "fog_020",
+                                                                                 "fog_025",
+                                                                                 "fog_050",
+                                                                                 "fog_100",
+                                                                                 "fog_100__depth_noise_mag20",
+                                                                                 "fog_100__rgb_noise_mag20"]}
 
 
     n_classes = t_loader.n_classes
@@ -246,33 +245,35 @@ def train(cfg, writer, logger):
             loss2 = loss_fn(input=(x2,x2_aux), target=labels)
             loss2.backward()
 
-            # # Multiple Forward Passes
-            # with torch.no_grad():
-            #     model_rgb.eval()
-            #     model_depth.eval()
-            #     x1n = torch.zeros(list(x1.shape)+[0],device=device)
-            #     x2n = torch.zeros(list(x2.shape)+[0],device=device)
-            #     for ii in range(5):
-            #         x1 = model_rgb(rgb,mode="dropout")
-            #         x2 = model_depth(depth,mode="dropout")
-            #         x1n = torch.cat((x1n,x1.unsqueeze(-1)),-1)
-            #         x2n = torch.cat((x2n,x2.unsqueeze(-1)),-1)
-            #     outputs_rgb = x1n.mean(-1)
-            #     uncertainty_rgb = x1n.std(-1)
-               
-            #     outputs_depth = x2n.mean(-1)
-            #     uncertainty_depth = x2n.std(-1)
-
-            # Multiple Forward Passes
-            with torch.no_grad():
-                model_rgb.eval()
-                model_depth.eval()
-                x1 = model_rgb(rgb)
-                x2 = model_depth(depth)
-
-
-            # fused = torch.cat((outputs_rgb,uncertainty_rgb,outputs_depth,uncertainty_depth),1)
-            fused = torch.cat((x1,x2),1)
+            if mcdo:
+                # Multiple Forward Passes
+                with torch.no_grad():
+                    model_rgb.eval()
+                    model_depth.eval()
+                    x1n = torch.zeros(list(x1.shape),device=device).unsqueeze(-1)
+                    x2n = torch.zeros(list(x2.shape),device=device).unsqueeze(-1)
+                    for ii in range(5):
+                        x1 = model_rgb(rgb,mode="dropout")
+                        x2 = model_depth(depth,mode="dropout")
+                        x1n = torch.cat((x1n,x1.unsqueeze(-1)),-1)
+                        x2n = torch.cat((x2n,x2.unsqueeze(-1)),-1)
+                    outputs_rgb = x1n.mean(-1)
+                    uncertainty_rgb = x1n.std(-1)
+                   
+                    outputs_depth = x2n.mean(-1)
+                    uncertainty_depth = x2n.std(-1)
+                    
+                    fused = torch.cat((outputs_rgb,uncertainty_rgb,outputs_depth,uncertainty_depth),1)
+            else:
+                # Single Forward Pass
+                with torch.no_grad():
+                    model_rgb.eval()
+                    model_depth.eval()
+                    x1 = model_rgb(rgb)
+                    x2 = model_depth(depth)
+                    
+                    fused = torch.cat((x1,x2),1)
+      
 
             outputs = model(fused)
             loss = loss_fn(input=outputs, target=labels)
@@ -332,34 +333,36 @@ def train(cfg, writer, logger):
                             val_loss_D = loss_fn(input=x2, target=labels_val)
 
 
-                            # # Multiple Forward Passes
-                            # with torch.no_grad():
-                            #     model_rgb.eval()
-                            #     model_depth.eval()
-                            #     x1n = torch.zeros(list(x1.shape)+[0],device=device)
-                            #     x2n = torch.zeros(list(x2.shape)+[0],device=device)
-                            #     for ii in range(4):
-                            #         x1 = model_rgb(rgb_val,mode="dropout")
-                            #         x2 = model_depth(depth_val,mode="dropout")
-                            #         x1n = torch.cat((x1n,x1.unsqueeze(-1)),-1)
-                            #         x2n = torch.cat((x2n,x2.unsqueeze(-1)),-1)
-                            #     outputs_rgb = x1n.mean(-1)
-                            #     uncertainty_rgb = x1n.std(-1)
-                               
-                            #     outputs_depth = x2n.mean(-1)
-                            #     uncertainty_depth = x2n.std(-1)
+                            if mcdo:
+                                # Multiple Forward Passes
+                                with torch.no_grad():
+                                    model_rgb.eval()
+                                    model_depth.eval()
+                                    x1n = torch.zeros(list(x1.shape)+[0],device=device)
+                                    x2n = torch.zeros(list(x2.shape)+[0],device=device)
+                                    for ii in range(4):
+                                        x1 = model_rgb(rgb_val,mode="dropout")
+                                        x2 = model_depth(depth_val,mode="dropout")
+                                        x1n = torch.cat((x1n,x1.unsqueeze(-1)),-1)
+                                        x2n = torch.cat((x2n,x2.unsqueeze(-1)),-1)
+                                    outputs_rgb = x1n.mean(-1)
+                                    uncertainty_rgb = x1n.std(-1)
+                                   
+                                    outputs_depth = x2n.mean(-1)
+                                    uncertainty_depth = x2n.std(-1)
 
+                                    fused_val = torch.cat((outputs_rgb,uncertainty_rgb,outputs_depth,uncertainty_depth),1)
+                            else:
+                                # Single Forward Pass
+                                with torch.no_grad():
+                                    model_rgb.eval()
+                                    model_depth.eval()
+                                    x1 = model_rgb(rgb_val)
+                                    x2 = model_depth(depth_val)
 
-                            # Multiple Forward Passes
-                            with torch.no_grad():
-                                model_rgb.eval()
-                                model_depth.eval()
-                                x1 = model_rgb(rgb_val)
-                                x2 = model_depth(depth_val)
+                                    fused_val = torch.cat((x1,x2),1)
 
-
-                            # fused_val = torch.cat((outputs_rgb,uncertainty_rgb,outputs_depth,uncertainty_depth),1)
-                            fused_val = torch.cat((x1,x2),1)
+        
                             outputs = model(fused_val)
 
                             val_loss = loss_fn(input=outputs, target=labels_val)

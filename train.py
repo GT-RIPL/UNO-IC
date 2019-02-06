@@ -49,7 +49,7 @@ def train(cfg, writer, logger):
     # data_loader = get_loader('airsim')
     # data_path = "../../ros/data/airsim"
 
-    mcdo = cfg['mcdo']
+    mcdo = cfg['uncertainty']['mcdo']
 
     # t_loader = data_loader(
     #     data_path,
@@ -252,7 +252,7 @@ def train(cfg, writer, logger):
                     model_depth.eval()
                     x1n = torch.zeros(list(x1.shape),device=device).unsqueeze(-1)
                     x2n = torch.zeros(list(x2.shape),device=device).unsqueeze(-1)
-                    for ii in range(5):
+                    for ii in range(cfg['uncertainty']['passes']):
                         x1 = model_rgb(rgb,mode="dropout")
                         x2 = model_depth(depth,mode="dropout")
                         x1n = torch.cat((x1n,x1.unsqueeze(-1)),-1)
@@ -338,9 +338,9 @@ def train(cfg, writer, logger):
                                 with torch.no_grad():
                                     model_rgb.eval()
                                     model_depth.eval()
-                                    x1n = torch.zeros(list(x1.shape)+[0],device=device)
-                                    x2n = torch.zeros(list(x2.shape)+[0],device=device)
-                                    for ii in range(4):
+                                    x1n = torch.zeros(list(x1.shape),device=device).unsqueeze(-1)
+                                    x2n = torch.zeros(list(x2.shape),device=device).unsqueeze(-1)
+                                    for ii in range(cfg['uncertainty']['passes']):
                                         x1 = model_rgb(rgb_val,mode="dropout")
                                         x2 = model_depth(depth_val,mode="dropout")
                                         x1n = torch.cat((x1n,x1.unsqueeze(-1)),-1)
@@ -447,7 +447,15 @@ if __name__ == "__main__":
     with open(args.config) as fp:
         cfg = yaml.load(fp)
 
-    run_id = cfg['id']
+    run_id = "_".join([#cfg['id'],
+                       "mcdo" if cfg['uncertainty']['mcdo'] else "nomcdo",
+                       "pretrain" if not cfg['training']['resumeRGB'] is None else "fromscratch", 
+                       "{}x{}".format(cfg['data']['img_rows'],cfg['data']['img_cols']),
+                       "{}passes".format(cfg['uncertainty']['passes']),
+                       "_train_{}_".format(list(cfg['data']['train_subsplit'])[-1]),
+                       "_test_all_",
+                       "01-16-2019"])
+
     # run_id = "mcdo_1pass_pretrain_alignedclasses_fused_fog_all_01-16-2019" #random.randint(1,100000)
     logdir = os.path.join('runs', os.path.basename(args.config)[:-4] , str(run_id))
     writer = SummaryWriter(log_dir=logdir)

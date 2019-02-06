@@ -1,15 +1,17 @@
-id: mcdo_pretrain_256px_train_all_test_all_01-16-2019
+id: "" #mcdo_pretrain_256px_train_all_test_all_01-16-2019
 model:
     arch: pspnet
-mcdo: True
+uncertainty:
+    mcdo: True
+    passes: 10
 data:
     dataset: airsim
     path: ../../ros/data/airsim
     train_split: train
-    train_subsplit: ["fog_000","fog_005","fog_010","fog_020","fog_025", "fog_050","fog_100"]
+    train_subsplit: ["fog_000","fog_005","fog_010","fog_020"] #,"fog_025", "fog_050","fog_100"]
     val_split: val
-    img_rows: 256 #512
-    img_cols: 256 #512
+    img_rows: 128 #512
+    img_cols: 128 #512
 training:
     train_iters: 100000
     batch_size: 2

@@ -1,9 +1,10 @@
 id: "" #mcdo_pretrain_256px_train_all_test_all_01-16-2019
 model:
     arch: pspnet
+variant: rgbd_input #input_fusion #mcdo #1pass
+reduction: 0.125
 uncertainty:
-    mcdo: True
-    passes: 10
+    passes: 5
 data:
     dataset: airsim
     path: ../../ros/data/airsim

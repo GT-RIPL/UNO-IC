@@ -49,8 +49,6 @@ def train(cfg, writer, logger):
     # data_loader = get_loader('airsim')
     # data_path = "../../ros/data/airsim"
 
-    mcdo = cfg['uncertainty']['mcdo']
-
     # t_loader = data_loader(
     #     data_path,
     #     is_transform=True,
@@ -103,9 +101,14 @@ def train(cfg, writer, logger):
 
     # Setup Model
     # model = get_model(cfg['model'], n_classes, version="airsim").to(device)
-    model = get_model(cfg['model'], n_classes, version="airsim_gate").to(device)
-    model_rgb = get_model(cfg['model'], n_classes, version="airsim_rgb").to(device)
-    model_depth = get_model(cfg['model'], n_classes, version="airsim_depth").to(device)
+
+    if cfg['variant'] in ['mcdo','1pass']:
+        model = get_model(cfg['model'], n_classes, version="airsim_gate", reduction=cfg['reduction']).to(device)
+        model_rgb = get_model(cfg['model'], n_classes, version="airsim_rgb", reduction=cfg['reduction']).to(device)
+        model_depth = get_model(cfg['model'], n_classes, version="airsim_depth", reduction=cfg['reduction']).to(device)
+    else:
+        model = get_model(cfg['model'], n_classes, reduction=cfg['reduction']).to(device)
+
 
     # model = get_model(cfg['gate'], n_classes, version="airsim_gate").to(device)
     # model_gate = get_model(cfg['model'], n_classes, version="airsim_gate").to(device)
@@ -119,8 +122,10 @@ def train(cfg, writer, logger):
 
 
     model = torch.nn.DataParallel(model, device_ids=range(torch.cuda.device_count()))
-    model_rgb = torch.nn.DataParallel(model_rgb, device_ids=range(torch.cuda.device_count()))
-    model_depth = torch.nn.DataParallel(model_depth, device_ids=range(torch.cuda.device_count()))
+
+    if cfg['variant'] == 'mcdo':
+        model_rgb = torch.nn.DataParallel(model_rgb, device_ids=range(torch.cuda.device_count()))
+        model_depth = torch.nn.DataParallel(model_depth, device_ids=range(torch.cuda.device_count()))
     # model_gate = torch.nn.DataParallel(model_gate, device_ids=range(torch.cuda.device_count()))
 
     # Setup optimizer, lr_scheduler and loss function
@@ -155,41 +160,42 @@ def train(cfg, writer, logger):
         else:
             logger.info("No checkpoint found at '{}'".format(cfg['training']['resume']))
 
-    if cfg['training']['resumeRGB'] is not None:
-        if os.path.isfile(cfg['training']['resumeRGB']):
-            logger.info(
-                "Loading model and optimizer from checkpoint '{}'".format(cfg['training']['resumeRGB'])
-            )
-            checkpoint = torch.load(cfg['training']['resumeRGB'])
-            model_rgb.load_state_dict(checkpoint["model_state"])
-            # optimizer.load_state_dict(checkpoint["optimizer_state"])
-            # scheduler.load_state_dict(checkpoint["scheduler_state"])
-            # start_iter = checkpoint["epoch"]
-            logger.info(
-                "Loaded checkpoint '{}' (iter {})".format(
-                    cfg['training']['resumeRGB'], checkpoint["epoch"]
+    if cfg['variant'] == 'mcdo':
+        if cfg['training']['resumeRGB'] is not None:
+            if os.path.isfile(cfg['training']['resumeRGB']):
+                logger.info(
+                    "Loading model and optimizer from checkpoint '{}'".format(cfg['training']['resumeRGB'])
                 )
-            )
-        else:
-            logger.info("No checkpoint found at '{}'".format(cfg['training']['resumeRGB']))
+                checkpoint = torch.load(cfg['training']['resumeRGB'])
+                model_rgb.load_state_dict(checkpoint["model_state"])
+                # optimizer.load_state_dict(checkpoint["optimizer_state"])
+                # scheduler.load_state_dict(checkpoint["scheduler_state"])
+                # start_iter = checkpoint["epoch"]
+                logger.info(
+                    "Loaded checkpoint '{}' (iter {})".format(
+                        cfg['training']['resumeRGB'], checkpoint["epoch"]
+                    )
+                )
+            else:
+                logger.info("No checkpoint found at '{}'".format(cfg['training']['resumeRGB']))
 
-    if cfg['training']['resumeD'] is not None:
-        if os.path.isfile(cfg['training']['resumeD']):
-            logger.info(
-                "Loading model and optimizer from checkpoint '{}'".format(cfg['training']['resumeD'])
-            )
-            checkpoint = torch.load(cfg['training']['resumeD'])
-            model_depth.load_state_dict(checkpoint["model_state"])
-            # optimizer.load_state_dict(checkpoint["optimizer_state"])
-            # scheduler.load_state_dict(checkpoint["scheduler_state"])
-            # start_iter = checkpoint["epoch"]
-            logger.info(
-                "Loaded checkpoint '{}' (iter {})".format(
-                    cfg['training']['resumeD'], checkpoint["epoch"]
+        if cfg['training']['resumeD'] is not None:
+            if os.path.isfile(cfg['training']['resumeD']):
+                logger.info(
+                    "Loading model and optimizer from checkpoint '{}'".format(cfg['training']['resumeD'])
                 )
-            )
-        else:
-            logger.info("No checkpoint found at '{}'".format(cfg['training']['resumeD']))
+                checkpoint = torch.load(cfg['training']['resumeD'])
+                model_depth.load_state_dict(checkpoint["model_state"])
+                # optimizer.load_state_dict(checkpoint["optimizer_state"])
+                # scheduler.load_state_dict(checkpoint["scheduler_state"])
+                # start_iter = checkpoint["epoch"]
+                logger.info(
+                    "Loaded checkpoint '{}' (iter {})".format(
+                        cfg['training']['resumeD'], checkpoint["epoch"]
+                    )
+                )
+            else:
+                logger.info("No checkpoint found at '{}'".format(cfg['training']['resumeD']))
 
     val_loss_meter = averageMeter()
     val_loss_RGB_meter = averageMeter()
@@ -207,8 +213,10 @@ def train(cfg, writer, logger):
             scheduler.step()
 
             model.train()
-            model_rgb.train()
-            model_depth.train()
+
+            if cfg['variant'] in ['mcdo','1pass']:
+                model_rgb.train()
+                model_depth.train()
 
             # model_gate.train()
             
@@ -216,7 +224,7 @@ def train(cfg, writer, logger):
             labels = labels.to(device)
             aux = aux.unsqueeze(1).to(device)
 
-            # fused = torch.cat((images,aux),1)
+            fused = torch.cat((images,aux),1)
             depth = torch.cat((aux,aux,aux,aux),1)
             rgb = torch.cat((images[:,0,:,:].unsqueeze(1),
                              images[:,1,:,:].unsqueeze(1),
@@ -237,76 +245,111 @@ def train(cfg, writer, logger):
             # outputs_depth = model_depth(aux)
 
 
-            x1,x1_aux = model_rgb(rgb)
-            loss1 = loss_fn(input=(x1,x1_aux), target=labels)
-            loss1.backward()
-            
-            x2,x2_aux = model_depth(depth)
-            loss2 = loss_fn(input=(x2,x2_aux), target=labels)
-            loss2.backward()
 
-            if mcdo:
-                # Multiple Forward Passes
-                with torch.no_grad():
-                    model_rgb.eval()
-                    model_depth.eval()
-                    x1n = torch.zeros(list(x1.shape),device=device).unsqueeze(-1)
-                    x2n = torch.zeros(list(x2.shape),device=device).unsqueeze(-1)
-                    for ii in range(cfg['uncertainty']['passes']):
-                        x1 = model_rgb(rgb,mode="dropout")
-                        x2 = model_depth(depth,mode="dropout")
-                        x1n = torch.cat((x1n,x1.unsqueeze(-1)),-1)
-                        x2n = torch.cat((x2n,x2.unsqueeze(-1)),-1)
-                    outputs_rgb = x1n.mean(-1)
-                    uncertainty_rgb = x1n.std(-1)
-                   
-                    outputs_depth = x2n.mean(-1)
-                    uncertainty_depth = x2n.std(-1)
-                    
-                    fused = torch.cat((outputs_rgb,uncertainty_rgb,outputs_depth,uncertainty_depth),1)
+
+
+
+            if cfg['variant'] in ['mcdo','1pass']:
+
+                x1,x1_aux = model_rgb(rgb)
+                loss1 = loss_fn(input=(x1,x1_aux), target=labels)
+                loss1.backward()
+                
+                x2,x2_aux = model_depth(depth)
+                loss2 = loss_fn(input=(x2,x2_aux), target=labels)
+                loss2.backward()
+
+                if cfg['variant'] == 'mcdo':
+                    # Multiple Forward Passes
+                    with torch.no_grad():
+                        model_rgb.eval()
+                        model_depth.eval()
+                        x1n = torch.zeros(list(x1.shape),device=device).unsqueeze(-1)
+                        x2n = torch.zeros(list(x2.shape),device=device).unsqueeze(-1)
+                        for ii in range(cfg['uncertainty']['passes']):
+                            x1 = model_rgb(rgb,mode="dropout")
+                            x2 = model_depth(depth,mode="dropout")
+                            x1n = torch.cat((x1n,x1.unsqueeze(-1)),-1)
+                            x2n = torch.cat((x2n,x2.unsqueeze(-1)),-1)
+                        outputs_rgb = x1n.mean(-1)
+                        uncertainty_rgb = x1n.std(-1)
+                       
+                        outputs_depth = x2n.mean(-1)
+                        uncertainty_depth = x2n.std(-1)
+                        
+                        fused = torch.cat((outputs_rgb,uncertainty_rgb,outputs_depth,uncertainty_depth),1)
+
+                elif cfg['variant'] == '1pass':
+                    # Single Forward Pass
+                    with torch.no_grad():
+                        model_rgb.eval()
+                        model_depth.eval()
+                        x1 = model_rgb(rgb)
+                        x2 = model_depth(depth)
+                        
+                        fused = torch.cat((x1,x2),1)
+          
+                outputs = model(fused)
+                loss = loss_fn(input=outputs, target=labels)
+                loss.backward()
+                optimizer.step()
+
+                time_meter.update(time.time() - start_ts)
+
+                if (i + 1) % cfg['training']['print_interval'] == 0:
+                    fmt_str = "Iter [{:d}/{:d}]  Loss RGB: {:.4f}  Loss D: {:.4f}  Loss Gate: {:.4f}  Time/Image: {:.4f}"
+                    print_str = fmt_str.format(i + 1,
+                                               cfg['training']['train_iters'], 
+                                               loss1.item(),
+                                               loss2.item(),
+                                               loss.item(),
+                                               time_meter.avg / cfg['training']['batch_size'])
+
+                    print(print_str)
+                    logger.info(print_str)
+                    writer.add_scalar('loss/train_loss_RGB', loss1.item(), i+1)
+                    writer.add_scalar('loss/train_loss_D', loss2.item(), i+1)
+                    writer.add_scalar('loss/train_loss_Gate', loss.item(), i+1)
+                    time_meter.reset()
+
             else:
-                # Single Forward Pass
-                with torch.no_grad():
-                    model_rgb.eval()
-                    model_depth.eval()
-                    x1 = model_rgb(rgb)
-                    x2 = model_depth(depth)
-                    
-                    fused = torch.cat((x1,x2),1)
-      
 
-            outputs = model(fused)
-            loss = loss_fn(input=outputs, target=labels)
-            loss.backward()
+                if cfg['variant'] == 'rgbd_input':
+                    model_input = fused
+                if cfg['variant'] == 'rgb':
+                    model_input = rgb
+                if cfg['variant'] == 'depth':
+                    model_input = depth
+
+                outputs = model(model_input)
+                loss = loss_fn(input=outputs, target=labels)
+                loss.backward()
+                optimizer.step()
+
+                time_meter.update(time.time() - start_ts)
+
+                if (i + 1) % cfg['training']['print_interval'] == 0:
+                    fmt_str = "Iter [{:d}/{:d}]  Loss: {:.4f}  Time/Image: {:.4f}"
+                    print_str = fmt_str.format(i + 1,
+                                               cfg['training']['train_iters'], 
+                                               loss.item(),
+                                               time_meter.avg / cfg['training']['batch_size'])
+
+                    print(print_str)
+                    logger.info(print_str)
+                    writer.add_scalar('loss/train_loss', loss.item(), i+1)
+                    time_meter.reset()
 
 
-
-            optimizer.step()
-            
-            time_meter.update(time.time() - start_ts)
-
-            if (i + 1) % cfg['training']['print_interval'] == 0:
-                fmt_str = "Iter [{:d}/{:d}]  Loss RGB: {:.4f}  Loss D: {:.4f}  Loss Gate: {:.4f}  Time/Image: {:.4f}"
-                print_str = fmt_str.format(i + 1,
-                                           cfg['training']['train_iters'], 
-                                           loss1.item(),
-                                           loss2.item(),
-                                           loss.item(),
-                                           time_meter.avg / cfg['training']['batch_size'])
-
-                print(print_str)
-                logger.info(print_str)
-                writer.add_scalar('loss/train_loss_RGB', loss1.item(), i+1)
-                writer.add_scalar('loss/train_loss_D', loss2.item(), i+1)
-                writer.add_scalar('loss/train_loss_Gate', loss.item(), i+1)
-                time_meter.reset()
 
             if (i + 1) % cfg['training']['val_interval'] == 0 or \
                (i + 1) == cfg['training']['train_iters']:
                 
-                model.eval()                
-                model_rgb.eval()
-                model_depth.eval()
+                model.eval()   
+
+                if cfg['variant'] in ['mcdo','1pass']:
+                    model_rgb.eval()
+                    model_depth.eval()
                 # model_gate.eval()
 
                 with torch.no_grad():
@@ -326,47 +369,62 @@ def train(cfg, writer, logger):
                             if images_val.shape[0]<=1:
                                 continue
 
-                            x1 = model_rgb(rgb_val)                           
-                            x2 = model_depth(depth_val)
-
-                            val_loss_RGB = loss_fn(input=x1, target=labels_val)
-                            val_loss_D = loss_fn(input=x2, target=labels_val)
 
 
-                            if mcdo:
-                                # Multiple Forward Passes
-                                with torch.no_grad():
-                                    model_rgb.eval()
-                                    model_depth.eval()
-                                    x1n = torch.zeros(list(x1.shape),device=device).unsqueeze(-1)
-                                    x2n = torch.zeros(list(x2.shape),device=device).unsqueeze(-1)
-                                    for ii in range(cfg['uncertainty']['passes']):
-                                        x1 = model_rgb(rgb_val,mode="dropout")
-                                        x2 = model_depth(depth_val,mode="dropout")
-                                        x1n = torch.cat((x1n,x1.unsqueeze(-1)),-1)
-                                        x2n = torch.cat((x2n,x2.unsqueeze(-1)),-1)
-                                    outputs_rgb = x1n.mean(-1)
-                                    uncertainty_rgb = x1n.std(-1)
-                                   
-                                    outputs_depth = x2n.mean(-1)
-                                    uncertainty_depth = x2n.std(-1)
 
-                                    fused_val = torch.cat((outputs_rgb,uncertainty_rgb,outputs_depth,uncertainty_depth),1)
+                            if cfg['variant'] in ['mcdo','1pass']:
+
+                                x1 = model_rgb(rgb_val)                           
+                                x2 = model_depth(depth_val)
+
+                                val_loss_RGB = loss_fn(input=x1, target=labels_val)
+                                val_loss_D = loss_fn(input=x2, target=labels_val)
+
+                                if cfg['variant'] == 'mcdo':
+                                    # Multiple Forward Passes
+                                    with torch.no_grad():
+                                        model_rgb.eval()
+                                        model_depth.eval()
+                                        x1n = torch.zeros(list(x1.shape),device=device).unsqueeze(-1)
+                                        x2n = torch.zeros(list(x2.shape),device=device).unsqueeze(-1)
+                                        for ii in range(cfg['uncertainty']['passes']):
+                                            x1 = model_rgb(rgb_val,mode="dropout")
+                                            x2 = model_depth(depth_val,mode="dropout")
+                                            x1n = torch.cat((x1n,x1.unsqueeze(-1)),-1)
+                                            x2n = torch.cat((x2n,x2.unsqueeze(-1)),-1)
+                                        outputs_rgb = x1n.mean(-1)
+                                        uncertainty_rgb = x1n.std(-1)
+                                       
+                                        outputs_depth = x2n.mean(-1)
+                                        uncertainty_depth = x2n.std(-1)
+
+                                        fused_val = torch.cat((outputs_rgb,uncertainty_rgb,outputs_depth,uncertainty_depth),1)
+                                
+                                if cfg['variant'] == '1pass':
+                                    # Single Forward Pass
+                                    with torch.no_grad():
+                                        model_rgb.eval()
+                                        model_depth.eval()
+                                        x1 = model_rgb(rgb_val)
+                                        x2 = model_depth(depth_val)
+
+                                        fused_val = torch.cat((x1,x2),1)
+
+                                outputs = model(fused_val)
+                                val_loss = loss_fn(input=outputs, target=labels_val)
+
+
                             else:
-                                # Single Forward Pass
-                                with torch.no_grad():
-                                    model_rgb.eval()
-                                    model_depth.eval()
-                                    x1 = model_rgb(rgb_val)
-                                    x2 = model_depth(depth_val)
 
-                                    fused_val = torch.cat((x1,x2),1)
+                                if cfg['variant'] == 'rgbd_input':
+                                    model_input = fused_val
+                                if cfg['variant'] == 'rgb':
+                                    model_input = rgb_val
+                                if cfg['variant'] == 'depth':
+                                    model_input = depth_val
 
-        
-                            outputs = model(fused_val)
-
-                            val_loss = loss_fn(input=outputs, target=labels_val)
-
+                                outputs = model(model_input)
+                                val_loss = loss_fn(input=outputs, target=labels)
 
                             pred = outputs.data.max(1)[1].cpu().numpy()
                             gt = labels_val.data.cpu().numpy()
@@ -386,15 +444,21 @@ def train(cfg, writer, logger):
 
 
                             running_metrics_val[k].update(gt, pred)
-                            val_loss_RGB_meter.update(val_loss_RGB.item())
-                            val_loss_D_meter.update(val_loss_D.item())
+
+                            if cfg['variant'] in ['mcdo','1pass']:
+                                val_loss_RGB_meter.update(val_loss_RGB.item())
+                                val_loss_D_meter.update(val_loss_D.item())
                             val_loss_meter.update(val_loss.item())
 
-                writer.add_scalar('loss/val_loss_RGB', val_loss_RGB_meter.avg, i+1)
-                writer.add_scalar('loss/val_loss_D', val_loss_D_meter.avg, i+1)
-                writer.add_scalar('loss/val_loss', val_loss_meter.avg, i+1)
-                logger.info("Iter %d Loss RGB: %.4f Loss D: %.4f Loss: %.4f" % (i + 1, val_loss_RGB_meter.avg, val_loss_D_meter.avg, val_loss_meter.avg))
-
+                if cfg['variant'] in ['mcdo','1pass']:
+                    writer.add_scalar('loss/val_loss_RGB', val_loss_RGB_meter.avg, i+1)
+                    writer.add_scalar('loss/val_loss_D', val_loss_D_meter.avg, i+1)
+                    writer.add_scalar('loss/val_loss', val_loss_meter.avg, i+1)
+                    logger.info("Iter %d Loss RGB: %.4f Loss D: %.4f Loss: %.4f" % (i + 1, val_loss_RGB_meter.avg, val_loss_D_meter.avg, val_loss_meter.avg))
+                else:
+                    writer.add_scalar('loss/val_loss', val_loss_meter.avg, i+1)
+                    logger.info("Iter %d Loss: %.4f" % (i + 1, val_loss_meter.avg))
+                
                 for env,valloader in valloaders.items():
 
                     score, class_iou = running_metrics_val[env].get_scores()
@@ -407,8 +471,9 @@ def train(cfg, writer, logger):
                         logger.info('{}: {}'.format(k, v))
                         writer.add_scalar('val_metrics/{}/cls_{}'.format(env,k), v, i+1)
 
-                    val_loss_RGB_meter.reset()
-                    val_loss_D_meter.reset()
+                    if cfg['variant'] in ['mcdo','1pass']:
+                        val_loss_RGB_meter.reset()
+                        val_loss_D_meter.reset()
                     val_loss_meter.reset()
                     running_metrics_val[env].reset()
 
@@ -448,10 +513,11 @@ if __name__ == "__main__":
         cfg = yaml.load(fp)
 
     run_id = "_".join([#cfg['id'],
-                       "mcdo" if cfg['uncertainty']['mcdo'] else "nomcdo",
+                       cfg['variant'],
                        "pretrain" if not cfg['training']['resumeRGB'] is None else "fromscratch", 
                        "{}x{}".format(cfg['data']['img_rows'],cfg['data']['img_cols']),
                        "{}passes".format(cfg['uncertainty']['passes']),
+                       "{}reduction".format(cfg['reduction']),
                        "_train_{}_".format(list(cfg['data']['train_subsplit'])[-1]),
                        "_test_all_",
                        "01-16-2019"])

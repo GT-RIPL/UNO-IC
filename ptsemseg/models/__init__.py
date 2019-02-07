@@ -9,7 +9,7 @@ from ptsemseg.models.icnet import *
 from ptsemseg.models.linknet import *
 from ptsemseg.models.frrn import *
 
-def get_model(model_dict, n_classes, version=None):
+def get_model(model_dict, n_classes, version=None, reduction=1.0):
     name = model_dict['arch']
     model = _get_model_instance(name)
     param_dict = copy.deepcopy(model_dict)
@@ -32,7 +32,7 @@ def get_model(model_dict, n_classes, version=None):
         model = model(n_classes=n_classes, **param_dict)
 
     elif name == "pspnet":
-        model = model(n_classes=n_classes, version=version, **param_dict)
+        model = model(n_classes=n_classes, version=version, reduction=reduction, **param_dict)
 
     elif name == "icnet":
         model = model(n_classes=n_classes, **param_dict)

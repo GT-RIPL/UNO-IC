@@ -70,6 +70,7 @@ class pspnet(nn.Module):
         block_config=[3, 4, 23, 3],
         input_size=(473, 473),
         version=None,
+        reduction=1.0,
     ):
 
         super(pspnet, self).__init__()
@@ -89,52 +90,52 @@ class pspnet(nn.Module):
         # Encoder
         if version == "airsim_rgb":
             self.convbnrelu1_1 = conv2DBatchNormRelu(
-                in_channels=4, k_size=3, n_filters=64, padding=1, stride=2, bias=False
+                in_channels=4, k_size=3, n_filters=int(64*reduction), padding=1, stride=2, bias=False
             )
         elif version == "airsim_depth":
             self.convbnrelu1_1 = conv2DBatchNormRelu(
                 # in_channels=3, k_size=3, n_filters=64, padding=1, stride=2, bias=False
-                in_channels=4, k_size=3, n_filters=64, padding=1, stride=2, bias=False
+                in_channels=4, k_size=3, n_filters=int(64*reduction), padding=1, stride=2, bias=False
             )
         elif version == "airsim_gate":
             self.convbnrelu1_1 = conv2DBatchNormRelu(
                 # in_channels=3, k_size=3, n_filters=64, padding=1, stride=2, bias=False
-                in_channels=4*n_classes, k_size=3, n_filters=64, padding=1, stride=2, bias=False
+                in_channels=4*n_classes, k_size=3, n_filters=int(64*reduction), padding=1, stride=2, bias=False
             )                        
         else:
             self.convbnrelu1_1 = conv2DBatchNormRelu(
-                # in_channels=3, k_size=3, n_filters=64, padding=1, stride=2, bias=False
-                in_channels=4, k_size=3, n_filters=64, padding=1, stride=2, bias=False
+                # in_channels=3, k_size=3, n_filters=int(64*reduction), padding=1, stride=2, bias=False
+                in_channels=4, k_size=3, n_filters=int(64*reduction), padding=1, stride=2, bias=False
             )
 
         self.convbnrelu1_2 = conv2DBatchNormRelu(
-            in_channels=64, k_size=3, n_filters=64, padding=1, stride=1, bias=False
+            in_channels=int(64*reduction), k_size=3, n_filters=int(64*reduction), padding=1, stride=1, bias=False
         )
         self.convbnrelu1_3 = conv2DBatchNormRelu(
-            in_channels=64, k_size=3, n_filters=128, padding=1, stride=1, bias=False
+            in_channels=int(64*reduction), k_size=3, n_filters=int(128*reduction), padding=1, stride=1, bias=False
         )
 
         # Vanilla Residual Blocks
-        self.res_block2 = residualBlockPSP(self.block_config[0], 128, 64, 256, 1, 1)
-        self.res_block3 = residualBlockPSP(self.block_config[1], 256, 128, 512, 2, 1)
+        self.res_block2 = residualBlockPSP(self.block_config[0], int(128*reduction), int(64*reduction), int(256*reduction), 1, 1)
+        self.res_block3 = residualBlockPSP(self.block_config[1], int(256*reduction), int(128*reduction), int(512*reduction), 2, 1)
 
         # Dilated Residual Blocks
-        self.res_block4 = residualBlockPSP(self.block_config[2], 512, 256, 1024, 1, 2)
-        self.res_block5 = residualBlockPSP(self.block_config[3], 1024, 512, 2048, 1, 4)
+        self.res_block4 = residualBlockPSP(self.block_config[2], int(512*reduction), int(256*reduction), int(1024*reduction), 1, 2)
+        self.res_block5 = residualBlockPSP(self.block_config[3], int(1024*reduction), int(512*reduction), int(2048*reduction), 1, 4)
 
         # Pyramid Pooling Module
-        self.pyramid_pooling = pyramidPooling(2048, [6, 3, 2, 1])
+        self.pyramid_pooling = pyramidPooling(int(2048*reduction), [6, 3, 2, 1])
 
         # Final conv layers
-        self.cbr_final = conv2DBatchNormRelu(4096, 512, 3, 1, 1, False)
+        self.cbr_final = conv2DBatchNormRelu(int(4096*reduction), int(512*reduction), 3, 1, 1, False)
         self.dropout = nn.Dropout2d(p=0.1, inplace=False)
-        self.classification = nn.Conv2d(512, self.n_classes, 1, 1, 0)
+        self.classification = nn.Conv2d(int(512*reduction), self.n_classes, 1, 1, 0)
 
         # Auxiliary layers for training
         self.convbnrelu4_aux = conv2DBatchNormRelu(
-            in_channels=1024, k_size=3, n_filters=256, padding=1, stride=1, bias=False
+            in_channels=int(1024*reduction), k_size=3, n_filters=int(256*reduction), padding=1, stride=1, bias=False
         )
-        self.aux_cls = nn.Conv2d(256, self.n_classes, 1, 1, 0)
+        self.aux_cls = nn.Conv2d(int(256*reduction), self.n_classes, 1, 1, 0)
 
         # Define auxiliary loss function
         self.loss = multi_scale_cross_entropy2d

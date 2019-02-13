@@ -203,26 +203,39 @@ def train(cfg, writer, logger):
 
                 if i>cfg['models'][m]['mcdo_start_iter']:
                     models[m].mcdo_passes = cfg['models'][m]['mcdo_passes']
+
+                    with torch.no_grad():
+                        for mi in range(models[m].mcdo_passes):
+                            x = models[m](inputs[m])
+                            x_aux = None
+                            if isinstance(x,tuple):
+                                x, x_aux = x
+                            if not m in outputs:
+                                outputs[m] = x.unsqueeze(-1)
+                                if not x_aux is None:
+                                    outputs_aux[m] = x_aux.unsqueeze(-1)
+                            else:
+                                outputs[m] = torch.cat((outputs[m], x.unsqueeze(-1)),-1)
+                                if not x_aux is None:
+                                    outputs_aux[m] = torch.cat((outputs_aux[m], x_aux.unsqueeze(-1)),-1)
+                    
                 else:
                     models[m].mcdo_passes = 1
 
-                for mi in range(models[m].mcdo_passes):
-                    x = models[m](inputs[m])
-                    x_aux = None
-                    if isinstance(x,tuple):
-                        x, x_aux = x
-
-                    if not m in outputs:
-                        outputs[m] = x.unsqueeze(-1)
-
-                        if not x_aux is None:
-                            outputs_aux[m] = x_aux.unsqueeze(-1)
-                    else:
-                        outputs[m] = torch.cat((outputs[m], x.unsqueeze(-1)),-1)
-                        
-                        if not x_aux is None:
-                            outputs_aux[m] = torch.cat((outputs_aux[m], x_aux.unsqueeze(-1)),-1)
-            
+                    for mi in range(models[m].mcdo_passes):
+                        x = models[m](inputs[m])
+                        x_aux = None
+                        if isinstance(x,tuple):
+                            x, x_aux = x
+                        if not m in outputs:
+                            outputs[m] = x.unsqueeze(-1)
+                            if not x_aux is None:
+                                outputs_aux[m] = x_aux.unsqueeze(-1)
+                        else:
+                            outputs[m] = torch.cat((outputs[m], x.unsqueeze(-1)),-1)
+                            if not x_aux is None:
+                                outputs_aux[m] = torch.cat((outputs_aux[m], x_aux.unsqueeze(-1)),-1)
+                
             mean_outputs = {}
             var_outputs = {}
             for m in outputs.keys():
@@ -242,7 +255,7 @@ def train(cfg, writer, logger):
             if len(outputs_aux)>0:
                 mean_outputs_aux = {m:outputs_aux[m].mean(-1) for m in outputs_aux.keys()}
                 with torch.no_grad():
-                    if cfg['models'][m]['mcdo_passes']>1:
+                    if models[m].mcdo_passes>1:
                         var_outputs_aux = {m:outputs_aux[m].std(-1) for m in outputs_aux.keys()}
                     else:
                         var_outputs_aux = {m:outputs_aux[m].mean(-1) for m in outputs_aux.keys()}

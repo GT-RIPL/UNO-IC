@@ -102,6 +102,14 @@ def train(cfg, writer, logger):
                                   mcdo_passes=attr['mcdo_passes'], 
                                   reduction=attr['reduction']).to(device)
 
+        # Load Pretrained PSPNet
+        if cfg['model'] == 'pspnet':
+            caffemodel_dir_path = "./models"
+            model.load_pretrained_model(
+                model_path=os.path.join(caffemodel_dir_path, "pspnet101_cityscapes.caffemodel")
+            )  
+
+
         models[model] = torch.nn.DataParallel(models[model], device_ids=range(torch.cuda.device_count()))
 
         # Setup optimizer, lr_scheduler and loss function
@@ -211,10 +219,10 @@ def train(cfg, writer, logger):
                                 outputs_aux[m] = torch.cat((outputs_aux[m], x_aux.unsqueeze(-1)),-1)
 
             mean_outputs = {m:outputs[m].mean(-1) for m in outputs.keys()}
-            std_outputs = {m:outputs[m].mean(-1) for m in outputs.keys()}
+            std_outputs = {m:outputs[m].std(-1) for m in outputs.keys()}
 
             if len(outputs_aux)>0:
-                mean_outputs_aux = {m:outputs_aux[m].std(-1) for m in outputs_aux.keys()}
+                mean_outputs_aux = {m:outputs_aux[m].mean(-1) for m in outputs_aux.keys()}
                 std_outputs_aux = {m:outputs_aux[m].std(-1) for m in outputs_aux.keys()}
 
             # stack outputs from parallel legs

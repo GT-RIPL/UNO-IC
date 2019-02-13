@@ -14,7 +14,7 @@ model:
 #         start_layer: convbnrelu1_1
 #         end_layer: convbnrelu1_3        
 #         reduction: 0.5
-#         mcdo_passes: 5        
+#         mcdo_passes: 5   
 #         resume: None
 #     fuse:
 #         in_channels: 256 #x4 from size of previous model

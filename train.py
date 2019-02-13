@@ -243,7 +243,7 @@ def train(cfg, writer, logger):
                 if models[m].mcdo_passes>1:
                     var_outputs[m] = outputs[m].pow(2).mean(-1)-mean_outputs[m].pow(2)
                 else:
-                    var_outputs[m] = mean_outputs[m] for m in outputs.keys()     
+                    var_outputs[m] = mean_outputs[m]  
 
             # with torch.no_grad():
             #     if cfg['models'][m]['mcdo_passes']>1:

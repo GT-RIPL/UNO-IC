@@ -11,6 +11,9 @@ import matplotlib.pyplot as plt
 from ptsemseg.utils import recursive_glob
 from ptsemseg.augmentations import *
 
+import matplotlib as mpl
+import matplotlib.cm as cm
+import cv2
 
 class airsimLoader(data.Dataset):
     
@@ -107,6 +110,11 @@ class airsimLoader(data.Dataset):
 
         print("Found %d %s images" % (len(self.imgs[self.split][self.image_modes[0]]), self.split))
 
+        norm = mpl.colors.Normalize(vmin=0, vmax=255)
+        cmap = cm.jet
+        self.m = cm.ScalarMappable(norm=norm, cmap=cmap)
+
+
     def __len__(self):
         """__len__"""
         return len(self.imgs[self.split][self.image_modes[0]])
@@ -122,7 +130,7 @@ class airsimLoader(data.Dataset):
 
         depth_path = self.imgs[self.split]['depth'][index]
         depth = np.array(m.imread(depth_path),dtype=np.uint8)[:,:,0]
-
+      
         # aux = np.dstack((depth,depth))
         aux = depth
 

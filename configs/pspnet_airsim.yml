@@ -1,10 +1,32 @@
 id: "" #mcdo_pretrain_256px_train_all_test_all_01-16-2019
 model:
     arch: pspnet
-variant: rgbd_input #input_fusion #mcdo #1pass
-reduction: 0.125
-uncertainty:
-    passes: 5
+model_params:
+    variant: input_fusion #input_fusion #mcdo #1pass
+    reduction: 1.0
+    mcdo_passes: 5
+models:
+    rgb:
+        in_channels: 3
+        start_layer: convbnrelu1_1
+        end_layer: res_block5
+        reduction: 1.0
+        mcdo_passes: 5
+        resume: None        
+    d:
+        in_channels: 3
+        start_layer: convbnrelu1_1
+        end_layer: res_block5        
+        reduction: 1.0
+        mcdo_passes: 5        
+        resume: None
+    fuse:
+        in_channels: 8192
+        start_layer: pyramid_pooling
+        end_layer: classification        
+        reduction: 1.0
+        mcdo_passes: 1
+        resume: None
 data:
     dataset: airsim
     path: ../../ros/data/airsim
@@ -14,8 +36,8 @@ data:
     img_rows: 128 #512
     img_cols: 128 #512
 training:
-    train_iters: 100000
-    batch_size: 2
+    train_iters: 200000
+    batch_size: 2 
     val_interval: 1000
     n_workers: 16
     print_interval: 50
@@ -28,6 +50,6 @@ training:
         name: 'multi_scale_cross_entropy'
         size_average: False
     lr_schedule:
-    resume: None #runs/pspnet_airsim/default_fixed_segmentation_01-11-2019/pspnet_airsim_best_model.pkl
-    resumeRGB: models/pspnet_airsim_rgb_fog_all_01-16-2019.pkl
-    resumeD: models/pspnet_airsim_depth_fog_all_01-16-2019.pkl
+    resume: models/pspnet_airsim_default_fixed_segmentation_01-11-2019.pkl
+    resumeRGB: None #models/pspnet_airsim_rgb_fog_all_01-16-2019.pkl
+    resumeD: None #models/pspnet_airsim_depth_fog_all_01-16-2019.pkl

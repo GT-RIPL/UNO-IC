@@ -27,6 +27,8 @@ from ptsemseg.optimizers import get_optimizer
 from tensorboardX import SummaryWriter
 
 import matplotlib.pyplot as plt
+import matplotlib.cm as cm
+from matplotlib.colors import Normalize
 
 def train(cfg, writer, logger):
     
@@ -46,21 +48,6 @@ def train(cfg, writer, logger):
     # Setup Dataloader
     data_loader = get_loader(cfg['data']['dataset'])
     data_path = cfg['data']['path']
-    # data_loader = get_loader('airsim')
-    # data_path = "../../ros/data/airsim"
-
-    # t_loader = data_loader(
-    #     data_path,
-    #     is_transform=True,
-    #     split=cfg['data']['train_split'],
-    #     img_size=(cfg['data']['img_rows'], cfg['data']['img_cols']),
-    #     augmentations=data_aug)
-
-    # v_loader = data_loader(
-    #     data_path,
-    #     is_transform=True,
-    #     split=cfg['data']['val_split'],
-    #     img_size=(cfg['data']['img_rows'], cfg['data']['img_cols']),)
 
     t_loader = data_loader(
         data_path,
@@ -99,107 +86,73 @@ def train(cfg, writer, logger):
     # Setup Metrics
     running_metrics_val = {env:runningScore(n_classes) for env in v_loader.keys()}
 
-    # Setup Model
-    # model = get_model(cfg['model'], n_classes, version="airsim").to(device)
-
-    if cfg['variant'] in ['mcdo','1pass']:
-        model = get_model(cfg['model'], n_classes, version="airsim_gate", reduction=cfg['reduction']).to(device)
-        model_rgb = get_model(cfg['model'], n_classes, version="airsim_rgb", reduction=cfg['reduction']).to(device)
-        model_depth = get_model(cfg['model'], n_classes, version="airsim_depth", reduction=cfg['reduction']).to(device)
-    else:
-        model = get_model(cfg['model'], n_classes, reduction=cfg['reduction']).to(device)
-
-
-    # model = get_model(cfg['gate'], n_classes, version="airsim_gate").to(device)
-    # model_gate = get_model(cfg['model'], n_classes, version="airsim_gate").to(device)
-
-    # # Load Pretrained PSPNet
-    # if cfg['model'] == 'pspnet':
-    #     caffemodel_dir_path = "./models"
-    #     model.load_pretrained_model(
-    #         model_path=os.path.join(caffemodel_dir_path, "pspnet101_cityscapes.caffemodel")
-    #     )  
-
-
-    model = torch.nn.DataParallel(model, device_ids=range(torch.cuda.device_count()))
-
-    if cfg['variant'] == 'mcdo':
-        model_rgb = torch.nn.DataParallel(model_rgb, device_ids=range(torch.cuda.device_count()))
-        model_depth = torch.nn.DataParallel(model_depth, device_ids=range(torch.cuda.device_count()))
-    # model_gate = torch.nn.DataParallel(model_gate, device_ids=range(torch.cuda.device_count()))
-
-    # Setup optimizer, lr_scheduler and loss function
-    optimizer_cls = get_optimizer(cfg)
-    optimizer_params = {k:v for k, v in cfg['training']['optimizer'].items() 
-                        if k != 'name'}
-
-    optimizer = optimizer_cls(model.parameters(), **optimizer_params)
-    logger.info("Using optimizer {}".format(optimizer))
-
-    scheduler = get_scheduler(optimizer, cfg['training']['lr_schedule'])
-
-    loss_fn = get_loss_function(cfg)
-    logger.info("Using loss {}".format(loss_fn))
-
     start_iter = 0
-    if cfg['training']['resume'] is not None:
-        if os.path.isfile(cfg['training']['resume']):
-            logger.info(
-                "Loading model and optimizer from checkpoint '{}'".format(cfg['training']['resume'])
-            )
-            checkpoint = torch.load(cfg['training']['resume'])
-            model.load_state_dict(checkpoint["model_state"])
-            optimizer.load_state_dict(checkpoint["optimizer_state"])
-            scheduler.load_state_dict(checkpoint["scheduler_state"])
-            start_iter = checkpoint["epoch"]
-            logger.info(
-                "Loaded checkpoint '{}' (iter {})".format(
-                    cfg['training']['resume'], checkpoint["epoch"]
-                )
-            )
-        else:
-            logger.info("No checkpoint found at '{}'".format(cfg['training']['resume']))
+    models = {}
+    optimizers = {}
+    schedulers = {}
+    val_loss_meter = {}
 
-    if cfg['variant'] == 'mcdo':
-        if cfg['training']['resumeRGB'] is not None:
-            if os.path.isfile(cfg['training']['resumeRGB']):
+    for model,attr in cfg["models"].items():
+        models[model] = get_model(cfg['model'], 
+                                  n_classes, 
+                                  input_size=(cfg['data']['img_rows'],cfg['data']['img_cols']),
+                                  in_channels=attr['in_channels'],
+                                  start_layer=attr['start_layer'],
+                                  end_layer=attr['end_layer'],
+                                  mcdo_passes=attr['mcdo_passes'], 
+                                  reduction=attr['reduction']).to(device)
+
+        models[model] = torch.nn.DataParallel(models[model], device_ids=range(torch.cuda.device_count()))
+
+        # Setup optimizer, lr_scheduler and loss function
+        optimizer_cls = get_optimizer(cfg)
+        optimizer_params = {k:v for k, v in cfg['training']['optimizer'].items() 
+                            if k != 'name'}
+
+        optimizers[model] = optimizer_cls(models[model].parameters(), **optimizer_params)
+        logger.info("Using optimizer {}".format(optimizers[model]))
+
+        schedulers[model] = get_scheduler(optimizers[model], cfg['training']['lr_schedule'])
+
+        loss_fn = get_loss_function(cfg)
+        logger.info("Using loss {}".format(loss_fn))
+
+        # Load pretrained weights
+        if attr['resume'] is not None:
+            if os.path.isfile(attr['resume']):
                 logger.info(
-                    "Loading model and optimizer from checkpoint '{}'".format(cfg['training']['resumeRGB'])
+                    "Loading model and optimizer from checkpoint '{}'".format(attr['resume'])
                 )
-                checkpoint = torch.load(cfg['training']['resumeRGB'])
-                model_rgb.load_state_dict(checkpoint["model_state"])
+                checkpoint = torch.load(attr['resume'])
+
+                ###
+                pretrained_dict = torch.load(attr['resume'])['model_state']
+                model_dict = model.state_dict()
+
+                # 1. filter out unnecessary keys
+                pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict}
+                # 2. overwrite entries in the existing state dict
+                model_dict.update(pretrained_dict) 
+                # 3. load the new state dict
+                model.load_state_dict(pretrained_dict)
+                ###
+
+
+                # model.load_state_dict(checkpoint["model_state"])
                 # optimizer.load_state_dict(checkpoint["optimizer_state"])
                 # scheduler.load_state_dict(checkpoint["scheduler_state"])
                 # start_iter = checkpoint["epoch"]
+                start_iter = 0
                 logger.info(
                     "Loaded checkpoint '{}' (iter {})".format(
-                        cfg['training']['resumeRGB'], checkpoint["epoch"]
+                        attr['resume'], checkpoint["epoch"]
                     )
                 )
             else:
-                logger.info("No checkpoint found at '{}'".format(cfg['training']['resumeRGB']))
+                logger.info("No checkpoint found at '{}'".format(attr['resume']))        
 
-        if cfg['training']['resumeD'] is not None:
-            if os.path.isfile(cfg['training']['resumeD']):
-                logger.info(
-                    "Loading model and optimizer from checkpoint '{}'".format(cfg['training']['resumeD'])
-                )
-                checkpoint = torch.load(cfg['training']['resumeD'])
-                model_depth.load_state_dict(checkpoint["model_state"])
-                # optimizer.load_state_dict(checkpoint["optimizer_state"])
-                # scheduler.load_state_dict(checkpoint["scheduler_state"])
-                # start_iter = checkpoint["epoch"]
-                logger.info(
-                    "Loaded checkpoint '{}' (iter {})".format(
-                        cfg['training']['resumeD'], checkpoint["epoch"]
-                    )
-                )
-            else:
-                logger.info("No checkpoint found at '{}'".format(cfg['training']['resumeD']))
-
-    val_loss_meter = averageMeter()
-    val_loss_RGB_meter = averageMeter()
-    val_loss_D_meter = averageMeter()
+        val_loss_meter[model] = averageMeter()
+        
     time_meter = averageMeter()
 
     best_iou = -100.0
@@ -210,169 +163,146 @@ def train(cfg, writer, logger):
         for (images, labels, aux) in trainloader:
             i += 1
             start_ts = time.time()
-            scheduler.step()
 
-            model.train()
+            [schedulers[m].step() for m in models.keys()]
+            [models[m].train() for m in models.keys()]
 
-            if cfg['variant'] in ['mcdo','1pass']:
-                model_rgb.train()
-                model_depth.train()
-
-            # model_gate.train()
-            
             images = images.to(device)
             labels = labels.to(device)
             aux = aux.unsqueeze(1).to(device)
 
             fused = torch.cat((images,aux),1)
-            depth = torch.cat((aux,aux,aux,aux),1)
+            depth = torch.cat((aux,aux,aux),1)
             rgb = torch.cat((images[:,0,:,:].unsqueeze(1),
                              images[:,1,:,:].unsqueeze(1),
-                             images[:,2,:,:].unsqueeze(1),
-                             images[:,0,:,:].unsqueeze(1)),1)
+                             images[:,2,:,:].unsqueeze(1)),1)
+
+            inputs = {"rgb": rgb,
+                      "d": depth,
+                      "fused": fused}
 
             if images.shape[0]<=1:
                 continue
 
-            optimizer.zero_grad()
-            # outputs = model(images)
+            [optimizers[m].zero_grad() for m in models.keys()]
             
-            # outputs = model(fused)
-            # loss = loss_fn(input=outputs, target=labels)
-            # loss.backward()
 
-            # outputs = model(images)
-            # outputs_depth = model_depth(aux)
+            outputs = {}
+            outputs_aux = {}
+
+            for m in ['rgb','d']:
+                # with torch.no_grad():
+                    # models[m].eval()
+                    for mi in range(cfg['models'][m]['mcdo_passes']):
+                        x = models[m](inputs[m])
+                        x_aux = None
+                        if isinstance(x,tuple):
+                            x, x_aux = x
+
+                        if not m in outputs:
+                            outputs[m] = x.unsqueeze(-1)
+
+                            if not x_aux is None:
+                                outputs_aux[m] = x_aux.unsqueeze(-1)
+                        else:
+                            outputs[m] = torch.cat((outputs[m], x.unsqueeze(-1)),-1)
+                            
+                            if not x_aux is None:
+                                outputs_aux[m] = torch.cat((outputs_aux[m], x_aux.unsqueeze(-1)),-1)
+
+            mean_outputs = {m:outputs[m].mean(-1) for m in outputs.keys()}
+            std_outputs = {m:outputs[m].mean(-1) for m in outputs.keys()}
+
+            if len(outputs_aux)>0:
+                mean_outputs_aux = {m:outputs_aux[m].std(-1) for m in outputs_aux.keys()}
+                std_outputs_aux = {m:outputs_aux[m].std(-1) for m in outputs_aux.keys()}
+
+            # stack outputs from parallel legs
+            intermediate = torch.cat(tuple([mean_outputs[m] for m in outputs.keys()]+[std_outputs[m] for m in outputs.keys()]),1)
+
+            outputs = models['fuse'](intermediate)
+
+            # with torch.no_grad():
+            #     print(mean_outputs['rgb'].cpu().numpy().shape)
+            #     print(intermediate.cpu().numpy().shape)
+            #     print(outputs.cpu().numpy().shape)
+     
+            loss = loss_fn(input=outputs,target=labels)
+            loss.backward()
+
+            [optimizers[m].step() for m in models.keys()]
 
 
 
 
 
+            time_meter.update(time.time() - start_ts)
+            if (i + 1) % cfg['training']['print_interval'] == 0:
+                fmt_str = "Iter [{:d}/{:d}]  Loss: {:.4f}  Time/Image: {:.4f}"
+                print_str = fmt_str.format(i + 1,
+                                           cfg['training']['train_iters'], 
+                                           loss.item(),
+                                           time_meter.avg / cfg['training']['batch_size'])
 
-            if cfg['variant'] in ['mcdo','1pass']:
+                print(print_str)
+                logger.info(print_str)
+                writer.add_scalar('loss/train_loss', loss.item(), i+1)
+                time_meter.reset()
 
-                x1,x1_aux = model_rgb(rgb)
-                loss1 = loss_fn(input=(x1,x1_aux), target=labels)
-                loss1.backward()
-                
-                x2,x2_aux = model_depth(depth)
-                loss2 = loss_fn(input=(x2,x2_aux), target=labels)
-                loss2.backward()
 
-                if cfg['variant'] == 'mcdo':
-                    # Multiple Forward Passes
-                    with torch.no_grad():
-                        model_rgb.eval()
-                        model_depth.eval()
-                        x1n = torch.zeros(list(x1.shape),device=device).unsqueeze(-1)
-                        x2n = torch.zeros(list(x2.shape),device=device).unsqueeze(-1)
-                        for ii in range(cfg['uncertainty']['passes']):
-                            x1 = model_rgb(rgb,mode="dropout")
-                            x2 = model_depth(depth,mode="dropout")
-                            x1n = torch.cat((x1n,x1.unsqueeze(-1)),-1)
-                            x2n = torch.cat((x2n,x2.unsqueeze(-1)),-1)
-                        outputs_rgb = x1n.mean(-1)
-                        uncertainty_rgb = x1n.std(-1)
-                       
-                        outputs_depth = x2n.mean(-1)
-                        uncertainty_depth = x2n.std(-1)
-                        
-                        fused = torch.cat((outputs_rgb,uncertainty_rgb,outputs_depth,uncertainty_depth),1)
 
-                elif cfg['variant'] == '1pass':
-                    # Single Forward Pass
-                    with torch.no_grad():
-                        model_rgb.eval()
-                        model_depth.eval()
-                        x1 = model_rgb(rgb)
-                        x2 = model_depth(depth)
-                        
-                        fused = torch.cat((x1,x2),1)
-          
-                outputs = model(fused)
-                loss = loss_fn(input=outputs, target=labels)
-                loss.backward()
-                optimizer.step()
-
-                time_meter.update(time.time() - start_ts)
-
-                if (i + 1) % cfg['training']['print_interval'] == 0:
-                    fmt_str = "Iter [{:d}/{:d}]  Loss RGB: {:.4f}  Loss D: {:.4f}  Loss Gate: {:.4f}  Time/Image: {:.4f}"
-                    print_str = fmt_str.format(i + 1,
-                                               cfg['training']['train_iters'], 
-                                               loss1.item(),
-                                               loss2.item(),
-                                               loss.item(),
-                                               time_meter.avg / cfg['training']['batch_size'])
-
-                    print(print_str)
-                    logger.info(print_str)
-                    writer.add_scalar('loss/train_loss_RGB', loss1.item(), i+1)
-                    writer.add_scalar('loss/train_loss_D', loss2.item(), i+1)
-                    writer.add_scalar('loss/train_loss_Gate', loss.item(), i+1)
-                    time_meter.reset()
-
-            else:
-
-                if cfg['variant'] == 'rgbd_input':
-                    model_input = fused
-                if cfg['variant'] == 'rgb':
-                    model_input = rgb
-                if cfg['variant'] == 'depth':
-                    model_input = depth
-
-                outputs = model(model_input)
-                loss = loss_fn(input=outputs, target=labels)
-                loss.backward()
-                optimizer.step()
-
-                time_meter.update(time.time() - start_ts)
-
-                if (i + 1) % cfg['training']['print_interval'] == 0:
-                    fmt_str = "Iter [{:d}/{:d}]  Loss: {:.4f}  Time/Image: {:.4f}"
-                    print_str = fmt_str.format(i + 1,
-                                               cfg['training']['train_iters'], 
-                                               loss.item(),
-                                               time_meter.avg / cfg['training']['batch_size'])
-
-                    print(print_str)
-                    logger.info(print_str)
-                    writer.add_scalar('loss/train_loss', loss.item(), i+1)
-                    time_meter.reset()
 
 
 
             if (i + 1) % cfg['training']['val_interval'] == 0 or \
                (i + 1) == cfg['training']['train_iters']:
                 
-                model.eval()   
-
-                if cfg['variant'] in ['mcdo','1pass']:
-                    model_rgb.eval()
-                    model_depth.eval()
-                # model_gate.eval()
+                [models[m].train() for m in models.keys()]
 
                 with torch.no_grad():
                     for k,valloader in valloaders.items():
-                        for i_val, (images_val, labels_val, aux_val) in tqdm(enumerate(valloader)):
-                            images_val = images_val.to(device)
-                            labels_val = labels_val.to(device)
-                            aux_val = aux_val.unsqueeze(1).to(device)
+                        for i_val, (images, labels, aux) in tqdm(enumerate(valloader)):
+                            
+                            images = images.to(device)
+                            labels = labels.to(device)
+                            aux = aux.unsqueeze(1).to(device)
 
-                            fused_val = torch.cat((images_val,aux_val),1)
-                            depth_val = torch.cat((aux_val,aux_val,aux_val,aux_val),1)
-                            rgb_val = torch.cat((images_val[:,0,:,:].unsqueeze(1),
-                                                 images_val[:,1,:,:].unsqueeze(1),
-                                                 images_val[:,2,:,:].unsqueeze(1),
-                                                 images_val[:,0,:,:].unsqueeze(1)),1)
+                            fused = torch.cat((images,aux),1)
+                            depth = torch.cat((aux,aux,aux),1)
+                            rgb = torch.cat((images[:,0,:,:].unsqueeze(1),
+                                             images[:,1,:,:].unsqueeze(1),
+                                             images[:,2,:,:].unsqueeze(1)),1)
 
-                            if images_val.shape[0]<=1:
+                            inputs = {"rgb": rgb,
+                                      "d": depth,
+                                      "fused": fused}
+
+                            if images.shape[0]<=1:
                                 continue
 
+                            outputs = {}
+                            outputs_aux = {}
+
+                            for m in ['rgb','d']:
+                                for mi in range(cfg['models'][m]['mcdo_passes']):
+                                    x = models[m](inputs[m])
+                                    x_aux = None
+                                    if isinstance(x,tuple):
+                                        x, x_aux = x
+
+                                    if not m in outputs:
+                                        outputs[m] = x.unsqueeze(-1)
+
+                                        if not x_aux is None:
+                                            outputs_aux[m] = x_aux.unsqueeze(-1)
+                                    else:
+                                        outputs[m] = torch.cat((outputs[m], x.unsqueeze(-1)),-1)
+                                        
+                                        if not x_aux is None:
+                                            outputs_aux[m] = torch.cat((outputs_aux[m], x_aux.unsqueeze(-1)),-1)
 
 
-
-                            if cfg['variant'] in ['mcdo','1pass']:
+                            if cfg['model_params']['variant'] in ['mcdo','1pass']:
 
                                 x1 = model_rgb(rgb_val)                           
                                 x2 = model_depth(depth_val)
@@ -380,7 +310,7 @@ def train(cfg, writer, logger):
                                 val_loss_RGB = loss_fn(input=x1, target=labels_val)
                                 val_loss_D = loss_fn(input=x2, target=labels_val)
 
-                                if cfg['variant'] == 'mcdo':
+                                if cfg['model_params']['variant'] == 'mcdo':
                                     # Multiple Forward Passes
                                     with torch.no_grad():
                                         model_rgb.eval()
@@ -400,7 +330,7 @@ def train(cfg, writer, logger):
 
                                         fused_val = torch.cat((outputs_rgb,uncertainty_rgb,outputs_depth,uncertainty_depth),1)
                                 
-                                if cfg['variant'] == '1pass':
+                                if cfg['model_params']['variant'] == '1pass':
                                     # Single Forward Pass
                                     with torch.no_grad():
                                         model_rgb.eval()
@@ -416,11 +346,11 @@ def train(cfg, writer, logger):
 
                             else:
 
-                                if cfg['variant'] == 'rgbd_input':
+                                if cfg['model_params']['variant'] == 'input_fusion':
                                     model_input = fused_val
-                                if cfg['variant'] == 'rgb':
+                                if cfg['model_params']['variant'] == 'rgb':
                                     model_input = rgb_val
-                                if cfg['variant'] == 'depth':
+                                if cfg['model_params']['variant'] == 'depth':
                                     model_input = depth_val
 
                                 outputs = model(model_input)
@@ -445,12 +375,12 @@ def train(cfg, writer, logger):
 
                             running_metrics_val[k].update(gt, pred)
 
-                            if cfg['variant'] in ['mcdo','1pass']:
+                            if cfg['model_params']['variant'] in ['mcdo','1pass']:
                                 val_loss_RGB_meter.update(val_loss_RGB.item())
                                 val_loss_D_meter.update(val_loss_D.item())
                             val_loss_meter.update(val_loss.item())
 
-                if cfg['variant'] in ['mcdo','1pass']:
+                if cfg['model_params']['variant'] in ['mcdo','1pass']:
                     writer.add_scalar('loss/val_loss_RGB', val_loss_RGB_meter.avg, i+1)
                     writer.add_scalar('loss/val_loss_D', val_loss_D_meter.avg, i+1)
                     writer.add_scalar('loss/val_loss', val_loss_meter.avg, i+1)
@@ -471,7 +401,7 @@ def train(cfg, writer, logger):
                         logger.info('{}: {}'.format(k, v))
                         writer.add_scalar('val_metrics/{}/cls_{}'.format(env,k), v, i+1)
 
-                    if cfg['variant'] in ['mcdo','1pass']:
+                    if cfg['model_params']['variant'] in ['mcdo','1pass']:
                         val_loss_RGB_meter.reset()
                         val_loss_D_meter.reset()
                     val_loss_meter.reset()
@@ -513,11 +443,11 @@ if __name__ == "__main__":
         cfg = yaml.load(fp)
 
     run_id = "_".join([#cfg['id'],
-                       cfg['variant'],
+                       cfg['model_params']['variant'],
                        "pretrain" if not cfg['training']['resumeRGB'] is None else "fromscratch", 
                        "{}x{}".format(cfg['data']['img_rows'],cfg['data']['img_cols']),
-                       "{}passes".format(cfg['uncertainty']['passes']),
-                       "{}reduction".format(cfg['reduction']),
+                       "{}passes".format(cfg['model_params']['mcdo_passes']),
+                       "{}reduction".format(cfg['model_params']['reduction']),
                        "_train_{}_".format(list(cfg['data']['train_subsplit'])[-1]),
                        "_test_all_",
                        "01-16-2019"])

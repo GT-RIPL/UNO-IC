@@ -29,22 +29,7 @@ pspnet_specs = {
         "n_classes": 9,
         "input_size": (512, 512),
         "block_config": [3, 4, 23, 3],
-    },    
-    "airsim_rgb": {
-        "n_classes": 9,
-        "input_size": (512, 512),
-        "block_config": [3, 4, 23, 3],
-    },    
-    "airsim_depth": {
-        "n_classes": 9,
-        "input_size": (512, 512),
-        "block_config": [3, 4, 23, 3],
-    },            
-    "airsim_gate": {
-        "n_classes": 9,
-        "input_size": (512, 512),
-        "block_config": [3, 4, 23, 3],
-    },        
+    },     
 }
 
 
@@ -70,6 +55,10 @@ class pspnet(nn.Module):
         block_config=[3, 4, 23, 3],
         input_size=(473, 473),
         version=None,
+        mcdo_passes=1,
+        in_channels=3,
+        start_layer="convbnrelu1_1",
+        end_layer="classification",
         reduction=1.0,
     ):
 
@@ -87,105 +76,174 @@ class pspnet(nn.Module):
             pspnet_specs[version]["input_size"] if version is not None else input_size
         )
 
-        # Encoder
-        if version == "airsim_rgb":
-            self.convbnrelu1_1 = conv2DBatchNormRelu(
-                in_channels=4, k_size=3, n_filters=int(64*reduction), padding=1, stride=2, bias=False
-            )
-        elif version == "airsim_depth":
-            self.convbnrelu1_1 = conv2DBatchNormRelu(
-                # in_channels=3, k_size=3, n_filters=64, padding=1, stride=2, bias=False
-                in_channels=4, k_size=3, n_filters=int(64*reduction), padding=1, stride=2, bias=False
-            )
-        elif version == "airsim_gate":
-            self.convbnrelu1_1 = conv2DBatchNormRelu(
-                # in_channels=3, k_size=3, n_filters=64, padding=1, stride=2, bias=False
-                in_channels=4*n_classes, k_size=3, n_filters=int(64*reduction), padding=1, stride=2, bias=False
-            )                        
-        else:
-            self.convbnrelu1_1 = conv2DBatchNormRelu(
-                # in_channels=3, k_size=3, n_filters=int(64*reduction), padding=1, stride=2, bias=False
-                in_channels=4, k_size=3, n_filters=int(64*reduction), padding=1, stride=2, bias=False
-            )
+        self.mcdo_passes = mcdo_passes
 
-        self.convbnrelu1_2 = conv2DBatchNormRelu(
-            in_channels=int(64*reduction), k_size=3, n_filters=int(64*reduction), padding=1, stride=1, bias=False
-        )
-        self.convbnrelu1_3 = conv2DBatchNormRelu(
-            in_channels=int(64*reduction), k_size=3, n_filters=int(128*reduction), padding=1, stride=1, bias=False
-        )
+        self.default_layers = [[  "convbnrelu1_1",                   4,   int(64*reduction), 3, 1, 2, False],
+                               [  "convbnrelu1_2",   int(64*reduction),   int(64*reduction), 3, 1, 1, False],
+                               [  "convbnrelu1_3",   int(64*reduction),  int(128*reduction), 3, 1, 1, False],
+                               [     "res_block2",  int(128*reduction),  int(256*reduction), int(64*reduction), self.block_config[0], 1, 1],
+                               [     "res_block3",  int(256*reduction),  int(512*reduction), int(128*reduction), self.block_config[1], 2, 1],
+                               [     "res_block4",  int(512*reduction), int(1024*reduction), int(256*reduction), self.block_config[2], 1, 2],
+                               ["convbnrelu4_aux", int(1024*reduction),  int(256*reduction), 3, 1, 1, False],
+                               [        "aux_cls",  int(256*reduction),                None, self.n_classes, 1, 1, 0],
+                               [     "res_block5", int(1024*reduction), int(2048*reduction), int(512*reduction), self.block_config[3], 1, 4],
+                               ["pyramid_pooling", int(2048*reduction),                None, [6,3,2,1]],
+                               [      "cbr_final", int(4096*reduction),  int(512*reduction), 3, 1, 1, False],
+                               [ "classification",  int(512*reduction),                None, self.n_classes, 1, 1, 0]]
 
-        # Vanilla Residual Blocks
-        self.res_block2 = residualBlockPSP(self.block_config[0], int(128*reduction), int(64*reduction), int(256*reduction), 1, 1)
-        self.res_block3 = residualBlockPSP(self.block_config[1], int(256*reduction), int(128*reduction), int(512*reduction), 2, 1)
+        # Extract Sub Layers for Fusion
+        start_i = 0
+        end_i = len(self.default_layers)
+        for i,row in enumerate(self.default_layers):
+            if start_layer == row[0]:
+                start_i = i
+            if end_layer == row[0]:
+                end_i = i
 
-        # Dilated Residual Blocks
-        self.res_block4 = residualBlockPSP(self.block_config[2], int(512*reduction), int(256*reduction), int(1024*reduction), 1, 2)
-        self.res_block5 = residualBlockPSP(self.block_config[3], int(1024*reduction), int(512*reduction), int(2048*reduction), 1, 4)
+        self.sub_layers = []
+        for i,row in enumerate(self.default_layers):
+            if i < start_i:
+                self.sub_layers.append([row[0],None])
+            elif i == start_i:
+                self.sub_layers.append([row[0]]+[in_channels]+row[2:])
+            elif i > start_i and i <= end_i:
+                self.sub_layers.append(row)
+            else:
+                self.sub_layers.append([row[0],None])
 
-        # Pyramid Pooling Module
-        self.pyramid_pooling = pyramidPooling(int(2048*reduction), [6, 3, 2, 1])
 
-        # Final conv layers
-        self.cbr_final = conv2DBatchNormRelu(int(4096*reduction), int(512*reduction), 3, 1, 1, False)
-        self.dropout = nn.Dropout2d(p=0.1, inplace=False)
-        self.classification = nn.Conv2d(int(512*reduction), self.n_classes, 1, 1, 0)
+        for i,row in enumerate(self.default_layers):
+            if row[0]=="cbr_final":
+                if not row[1] is None and not self.sub_layers[i-1][1] is None:
+                    self.sub_layers[i] = [row[0]]+[2*self.sub_layers[i-1][1]]+row[2:]
 
-        # Auxiliary layers for training
-        self.convbnrelu4_aux = conv2DBatchNormRelu(
-            in_channels=int(1024*reduction), k_size=3, n_filters=int(256*reduction), padding=1, stride=1, bias=False
-        )
-        self.aux_cls = nn.Conv2d(int(256*reduction), self.n_classes, 1, 1, 0)
+
+        self.layer_dict = {row[0]:row[1:] for row in self.sub_layers}
+
+        self.layers = {}
+        self.layers['dropout'] = nn.Dropout2d(p=0.1, inplace=False)
+        for k,v in self.layer_dict.items():
+            if ("convbnrelu" in k or "cbr_final" in k) and not v[0] is None:
+                self.layers[k] = conv2DBatchNormRelu(in_channels=v[0],
+                                                     k_size=v[2],
+                                                     n_filters=v[1],
+                                                     padding=v[3],
+                                                     stride=v[4],
+                                                     bias=v[5])
+            if "res_block" in k and not v[0] is None:
+                self.layers[k] = residualBlockPSP(v[3],v[0],v[2],v[1],v[4],v[5])
+            if "pyramid_pooling" in k and not v[0] is None:
+                self.layers[k] = pyramidPooling(v[0],v[2])
+            if ("classification" in k or "aux_cls" in k) and not v[0] is None:
+                self.layers[k] = nn.Conv2d(v[0],v[2],v[3],v[4],v[5])
+
+        # set attributes from dictionary
+        for k,v in self.layers.items():
+            setattr(self,k,v)
+
+        # # Encoder
+        # if not self.sub_layers["convbnrelu1_1"][0] is None: 
+        #     self.layers["convbnrelu1_1"] = conv2DBatchNormRelu(
+        #         in_channels=self.sub_layers[0][1], 
+        #         k_size=3, 
+        #         n_filters=self.sub_layers[0][1], 
+        #         padding=1, 
+        #         stride=2, 
+        #         bias=False,
+        #     )
+        # else:
+        #     self.convbnrelu1_1 = None
+
+        # self.convbnrelu1_2 = conv2DBatchNormRelu(
+        #     in_channels=int(64*reduction), k_size=3, n_filters=int(64*reduction), padding=1, stride=1, bias=False
+        # )
+        # self.convbnrelu1_3 = conv2DBatchNormRelu(
+        #     in_channels=int(64*reduction), k_size=3, n_filters=int(128*reduction), padding=1, stride=1, bias=False
+        # )
+
+        # # Vanilla Residual Blocks
+        # self.res_block2 = residualBlockPSP(self.block_config[0], int(128*reduction), int(64*reduction), int(256*reduction), 1, 1)
+        # self.res_block3 = residualBlockPSP(self.block_config[1], int(256*reduction), int(128*reduction), int(512*reduction), 2, 1)
+
+        # # Dilated Residual Blocks
+        # self.res_block4 = residualBlockPSP(self.block_config[2], int(512*reduction), int(256*reduction), int(1024*reduction), 1, 2)
+        # self.res_block5 = residualBlockPSP(self.block_config[3], int(1024*reduction), int(512*reduction), int(2048*reduction), 1, 4)
+
+        # # Pyramid Pooling Module
+        # self.pyramid_pooling = pyramidPooling(int(2048*reduction), [6, 3, 2, 1])
+
+        # # Final conv layers
+        # self.cbr_final = conv2DBatchNormRelu(int(4096*reduction), int(512*reduction), 3, 1, 1, False)
+        # self.dropout = nn.Dropout2d(p=0.1, inplace=False)
+        # self.classification = nn.Conv2d(int(512*reduction), self.n_classes, 1, 1, 0)
+
+        # # Auxiliary layers for training
+        # self.convbnrelu4_aux = conv2DBatchNormRelu(
+        #     in_channels=int(1024*reduction), k_size=3, n_filters=int(256*reduction), padding=1, stride=1, bias=False
+        # )
+        # self.aux_cls = nn.Conv2d(int(256*reduction), self.n_classes, 1, 1, 0)
 
         # Define auxiliary loss function
         self.loss = multi_scale_cross_entropy2d
 
 
 
-    def forward(self, x, mode=None):
+    def forward(self, x, dropout=False):
 
-        if mode=="dropout":
+        # Turn on training to get weight dropout
+        if self.mcdo_passes>1:
             self.dropout.train(mode=True)
+        else:
+            self.dropout.eval()
 
         inp_shape = x.shape[2:]
 
         # H, W -> H/2, W/2
-        x = self.convbnrelu1_1(x)
-        x = self.dropout(x)
-        
-        x = self.convbnrelu1_2(x)
-        x = self.dropout(x)
+        if 'convbnrelu1_1' in self.layers.keys():
+            x = getattr(self,'convbnrelu1_1')(x) 
+            x = getattr(self,'dropout')(x) 
+        if 'convbnrelu1_2' in self.layers.keys():
+            x = getattr(self,'convbnrelu1_2')(x) 
+            x = getattr(self,'dropout')(x) 
+        if 'convbnrelu1_3' in self.layers.keys():
+            x = getattr(self,'convbnrelu1_3')(x) 
+            x = getattr(self,'dropout')(x) 
+            x = F.max_pool2d(x, 3, 2, 1)
 
-        x = self.convbnrelu1_3(x)
-        x = self.dropout(x)
+        # # H/4, W/4 -> H/8, W/8
+        if 'res_block2' in self.layers.keys():
+            x = getattr(self,'res_block2')(x)
+        if 'res_block3' in self.layers.keys():
+            x = getattr(self,'res_block3')(x)
+        if 'res_block4' in self.layers.keys():
+            x = getattr(self,'res_block4')(x)            
 
-        # H/2, W/2 -> H/4, W/4
-        x = F.max_pool2d(x, 3, 2, 1)
+        if self.training and 'convbnrelu4_aux' in self.layers.keys():  # Auxiliary layers for training
+            x_aux = getattr(self,'convbnrelu4_aux')(x)
+            x_aux = getattr(self,'dropout')(x_aux)
+            x_aux = getattr(self,'aux_cls')(x_aux)
 
-        # H/4, W/4 -> H/8, W/8
-        x = self.res_block2(x)
-        x = self.res_block3(x)
-        x = self.res_block4(x)
+        if 'res_block5' in self.layers.keys():
+            x = getattr(self,'res_block5')(x)   
 
-        if self.training:  # Auxiliary layers for training
-            x_aux = self.convbnrelu4_aux(x)
-            x_aux = self.dropout(x_aux)
-            x_aux = self.aux_cls(x_aux)
+        if 'pyramid_pooling' in self.layers.keys():
+            x = getattr(self,'pyramid_pooling')(x)   
 
-        x = self.res_block5(x)
+        if 'cbr_final' in self.layers.keys():
+            x = getattr(self,'cbr_final')(x)   
+        if 'dropout' in self.layers.keys():
+            x = getattr(self,'dropout')(x)   
 
-        x = self.pyramid_pooling(x)
+        if 'classification' in self.layers.keys():
+            x = getattr(self,'classification')(x)   
+            x = F.interpolate(x, size=self.input_size, mode='bilinear', align_corners=True)
 
-        x = self.cbr_final(x)
-        x = self.dropout(x)
-
-        x = self.classification(x)
-        x = F.interpolate(x, size=inp_shape, mode='bilinear', align_corners=True)
-
-        if self.training:
+        if self.training and 'convbnrelu4_aux' in self.layers.keys():
             return (x, x_aux)
         else:  # eval mode
             return x
+
+
 
             
 

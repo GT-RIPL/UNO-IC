@@ -90,7 +90,7 @@ def train(cfg, writer, logger):
     models = {}
     optimizers = {}
     schedulers = {}
-    val_loss_meter = {}
+    # val_loss_meter = {}
 
     for model,attr in cfg["models"].items():
         models[model] = get_model(cfg['model'], 
@@ -151,8 +151,8 @@ def train(cfg, writer, logger):
             else:
                 logger.info("No checkpoint found at '{}'".format(attr['resume']))        
 
-        val_loss_meter[model] = averageMeter()
-        
+        # val_loss_meter[model] = averageMeter()
+    val_loss_meter = averageMeter()
     time_meter = averageMeter()
 
     best_iou = -100.0
@@ -257,7 +257,7 @@ def train(cfg, writer, logger):
             if (i + 1) % cfg['training']['val_interval'] == 0 or \
                (i + 1) == cfg['training']['train_iters']:
                 
-                [models[m].train() for m in models.keys()]
+                [models[m].eval() for m in models.keys()]
 
                 with torch.no_grad():
                     for k,valloader in valloaders.items():
@@ -286,78 +286,24 @@ def train(cfg, writer, logger):
                             for m in ['rgb','d']:
                                 for mi in range(cfg['models'][m]['mcdo_passes']):
                                     x = models[m](inputs[m])
-                                    x_aux = None
-                                    if isinstance(x,tuple):
-                                        x, x_aux = x
-
                                     if not m in outputs:
                                         outputs[m] = x.unsqueeze(-1)
-
-                                        if not x_aux is None:
-                                            outputs_aux[m] = x_aux.unsqueeze(-1)
                                     else:
                                         outputs[m] = torch.cat((outputs[m], x.unsqueeze(-1)),-1)
-                                        
-                                        if not x_aux is None:
-                                            outputs_aux[m] = torch.cat((outputs_aux[m], x_aux.unsqueeze(-1)),-1)
+                              
 
+                            mean_outputs = {m:outputs[m].mean(-1) for m in outputs.keys()}
+                            std_outputs = {m:outputs[m].mean(-1) for m in outputs.keys()}
 
-                            if cfg['model_params']['variant'] in ['mcdo','1pass']:
+                            # stack outputs from parallel legs
+                            intermediate = torch.cat(tuple([mean_outputs[m] for m in outputs.keys()]+[std_outputs[m] for m in outputs.keys()]),1)
 
-                                x1 = model_rgb(rgb_val)                           
-                                x2 = model_depth(depth_val)
+                            outputs = models['fuse'](intermediate)
 
-                                val_loss_RGB = loss_fn(input=x1, target=labels_val)
-                                val_loss_D = loss_fn(input=x2, target=labels_val)
-
-                                if cfg['model_params']['variant'] == 'mcdo':
-                                    # Multiple Forward Passes
-                                    with torch.no_grad():
-                                        model_rgb.eval()
-                                        model_depth.eval()
-                                        x1n = torch.zeros(list(x1.shape),device=device).unsqueeze(-1)
-                                        x2n = torch.zeros(list(x2.shape),device=device).unsqueeze(-1)
-                                        for ii in range(cfg['uncertainty']['passes']):
-                                            x1 = model_rgb(rgb_val,mode="dropout")
-                                            x2 = model_depth(depth_val,mode="dropout")
-                                            x1n = torch.cat((x1n,x1.unsqueeze(-1)),-1)
-                                            x2n = torch.cat((x2n,x2.unsqueeze(-1)),-1)
-                                        outputs_rgb = x1n.mean(-1)
-                                        uncertainty_rgb = x1n.std(-1)
-                                       
-                                        outputs_depth = x2n.mean(-1)
-                                        uncertainty_depth = x2n.std(-1)
-
-                                        fused_val = torch.cat((outputs_rgb,uncertainty_rgb,outputs_depth,uncertainty_depth),1)
-                                
-                                if cfg['model_params']['variant'] == '1pass':
-                                    # Single Forward Pass
-                                    with torch.no_grad():
-                                        model_rgb.eval()
-                                        model_depth.eval()
-                                        x1 = model_rgb(rgb_val)
-                                        x2 = model_depth(depth_val)
-
-                                        fused_val = torch.cat((x1,x2),1)
-
-                                outputs = model(fused_val)
-                                val_loss = loss_fn(input=outputs, target=labels_val)
-
-
-                            else:
-
-                                if cfg['model_params']['variant'] == 'input_fusion':
-                                    model_input = fused_val
-                                if cfg['model_params']['variant'] == 'rgb':
-                                    model_input = rgb_val
-                                if cfg['model_params']['variant'] == 'depth':
-                                    model_input = depth_val
-
-                                outputs = model(model_input)
-                                val_loss = loss_fn(input=outputs, target=labels)
+                            val_loss = loss_fn(input=outputs, target=labels)
 
                             pred = outputs.data.max(1)[1].cpu().numpy()
-                            gt = labels_val.data.cpu().numpy()
+                            gt = labels.data.cpu().numpy()
 
                             # print(uncertainty_rgb.shape)
 
@@ -375,17 +321,9 @@ def train(cfg, writer, logger):
 
                             running_metrics_val[k].update(gt, pred)
 
-                            if cfg['model_params']['variant'] in ['mcdo','1pass']:
-                                val_loss_RGB_meter.update(val_loss_RGB.item())
-                                val_loss_D_meter.update(val_loss_D.item())
                             val_loss_meter.update(val_loss.item())
 
-                if cfg['model_params']['variant'] in ['mcdo','1pass']:
-                    writer.add_scalar('loss/val_loss_RGB', val_loss_RGB_meter.avg, i+1)
-                    writer.add_scalar('loss/val_loss_D', val_loss_D_meter.avg, i+1)
-                    writer.add_scalar('loss/val_loss', val_loss_meter.avg, i+1)
-                    logger.info("Iter %d Loss RGB: %.4f Loss D: %.4f Loss: %.4f" % (i + 1, val_loss_RGB_meter.avg, val_loss_D_meter.avg, val_loss_meter.avg))
-                else:
+
                     writer.add_scalar('loss/val_loss', val_loss_meter.avg, i+1)
                     logger.info("Iter %d Loss: %.4f" % (i + 1, val_loss_meter.avg))
                 
@@ -401,26 +339,29 @@ def train(cfg, writer, logger):
                         logger.info('{}: {}'.format(k, v))
                         writer.add_scalar('val_metrics/{}/cls_{}'.format(env,k), v, i+1)
 
-                    if cfg['model_params']['variant'] in ['mcdo','1pass']:
-                        val_loss_RGB_meter.reset()
-                        val_loss_D_meter.reset()
                     val_loss_meter.reset()
                     running_metrics_val[env].reset()
 
-                if score["Mean IoU : \t"] >= best_iou:
-                    best_iou = score["Mean IoU : \t"]
-                    state = {
-                        "epoch": i + 1,
-                        "model_state": model.state_dict(),
-                        "optimizer_state": optimizer.state_dict(),
-                        "scheduler_state": scheduler.state_dict(),
-                        "best_iou": best_iou,
-                    }
-                    save_path = os.path.join(writer.file_writer.get_logdir(),
-                                             "{}_{}_best_model.pkl".format(
-                                                 cfg['model']['arch'],
-                                                 cfg['data']['dataset']))
-                    torch.save(state, save_path)
+                for m in models.keys():
+                    model = models[m]
+                    optimizer = optimizers[m]
+                    scheduler = schedulers[m]
+
+                    if score["Mean IoU : \t"] >= best_iou:
+                        best_iou = score["Mean IoU : \t"]
+                        state = {
+                            "epoch": i + 1,
+                            "model_state": model.state_dict(),
+                            "optimizer_state": optimizer.state_dict(),
+                            "scheduler_state": scheduler.state_dict(),
+                            "best_iou": best_iou,
+                        }
+                        save_path = os.path.join(writer.file_writer.get_logdir(),
+                                                 "{}_{}_{}_best_model.pkl".format(
+                                                     m,
+                                                     cfg['model']['arch'],
+                                                     cfg['data']['dataset']))
+                        torch.save(state, save_path)
 
             if (i + 1) == cfg['training']['train_iters']:
                 flag = False
@@ -442,12 +383,11 @@ if __name__ == "__main__":
     with open(args.config) as fp:
         cfg = yaml.load(fp)
 
-    run_id = "_".join([#cfg['id'],
-                       cfg['model_params']['variant'],
-                       "pretrain" if not cfg['training']['resumeRGB'] is None else "fromscratch", 
-                       "{}x{}".format(cfg['data']['img_rows'],cfg['data']['img_cols']),
-                       "{}passes".format(cfg['model_params']['mcdo_passes']),
-                       "{}reduction".format(cfg['model_params']['reduction']),
+    run_id = "_".join(["{}x{}".format(cfg['data']['img_rows'],cfg['data']['img_cols']),
+                       "{}reduction".format(cfg['models']['rgb']['reduction']),
+                       "_{}_{}_".format(cfg['models']['rgb']['start_layer'],cfg['models']['rgb']['end_layer']),
+                       "{}passes".format(cfg['models']['rgb']['mcdo_passes']),
+                       "pretrain" if not cfg['models']['rgb']['resume'] is None else "fromscratch", 
                        "_train_{}_".format(list(cfg['data']['train_subsplit'])[-1]),
                        "_test_all_",
                        "01-16-2019"])

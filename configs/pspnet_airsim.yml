@@ -1,30 +1,48 @@
 id: "" #mcdo_pretrain_256px_train_all_test_all_01-16-2019
 model:
     arch: pspnet
-model_params:
-    variant: input_fusion #input_fusion #mcdo #1pass
-    reduction: 1.0
-    mcdo_passes: 5
+# models:
+#     rgb:
+#         in_channels: 3
+#         start_layer: convbnrelu1_1
+#         end_layer: convbnrelu1_3
+#         reduction: 0.5
+#         mcdo_passes: 5
+#         resume: None        
+#     d:
+#         in_channels: 3
+#         start_layer: convbnrelu1_1
+#         end_layer: convbnrelu1_3        
+#         reduction: 0.5
+#         mcdo_passes: 5        
+#         resume: None
+#     fuse:
+#         in_channels: 256 #x4 from size of previous model
+#         start_layer: res_block2
+#         end_layer: classification        
+#         reduction: 0.5
+#         mcdo_passes: 1
+#         resume: None
 models:
     rgb:
         in_channels: 3
         start_layer: convbnrelu1_1
         end_layer: res_block5
-        reduction: 1.0
+        reduction: 0.5
         mcdo_passes: 5
         resume: None        
     d:
         in_channels: 3
         start_layer: convbnrelu1_1
         end_layer: res_block5        
-        reduction: 1.0
+        reduction: 0.5
         mcdo_passes: 5        
         resume: None
     fuse:
-        in_channels: 8192
+        in_channels: 4096
         start_layer: pyramid_pooling
         end_layer: classification        
-        reduction: 1.0
+        reduction: 0.5
         mcdo_passes: 1
         resume: None
 data:
@@ -38,7 +56,7 @@ data:
 training:
     train_iters: 200000
     batch_size: 2 
-    val_interval: 1000
+    val_interval: 5000
     n_workers: 16
     print_interval: 50
     optimizer:

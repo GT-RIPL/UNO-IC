@@ -439,6 +439,7 @@ if __name__ == "__main__":
                        "{}reduction".format(cfg['models']['rgb']['reduction']),
                        "_{}_{}_".format(cfg['models']['rgb']['start_layer'],cfg['models']['rgb']['end_layer']),
                        "{}passes".format(cfg['models']['rgb']['mcdo_passes']),
+                       "{}mcdostart".format(cfg['models']['rgb']['mcdo_start_iter']),
                        "pretrain" if not cfg['models']['rgb']['resume'] is None else "fromscratch", 
                        "_train_{}_".format(list(cfg['data']['train_subsplit'])[-1]),
                        "_test_all_",

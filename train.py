@@ -223,7 +223,7 @@ def train(cfg, writer, logger):
 
             mean_outputs = {m:outputs[m].mean(-1) for m in outputs.keys()}
             if cfg['models'][m]['mcdo_passes']>1:
-                var_outputs = {m:(outputs[m].pow(2).mean(-1)-mean_outputs[m]) for m in outputs.keys()}                
+                var_outputs = {m:(outputs[m].pow(2).mean(-1)-mean_outputs[m].pow(2)) for m in outputs.keys()}                
             else:
                 var_outputs = {m:mean_outputs[m] for m in outputs.keys()}                
 

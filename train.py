@@ -102,12 +102,12 @@ def train(cfg, writer, logger):
                                   mcdo_passes=attr['mcdo_passes'], 
                                   reduction=attr['reduction']).to(device)
 
-        # Load Pretrained PSPNet
-        if cfg['model'] == 'pspnet':
-            caffemodel_dir_path = "./models"
-            model.load_pretrained_model(
-                model_path=os.path.join(caffemodel_dir_path, "pspnet101_cityscapes.caffemodel")
-            )  
+        # # Load Pretrained PSPNet
+        # if cfg['model'] == 'pspnet':
+        #     caffemodel_dir_path = "./models"
+        #     model.load_pretrained_model(
+        #         model_path=os.path.join(caffemodel_dir_path, "pspnet101_cityscapes.caffemodel")
+        #     )  
 
 
         models[model] = torch.nn.DataParallel(models[model], device_ids=range(torch.cuda.device_count()))
@@ -218,12 +218,22 @@ def train(cfg, writer, logger):
                             if not x_aux is None:
                                 outputs_aux[m] = torch.cat((outputs_aux[m], x_aux.unsqueeze(-1)),-1)
 
-            mean_outputs = {m:outputs[m].mean(-1) for m in outputs.keys()}
-            std_outputs = {m:outputs[m].std(-1) for m in outputs.keys()}
+            with torch.no_grad():
+                mean_outputs = {m:outputs[m].mean(-1) for m in outputs.keys()}
+                if cfg['models'][m]['mcdo_passes']>1:
+                    std_outputs = {m:outputs[m].std(-1) for m in outputs.keys()}
+                else:
+                    std_outputs = {m:outputs[m].mean(-1) for m in outputs.keys()}
+
+
 
             if len(outputs_aux)>0:
-                mean_outputs_aux = {m:outputs_aux[m].mean(-1) for m in outputs_aux.keys()}
-                std_outputs_aux = {m:outputs_aux[m].std(-1) for m in outputs_aux.keys()}
+                with torch.no_grad():
+                    mean_outputs_aux = {m:outputs_aux[m].mean(-1) for m in outputs_aux.keys()}
+                    if cfg['models'][m]['mcdo_passes']>1:
+                        std_outputs_aux = {m:outputs_aux[m].std(-1) for m in outputs_aux.keys()}
+                    else:
+                        std_outputs_aux = {m:outputs_aux[m].mean(-1) for m in outputs_aux.keys()}
 
             # stack outputs from parallel legs
             intermediate = torch.cat(tuple([mean_outputs[m] for m in outputs.keys()]+[std_outputs[m] for m in outputs.keys()]),1)
@@ -231,12 +241,21 @@ def train(cfg, writer, logger):
             outputs = models['fuse'](intermediate)
 
             # with torch.no_grad():
-            #     print(mean_outputs['rgb'].cpu().numpy().shape)
-            #     print(intermediate.cpu().numpy().shape)
-            #     print(outputs.cpu().numpy().shape)
+                # print(mean_outputs['rgb'].cpu().numpy())
+                # print(std_outputs['rgb'].cpu().numpy())
+                # print(intermediate.cpu().numpy().shape)
+                # print(outputs.cpu().numpy())
      
             loss = loss_fn(input=outputs,target=labels)
             loss.backward()
+
+            # # average gradients
+            # for m in ['rgb','d']:
+            #     for p in models[m].parameters():
+            #         if not p.grad is None:
+            #             p.grad *= 1./cfg['models'][m]['mcdo_passes']
+
+            # exit()
 
             [optimizers[m].step() for m in models.keys()]
 

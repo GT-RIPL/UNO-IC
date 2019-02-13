@@ -208,7 +208,7 @@ def train(cfg, writer, logger):
                             x, x_aux = x
 
                         if not m in outputs:
-                            outputs[m] = x.unsqueeze(-1)
+                            outputs[m] = x.unsqueeze(-1)+1e-5
 
                             if not x_aux is None:
                                 outputs_aux[m] = x_aux.unsqueeze(-1)
@@ -218,25 +218,32 @@ def train(cfg, writer, logger):
                             if not x_aux is None:
                                 outputs_aux[m] = torch.cat((outputs_aux[m], x_aux.unsqueeze(-1)),-1)
 
-            with torch.no_grad():
-                mean_outputs = {m:outputs[m].mean(-1) for m in outputs.keys()}
-                if cfg['models'][m]['mcdo_passes']>1:
-                    std_outputs = {m:outputs[m].std(-1) for m in outputs.keys()}
-                else:
-                    std_outputs = {m:outputs[m].mean(-1) for m in outputs.keys()}
+            
+            # mean_outputs_tile = {m:torch.cat(tuple([mean_outputs[m].unsqueeze(-1)]*cfg['models'][m]['mcdo_passes']),-1) for m in outputs.keys()}
 
+            mean_outputs = {m:outputs[m].mean(-1) for m in outputs.keys()}
+            if cfg['models'][m]['mcdo_passes']>1:
+                var_outputs = {m:(outputs[m].pow(2).mean(-1)-mean_outputs[m]) for m in outputs.keys()}                
+            else:
+                var_outputs = {m:mean_outputs[m] for m in outputs.keys()}                
+
+            # with torch.no_grad():
+            #     if cfg['models'][m]['mcdo_passes']>1:
+            #         var_outputs = {m:outputs[m].std(-1) for m in outputs.keys()}
+            #     else:
+            #         var_outputs = {m:outputs[m].mean(-1) for m in outputs.keys()}
 
 
             if len(outputs_aux)>0:
+                mean_outputs_aux = {m:outputs_aux[m].mean(-1) for m in outputs_aux.keys()}
                 with torch.no_grad():
-                    mean_outputs_aux = {m:outputs_aux[m].mean(-1) for m in outputs_aux.keys()}
                     if cfg['models'][m]['mcdo_passes']>1:
-                        std_outputs_aux = {m:outputs_aux[m].std(-1) for m in outputs_aux.keys()}
+                        var_outputs_aux = {m:outputs_aux[m].std(-1) for m in outputs_aux.keys()}
                     else:
-                        std_outputs_aux = {m:outputs_aux[m].mean(-1) for m in outputs_aux.keys()}
+                        var_outputs_aux = {m:outputs_aux[m].mean(-1) for m in outputs_aux.keys()}
 
             # stack outputs from parallel legs
-            intermediate = torch.cat(tuple([mean_outputs[m] for m in outputs.keys()]+[std_outputs[m] for m in outputs.keys()]),1)
+            intermediate = torch.cat(tuple([mean_outputs[m] for m in outputs.keys()]+[var_outputs[m] for m in outputs.keys()]),1)
 
             outputs = models['fuse'](intermediate)
 

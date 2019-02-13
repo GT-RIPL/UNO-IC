@@ -204,7 +204,22 @@ def train(cfg, writer, logger):
                 if i>cfg['models'][m]['mcdo_start_iter']:
                     models[m].mcdo_passes = cfg['models'][m]['mcdo_passes']
 
-                    with torch.no_grad():
+                    if not cfg['models'][m]['mcdo_backprop']:
+                        with torch.no_grad():
+                            for mi in range(models[m].mcdo_passes):
+                                x = models[m](inputs[m])
+                                x_aux = None
+                                if isinstance(x,tuple):
+                                    x, x_aux = x
+                                if not m in outputs:
+                                    outputs[m] = x.unsqueeze(-1)
+                                    if not x_aux is None:
+                                        outputs_aux[m] = x_aux.unsqueeze(-1)
+                                else:
+                                    outputs[m] = torch.cat((outputs[m], x.unsqueeze(-1)),-1)
+                                    if not x_aux is None:
+                                        outputs_aux[m] = torch.cat((outputs_aux[m], x_aux.unsqueeze(-1)),-1)
+                    else:
                         for mi in range(models[m].mcdo_passes):
                             x = models[m](inputs[m])
                             x_aux = None
@@ -218,7 +233,8 @@ def train(cfg, writer, logger):
                                 outputs[m] = torch.cat((outputs[m], x.unsqueeze(-1)),-1)
                                 if not x_aux is None:
                                     outputs_aux[m] = torch.cat((outputs_aux[m], x_aux.unsqueeze(-1)),-1)
-                    
+
+
                 else:
                     models[m].mcdo_passes = 1
 
@@ -435,7 +451,8 @@ if __name__ == "__main__":
     with open(args.config) as fp:
         cfg = yaml.load(fp)
 
-    run_id = "_".join(["{}x{}".format(cfg['data']['img_rows'],cfg['data']['img_cols']),
+    run_id = "_".join([cfg['id'],
+                       "{}x{}".format(cfg['data']['img_rows'],cfg['data']['img_cols']),
                        "{}reduction".format(cfg['models']['rgb']['reduction']),
                        "_{}_{}_".format(cfg['models']['rgb']['start_layer'],cfg['models']['rgb']['end_layer']),
                        "{}passes".format(cfg['models']['rgb']['mcdo_passes']),

@@ -91,6 +91,13 @@ class pspnet(nn.Module):
                                [      "cbr_final", int(4096*reduction),  int(512*reduction), 3, 1, 1, False],
                                [ "classification",  int(512*reduction),                None, self.n_classes, 1, 1, 0]]
 
+        # specify in_channels programmatically
+        if in_channels == 0:
+            match = [index for index,row in enumerate(self.default_layers) if row[0]==start_layer][0]
+            in_channels = int(self.default_layers[match-1][2]*4) # two stacked mean and variance = x4
+
+
+
         # Extract Sub Layers for Fusion
         start_i = 0
         end_i = len(self.default_layers)

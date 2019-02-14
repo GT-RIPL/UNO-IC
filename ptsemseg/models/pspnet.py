@@ -95,7 +95,9 @@ class pspnet(nn.Module):
         if in_channels == 0:
             match = [index for index,row in enumerate(self.default_layers) if row[0]==start_layer][0]
             in_channels = int(self.default_layers[match-1][2]*4) # two stacked mean and variance = x4
-
+        if in_channels == -1:
+            match = [index for index,row in enumerate(self.default_layers) if row[0]==start_layer][0]
+            in_channels = int(self.default_layers[match-1][2]*1) # forwarded output from previous layer
 
 
         # Extract Sub Layers for Fusion
@@ -220,10 +222,13 @@ class pspnet(nn.Module):
         # # H/4, W/4 -> H/8, W/8
         if 'res_block2' in self.layers.keys():
             x = getattr(self,'res_block2')(x)
+            x = getattr(self,'dropout')(x) 
         if 'res_block3' in self.layers.keys():
             x = getattr(self,'res_block3')(x)
+            x = getattr(self,'dropout')(x) 
         if 'res_block4' in self.layers.keys():
             x = getattr(self,'res_block4')(x)            
+            x = getattr(self,'dropout')(x) 
 
         if self.training and 'convbnrelu4_aux' in self.layers.keys():  # Auxiliary layers for training
             x_aux = getattr(self,'convbnrelu4_aux')(x)
@@ -231,10 +236,12 @@ class pspnet(nn.Module):
             x_aux = getattr(self,'aux_cls')(x_aux)
 
         if 'res_block5' in self.layers.keys():
+            x = getattr(self,'dropout')(x) 
             x = getattr(self,'res_block5')(x)   
 
         if 'pyramid_pooling' in self.layers.keys():
             x = getattr(self,'pyramid_pooling')(x)   
+            x = getattr(self,'dropout')(x) 
 
         if 'cbr_final' in self.layers.keys():
             x = getattr(self,'cbr_final')(x)   

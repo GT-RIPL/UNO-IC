@@ -1,11 +1,29 @@
-id: "layer_test"
+id: "02-14-2019_layer_test"
 model:
     arch: pspnet
 models:
+    # rgb_static:
+    #     in_channels: 3
+    #     start_layer: convbnrelu1_1
+    #     end_layer: convbnrelu1_2
+    #     reduction: 0.5
+    #     mcdo_passes: 1
+    #     mcdo_start_iter: 0
+    #     mcdo_backprop: None
+    #     resume: None     
+    # d_static:
+    #     in_channels: 3
+    #     start_layer: convbnrelu1_1
+    #     end_layer: convbnrelu1_2
+    #     reduction: 0.5
+    #     mcdo_passes: 1
+    #     mcdo_start_iter: 0
+    #     mcdo_backprop: None
+    #     resume: None     
     rgb:
         in_channels: 3
         start_layer: convbnrelu1_1
-        end_layer: cbr_final
+        end_layer: convbnrelu1_3
         reduction: 0.5
         mcdo_passes: 5
         mcdo_start_iter: 0
@@ -14,7 +32,7 @@ models:
     d:
         in_channels: 3
         start_layer: convbnrelu1_1
-        end_layer: cbr_final        
+        end_layer: convbnrelu1_3
         reduction: 0.5
         mcdo_passes: 5  
         mcdo_start_iter: 0
@@ -22,7 +40,7 @@ models:
         resume: None
     fuse:
         in_channels: 0 #if receiving mean and variance from input legs
-        start_layer: classification
+        start_layer: res_block2 #res_block3 #res_block2
         end_layer: classification        
         reduction: 0.5
         mcdo_passes: 1
@@ -67,8 +85,8 @@ data:
     img_rows: 128 #512
     img_cols: 128 #512
 training:
-    train_iters: 200000
-    batch_size: 2 
+    train_iters: 300000
+    batch_size: 2
     val_interval: 5000
     n_workers: 16
     print_interval: 50

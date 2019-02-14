@@ -194,6 +194,8 @@ def train(cfg, writer, logger):
 
             [optimizers[m].zero_grad() for m in models.keys()]
             
+            # outputs = {m:models[m+"_static"](inputs[m]) for m in ['rgb','d']}
+            # inputs = outputs
 
             outputs = {}
             outputs_aux = {}
@@ -454,7 +456,9 @@ if __name__ == "__main__":
     run_id = "_".join([cfg['id'],
                        "{}x{}".format(cfg['data']['img_rows'],cfg['data']['img_cols']),
                        "{}reduction".format(cfg['models']['rgb']['reduction']),
-                       "_{}_{}_".format(cfg['models']['rgb']['start_layer'],cfg['models']['rgb']['end_layer']),
+                       # "_rgbS{}->{}_".format(cfg['models']['rgb_static']['start_layer'],cfg['models']['rgb_static']['end_layer']),
+                       "_rgbMCDO{}->{}_".format(cfg['models']['rgb']['start_layer'],cfg['models']['rgb']['end_layer']),
+                       "_fuseS{}->{}_".format(cfg['models']['fuse']['start_layer'],cfg['models']['fuse']['end_layer']),
                        "{}passes".format(cfg['models']['rgb']['mcdo_passes']),
                        "{}mcdostart".format(cfg['models']['rgb']['mcdo_start_iter']),
                        "pretrain" if not cfg['models']['rgb']['resume'] is None else "fromscratch", 

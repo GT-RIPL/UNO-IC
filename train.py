@@ -385,6 +385,9 @@ def train(cfg, writer, logger):
                             if images.shape[0]<=1:
                                 continue
 
+                            outputs = {m:models[m+"_static"](inputs[m]) for m in ['rgb','d']}
+                            inputs = outputs
+
                             outputs = {}
                             outputs_aux = {}
 

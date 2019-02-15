@@ -213,10 +213,16 @@ class pspnet(nn.Module):
     def forward(self, x, dropout=False):
 
         # Turn on training to get weight dropout
-        if self.mcdo_passes>1:
+        if self.training:
             self.dropout.train(mode=True)
+            dropout_scalar = 1
         else:
-            self.dropout.eval()
+            if self.mcdo_passes>1:
+                self.dropout.train(mode=True)
+                dropout_scalar = 1-self.dropout.p
+            else:
+                self.dropout.eval()
+                dropout_scalar = 1
 
         inp_shape = x.shape[2:]
 
@@ -224,42 +230,52 @@ class pspnet(nn.Module):
         if 'convbnrelu1_1' in self.layers.keys():
             x = getattr(self,'convbnrelu1_1')(x) 
             x = getattr(self,'dropout')(x) 
+            x *= dropout_scalar
         if 'convbnrelu1_2' in self.layers.keys():
             x = getattr(self,'convbnrelu1_2')(x) 
             x = getattr(self,'dropout')(x) 
+            x *= dropout_scalar
         if 'convbnrelu1_3' in self.layers.keys():
             x = getattr(self,'convbnrelu1_3')(x) 
             x = getattr(self,'dropout')(x) 
+            x *= dropout_scalar
             x = F.max_pool2d(x, 3, 2, 1)
 
         # # H/4, W/4 -> H/8, W/8
         if 'res_block2' in self.layers.keys():
             x = getattr(self,'res_block2')(x)
             x = getattr(self,'dropout')(x) 
+            x *= dropout_scalar
         if 'res_block3' in self.layers.keys():
             x = getattr(self,'res_block3')(x)
             x = getattr(self,'dropout')(x) 
+            x *= dropout_scalar
         if 'res_block4' in self.layers.keys():
             x = getattr(self,'res_block4')(x)            
             x = getattr(self,'dropout')(x) 
+            x *= dropout_scalar
 
         if self.training and 'convbnrelu4_aux' in self.layers.keys():  # Auxiliary layers for training
             x_aux = getattr(self,'convbnrelu4_aux')(x)
             x_aux = getattr(self,'dropout')(x_aux)
+            x_aux *= dropout_scalar
             x_aux = getattr(self,'aux_cls')(x_aux)
 
         if 'res_block5' in self.layers.keys():
-            x = getattr(self,'dropout')(x) 
             x = getattr(self,'res_block5')(x)   
+            x = getattr(self,'dropout')(x) 
+            x *= dropout_scalar
 
         if 'pyramid_pooling' in self.layers.keys():
             x = getattr(self,'pyramid_pooling')(x)   
             x = getattr(self,'dropout')(x) 
+            x *= dropout_scalar
 
         if 'cbr_final' in self.layers.keys():
             x = getattr(self,'cbr_final')(x)   
         if 'dropout' in self.layers.keys():
             x = getattr(self,'dropout')(x)   
+            x *= dropout_scalar
 
         if 'classification' in self.layers.keys():
             x = getattr(self,'classification')(x)   

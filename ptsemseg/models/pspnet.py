@@ -98,12 +98,16 @@ class pspnet(nn.Module):
 
             if start_layer == "res_block5":
                 match = [row[0] for row in (self.default_layers)].index("convbnrelu4_aux")
+                in_channels = int(self.default_layers[match-1][2]*4) # two stacked mean and variance = x4
+            elif start_layer == "cbr_final":
+                match = [row[0] for row in (self.default_layers)].index("cbr_final")
+                in_channels = int(self.default_layers[match][1]*0.5) # two stacked mean and variance = x4
             else:
                 match = [row[0] for row in (self.default_layers)].index(start_layer)
+                in_channels = int(self.default_layers[match-1][2]*4) # two stacked mean and variance = x4
             
 
 
-            in_channels = int(self.default_layers[match-1][2]*4) # two stacked mean and variance = x4
 
 
         if in_channels == -1:

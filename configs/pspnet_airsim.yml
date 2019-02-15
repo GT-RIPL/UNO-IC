@@ -1,7 +1,7 @@
-id: "isolated_layer_test"
+id: "correctedDropoutScalarLayerTest"
 model:
     arch: pspnet
-start_layers: [convbnrelu1_1,res_block2] #,res_block4]
+start_layers: [convbnrelu1_1,cbr_final] #,res_block4]
 models:
     # rgb_static:
     #     in_channels: 3

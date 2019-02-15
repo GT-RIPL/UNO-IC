@@ -97,7 +97,7 @@ class pspnet(nn.Module):
 
 
             if start_layer == "res_block5":
-                match = [row[0] for row in (self.default_layers)].index(convbnrelu4_aux)
+                match = [row[0] for row in (self.default_layers)].index("convbnrelu4_aux")
             else:
                 match = [row[0] for row in (self.default_layers)].index(start_layer)
             

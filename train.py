@@ -108,11 +108,15 @@ def train(cfg, writer, logger):
             start_layer = "convbnrelu1_1"
             end_layer = layers[layers.index(cfg['start_layers'][1])-1]
         elif "fuse" == model:
-            start_layer = cfg['start_layers'][2]
+            # start_layer = cfg['start_layers'][2]
+            # end_layer = "classification"
+            start_layer = cfg['start_layers'][1]
             end_layer = "classification"
         else:
-            start_layer = cfg['start_layers'][1]
-            end_layer = layers[layers.index(cfg['start_layers'][2])-1]
+            # start_layer = cfg['start_layers'][1]
+            # end_layer = layers[layers.index(cfg['start_layers'][2])-1]
+            start_layer = cfg['start_layers'][0]
+            end_layer = layers[layers.index(cfg['start_layers'][1])-1]
 
         print(start_layer,end_layer)
 
@@ -224,8 +228,8 @@ def train(cfg, writer, logger):
             # outputs = models['fused'](inputs['fused'])
 
 
-            outputs = {m:models[m+"_static"](inputs[m]) for m in ['rgb','d']}
-            inputs = outputs
+            # outputs = {m:models[m+"_static"](inputs[m]) for m in ['rgb','d']}
+            # inputs = outputs
 
             outputs = {}
             outputs_aux = {}
@@ -385,8 +389,8 @@ def train(cfg, writer, logger):
                             if images.shape[0]<=1:
                                 continue
 
-                            outputs = {m:models[m+"_static"](inputs[m]) for m in ['rgb','d']}
-                            inputs = outputs
+                            # outputs = {m:models[m+"_static"](inputs[m]) for m in ['rgb','d']}
+                            # inputs = outputs
 
                             outputs = {}
                             outputs_aux = {}
@@ -496,7 +500,8 @@ if __name__ == "__main__":
     run_id = "_".join([cfg['id'],
                        "{}x{}".format(cfg['data']['img_rows'],cfg['data']['img_cols']),
                        "{}reduction".format(cfg['models']['rgb']['reduction']),
-                       "_{}-{}-{}_".format(cfg['start_layers'][0],cfg['start_layers'][1],cfg['start_layers'][2]),
+                       # "_{}-{}-{}_".format(cfg['start_layers'][0],cfg['start_layers'][1],cfg['start_layers'][2]),
+                       "_{}-{}_".format(cfg['start_layers'][0],cfg['start_layers'][1]),
                        # "_rgbS{}->{}_".format(cfg['models']['rgb_static']['start_layer'],cfg['models']['rgb_static']['end_layer']),
                        # "_rgbMCDO{}->{}_".format(cfg['models']['rgb']['start_layer'],cfg['models']['rgb']['end_layer']),
                        # "_fuseS{}->{}_".format(cfg['models']['fuse']['start_layer'],cfg['models']['fuse']['end_layer']),

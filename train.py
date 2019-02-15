@@ -98,8 +98,6 @@ def train(cfg, writer, logger):
                    "res_block2",
                    "res_block3",
                    "res_block4",
-              "convbnrelu4_aux",
-                      "aux_cls",
                    "res_block5",
               "pyramid_pooling",
                     "cbr_final",

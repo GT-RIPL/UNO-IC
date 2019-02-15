@@ -93,10 +93,18 @@ class pspnet(nn.Module):
 
         # specify in_channels programmatically
         if in_channels == 0:
-            match = [index for index,row in enumerate(self.default_layers) if row[0]==start_layer][0]
+            print(self.default_layers)
+
+
+            match = [row[0] for row in (self.default_layers)].index(start_layer)
+            print(match)
             in_channels = int(self.default_layers[match-1][2]*4) # two stacked mean and variance = x4
+
+
         if in_channels == -1:
-            match = [index for index,row in enumerate(self.default_layers) if row[0]==start_layer][0]
+            match = [row[0] for row in (self.default_layers)].index(start_layer)
+
+
             in_channels = int(self.default_layers[match-1][2]*1) # forwarded output from previous layer
 
 

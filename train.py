@@ -92,13 +92,40 @@ def train(cfg, writer, logger):
     schedulers = {}
     # val_loss_meter = {}
 
-    for model,attr in cfg["models"].items():        
+    layers = [  "convbnrelu1_1",
+                "convbnrelu1_2",
+                "convbnrelu1_3",
+                   "res_block2",
+                   "res_block3",
+                   "res_block4",
+              "convbnrelu4_aux",
+                      "aux_cls",
+                   "res_block5",
+              "pyramid_pooling",
+                    "cbr_final",
+               "classification"]
+
+    for model,attr in cfg["models"].items():
+        if "_static" in model:
+            start_layer = "convbnrelu1_1"
+            end_layer = layers[layers.index(cfg['start_layers'][1])-1]
+        elif "fuse" == model:
+            start_layer = cfg['start_layers'][2]
+            end_layer = "classification"
+        else:
+            start_layer = cfg['start_layers'][1]
+            end_layer = layers[layers.index(cfg['start_layers'][2])-1]
+
+        print(start_layer,end_layer)
+
         models[model] = get_model(cfg['model'], 
                                   n_classes, 
                                   input_size=(cfg['data']['img_rows'],cfg['data']['img_cols']),
                                   in_channels=attr['in_channels'],
-                                  start_layer=attr['start_layer'],
-                                  end_layer=attr['end_layer'],
+                                  start_layer=start_layer,
+                                  end_layer=end_layer,
+                                  # start_layer=attr['start_layer'],
+                                  # end_layer=attr['end_layer'],
                                   mcdo_passes=attr['mcdo_passes'], 
                                   reduction=attr['reduction']).to(device)
 
@@ -192,10 +219,15 @@ def train(cfg, writer, logger):
             if images.shape[0]<=1:
                 continue
 
+            ###
+
             [optimizers[m].zero_grad() for m in models.keys()]
-            
-            # outputs = {m:models[m+"_static"](inputs[m]) for m in ['rgb','d']}
-            # inputs = outputs
+
+            # outputs = models['fused'](inputs['fused'])
+
+
+            outputs = {m:models[m+"_static"](inputs[m]) for m in ['rgb','d']}
+            inputs = outputs
 
             outputs = {}
             outputs_aux = {}
@@ -282,6 +314,11 @@ def train(cfg, writer, logger):
             intermediate = torch.cat(tuple([mean_outputs[m] for m in outputs.keys()]+[var_outputs[m] for m in outputs.keys()]),1)
 
             outputs = models['fuse'](intermediate)
+
+            ###
+
+
+
 
             # with torch.no_grad():
                 # print(mean_outputs['rgb'].cpu().numpy())
@@ -370,6 +407,8 @@ def train(cfg, writer, logger):
 
                             outputs = models['fuse'](intermediate)
 
+                            # outputs = models['fused'](inputs['fused'])
+
                             val_loss = loss_fn(input=outputs, target=labels)
 
                             pred = outputs.data.max(1)[1].cpu().numpy()
@@ -456,9 +495,10 @@ if __name__ == "__main__":
     run_id = "_".join([cfg['id'],
                        "{}x{}".format(cfg['data']['img_rows'],cfg['data']['img_cols']),
                        "{}reduction".format(cfg['models']['rgb']['reduction']),
+                       "_{}-{}-{}_".format(cfg['start_layers'][0],cfg['start_layers'][1],cfg['start_layers'][2]),
                        # "_rgbS{}->{}_".format(cfg['models']['rgb_static']['start_layer'],cfg['models']['rgb_static']['end_layer']),
-                       "_rgbMCDO{}->{}_".format(cfg['models']['rgb']['start_layer'],cfg['models']['rgb']['end_layer']),
-                       "_fuseS{}->{}_".format(cfg['models']['fuse']['start_layer'],cfg['models']['fuse']['end_layer']),
+                       # "_rgbMCDO{}->{}_".format(cfg['models']['rgb']['start_layer'],cfg['models']['rgb']['end_layer']),
+                       # "_fuseS{}->{}_".format(cfg['models']['fuse']['start_layer'],cfg['models']['fuse']['end_layer']),
                        "{}passes".format(cfg['models']['rgb']['mcdo_passes']),
                        "{}mcdostart".format(cfg['models']['rgb']['mcdo_start_iter']),
                        "pretrain" if not cfg['models']['rgb']['resume'] is None else "fromscratch", 

@@ -1,4 +1,4 @@
-id: "learnedLoss"
+id: "test"
 model:
     arch: pspnet
 start_layers: [convbnrelu1_1,res_block5] #,res_block4]

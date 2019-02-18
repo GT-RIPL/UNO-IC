@@ -111,8 +111,13 @@ def train(cfg, writer, logger):
                                   shuffle=True)
 
     valloaders = {key:data.DataLoader(v_loader[key], 
-                                batch_size=cfg['training']['batch_size'], 
-                                num_workers=cfg['training']['n_workers']) for key in v_loader.keys()}
+                                      batch_size=cfg['training']['batch_size'], 
+                                      num_workers=cfg['training']['n_workers']) for key in v_loader.keys()}
+
+    # add training samples to validation sweep
+    valloaders = {**valloaders,'train':data.DataLoader(t_loader,
+                                                       batch_size=cfg['training']['batch_size'], 
+                                                       num_workers=cfg['training']['n_workers'])}
 
     # Setup Metrics
     running_metrics_val = {env:runningScore(n_classes) for env in v_loader.keys()}
@@ -428,6 +433,7 @@ def train(cfg, writer, logger):
                 [models[m].eval() for m in models.keys()]
 
                 with torch.no_grad():
+                    # for k,valloader in valloaders.items():
                     for k,valloader in valloaders.items():
                         for i_val, (images, labels, aux) in tqdm(enumerate(valloader)):
                             

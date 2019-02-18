@@ -25,10 +25,41 @@ from ptsemseg.schedulers import get_scheduler
 from ptsemseg.optimizers import get_optimizer
 
 from tensorboardX import SummaryWriter
+from functools import partial
 
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 from matplotlib.colors import Normalize
+
+def module_hook(mean_outputs,module, grad_input, grad_out):
+
+
+    print(mean_outputs.keys())
+
+    if isinstance(mean_outputs['rgb'],tuple):
+        rgb,_ = mean_outputs['rgb']
+        d,_ = mean_outputs['d']
+    else:
+        rgb = mean_outputs['rgb']
+        d = mean_outputs['d']
+
+    print(mean_outputs['rgb'].shape)
+
+
+    
+    print(len(list(grad_input)))
+    print(len(list(grad_out)))
+    # print(ptr)
+    # ptr[0] = grad_input
+
+def tensor_hook(output,grad):
+
+    sigma = torch.cat((output[:,:int(output.shape[1]/2),:,:],output[:,:int(output.shape[1]/2),:,:]),1)
+
+    modified_grad = 0.5*torch.mul(torch.exp(-sigma),grad.pow(2))+0.5*sigma
+
+    return modified_grad
+
 
 def train(cfg, writer, logger):
     
@@ -85,12 +116,13 @@ def train(cfg, writer, logger):
 
     # Setup Metrics
     running_metrics_val = {env:runningScore(n_classes) for env in v_loader.keys()}
+    val_loss_meter = {env:averageMeter() for env in v_loader.keys()}
+    
 
     start_iter = 0
     models = {}
     optimizers = {}
     schedulers = {}
-    # val_loss_meter = {}
 
     layers = [  "convbnrelu1_1",
                 "convbnrelu1_2",
@@ -118,8 +150,6 @@ def train(cfg, writer, logger):
             start_layer = cfg['start_layers'][0]
             end_layer = layers[layers.index(cfg['start_layers'][1])-1]
 
-        print(start_layer,end_layer)
-
         models[model] = get_model(cfg['model'], 
                                   n_classes, 
                                   input_size=(cfg['data']['img_rows'],cfg['data']['img_cols']),
@@ -129,6 +159,7 @@ def train(cfg, writer, logger):
                                   # start_layer=attr['start_layer'],
                                   # end_layer=attr['end_layer'],
                                   mcdo_passes=attr['mcdo_passes'], 
+                                  learned_uncertainty=attr['learned_uncertainty'],
                                   reduction=attr['reduction']).to(device)
 
         # # Load Pretrained PSPNet
@@ -152,6 +183,7 @@ def train(cfg, writer, logger):
         schedulers[model] = get_scheduler(optimizers[model], cfg['training']['lr_schedule'])
 
         loss_fn = get_loss_function(cfg)
+        # loss_sig = # Loss Function for Aleatoric Uncertainty
         logger.info("Using loss {}".format(loss_fn))
 
         # Load pretrained weights
@@ -189,7 +221,7 @@ def train(cfg, writer, logger):
                 logger.info("No checkpoint found at '{}'".format(attr['resume']))        
 
         # val_loss_meter[model] = averageMeter()
-    val_loss_meter = averageMeter()
+    # val_loss_meter = averageMeter()
     time_meter = averageMeter()
 
     best_iou = -100.0
@@ -230,6 +262,13 @@ def train(cfg, writer, logger):
 
             # outputs = {m:models[m+"_static"](inputs[m]) for m in ['rgb','d']}
             # inputs = outputs
+
+
+            # register hooks for modifying gradients     
+            # mean_outputs = {}       
+            # models['fuse'].register_backward_hook(partial(module_hook,mean_outputs))
+            # models['rgb'].register_backward_hook(partial(module_hook,mean_outputs))
+
 
             outputs = {}
             outputs_aux = {}
@@ -315,9 +354,19 @@ def train(cfg, writer, logger):
             # stack outputs from parallel legs
             intermediate = torch.cat(tuple([mean_outputs[m] for m in outputs.keys()]+[var_outputs[m] for m in outputs.keys()]),1)
 
+            # save mean + std outputs to reference for backward_hook loss update
+            # ptrs['rgb'] = [10]
+
+
             outputs = models['fuse'](intermediate)
 
             ###
+            hooks = {m:mean_outputs[m].register_hook(partial(tensor_hook,mean_outputs[m])) for m in mean_outputs.keys()}
+
+
+            # register hooks for modifying gradients
+            # ptrs = {m:mean_outputs[m] for m in ['fuse']}
+            # [models[m].register_backward_hook(partial(module_hook,ptrs[m])) for m in ptrs.keys()]
 
 
 
@@ -330,6 +379,16 @@ def train(cfg, writer, logger):
      
             loss = loss_fn(input=outputs,target=labels)
             loss.backward()
+
+            [hooks[h].remove() for h in hooks.keys()]            
+
+            # print(ptrs['fuse'][0])
+            # # print(list(ptrs['fuse'][0])[0].cpu().numpy().shape)
+
+            # print("outputs",outputs.shape)
+            # print("intermediate",intermediate.shape)
+
+
 
             # # average gradients
             # for m in ['rgb','d']:
@@ -435,14 +494,14 @@ def train(cfg, writer, logger):
 
                             running_metrics_val[k].update(gt, pred)
 
-                            val_loss_meter.update(val_loss.item())
+                            val_loss_meter[k].update(val_loss.item())
 
 
-                    writer.add_scalar('loss/val_loss', val_loss_meter.avg, i+1)
-                    logger.info("Iter %d Loss: %.4f" % (i + 1, val_loss_meter.avg))
+                    for k in valloaders.keys():
+                        writer.add_scalar('loss/val_loss', val_loss_meter[k].avg, i+1)
+                        logger.info("Iter %d Loss: %.4f" % (i + 1, val_loss_meter[k].avg))
                 
                 for env,valloader in valloaders.items():
-
                     score, class_iou = running_metrics_val[env].get_scores()
                     for k, v in score.items():
                         print(k, v)

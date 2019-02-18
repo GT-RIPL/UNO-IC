@@ -56,6 +56,7 @@ class pspnet(nn.Module):
         input_size=(473, 473),
         version=None,
         mcdo_passes=1,
+        learned_uncertainty="none",
         in_channels=3,
         start_layer="convbnrelu1_1",
         end_layer="classification",
@@ -77,6 +78,7 @@ class pspnet(nn.Module):
         )
 
         self.mcdo_passes = mcdo_passes
+        self.learned_uncertainty = learned_uncertainty
 
         self.default_layers = [[  "convbnrelu1_1",                   4,   int(64*reduction), 3, 1, 2, False],
                                [  "convbnrelu1_2",   int(64*reduction),   int(64*reduction), 3, 1, 1, False],
@@ -91,11 +93,9 @@ class pspnet(nn.Module):
                                [      "cbr_final", int(4096*reduction),  int(512*reduction), 3, 1, 1, False],
                                [ "classification",  int(512*reduction),                None, self.n_classes, 1, 1, 0]]
 
+
         # specify in_channels programmatically
         if in_channels == 0:
-            print(self.default_layers)
-
-
             if start_layer == "res_block5":
                 match = [row[0] for row in (self.default_layers)].index("convbnrelu4_aux")
                 in_channels = int(self.default_layers[match-1][2]*4) # two stacked mean and variance = x4
@@ -105,16 +105,15 @@ class pspnet(nn.Module):
             else:
                 match = [row[0] for row in (self.default_layers)].index(start_layer)
                 in_channels = int(self.default_layers[match-1][2]*4) # two stacked mean and variance = x4
-            
-
-
-
-
         if in_channels == -1:
             match = [row[0] for row in (self.default_layers)].index(start_layer)
-
-
             in_channels = int(self.default_layers[match-1][2]*1) # forwarded output from previous layer
+
+        # double size of input after learned uncertainty layer (mu,sigma)
+        if learned_uncertainty=="double_input":
+            # match = [row[0] for row in (self.default_layers)].index(start_layer)
+            # in_channels = self.default_layers[match][1]*2
+            in_channels *= 2
 
 
         # Extract Sub Layers for Fusion
@@ -232,58 +231,79 @@ class pspnet(nn.Module):
 
         # H, W -> H/2, W/2
         if 'convbnrelu1_1' in self.layers.keys():
+            xprev = x            
             x = getattr(self,'convbnrelu1_1')(x) 
             x = getattr(self,'dropout')(x) 
             x *= dropout_scalar
         if 'convbnrelu1_2' in self.layers.keys():
+            xprev = x            
             x = getattr(self,'convbnrelu1_2')(x) 
             x = getattr(self,'dropout')(x) 
             x *= dropout_scalar
         if 'convbnrelu1_3' in self.layers.keys():
+            xprev = x
             x = getattr(self,'convbnrelu1_3')(x) 
             x = getattr(self,'dropout')(x) 
             x *= dropout_scalar
+            
             x = F.max_pool2d(x, 3, 2, 1)
 
         # # H/4, W/4 -> H/8, W/8
         if 'res_block2' in self.layers.keys():
+            xprev = x
             x = getattr(self,'res_block2')(x)
             x = getattr(self,'dropout')(x) 
             x *= dropout_scalar
         if 'res_block3' in self.layers.keys():
+            xprev = x
             x = getattr(self,'res_block3')(x)
             x = getattr(self,'dropout')(x) 
             x *= dropout_scalar
         if 'res_block4' in self.layers.keys():
+            xprev = x
             x = getattr(self,'res_block4')(x)            
             x = getattr(self,'dropout')(x) 
             x *= dropout_scalar
 
         if self.training and 'convbnrelu4_aux' in self.layers.keys():  # Auxiliary layers for training
+            xprev = x            
             x_aux = getattr(self,'convbnrelu4_aux')(x)
             x_aux = getattr(self,'dropout')(x_aux)
             x_aux *= dropout_scalar
             x_aux = getattr(self,'aux_cls')(x_aux)
 
         if 'res_block5' in self.layers.keys():
+            xprev = x
             x = getattr(self,'res_block5')(x)   
             x = getattr(self,'dropout')(x) 
             x *= dropout_scalar
 
         if 'pyramid_pooling' in self.layers.keys():
+            xprev = x            
             x = getattr(self,'pyramid_pooling')(x)   
             x = getattr(self,'dropout')(x) 
             x *= dropout_scalar
 
         if 'cbr_final' in self.layers.keys():
+            xprev = x
             x = getattr(self,'cbr_final')(x)   
-        if 'dropout' in self.layers.keys():
             x = getattr(self,'dropout')(x)   
             x *= dropout_scalar
 
         if 'classification' in self.layers.keys():
+            xprev = x
             x = getattr(self,'classification')(x)   
             x = F.interpolate(x, size=self.input_size, mode='bilinear', align_corners=True)
+
+        if self.learned_uncertainty == "yes":
+            last_module = [s[0] for s in self.sub_layers if not s[1] is None][-1]
+            sigma = getattr(self,last_module)(xprev)
+            if last_module=="convbnrelu1_3":
+                sigma = F.max_pool2d(sigma, 3, 2, 1)
+            if last_module=="classification":
+                sigma = F.interpolate(sigma, size=self.input_size, mode='bilinear', align_corners=True)
+
+            x = torch.cat((x,sigma),1)
 
         if self.training and 'convbnrelu4_aux' in self.layers.keys():
             return (x, x_aux)

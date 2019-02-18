@@ -1,7 +1,7 @@
-id: "test"
+id: "learnedLossCombined"
 model:
     arch: pspnet
-start_layers: [convbnrelu1_1,res_block5] #,res_block4]
+start_layers: [convbnrelu1_1,res_block3] #,res_block4]
 models:
     # rgb_static:
     #     in_channels: 3

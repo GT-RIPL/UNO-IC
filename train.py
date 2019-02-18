@@ -52,11 +52,14 @@ def module_hook(mean_outputs,module, grad_input, grad_out):
     # print(ptr)
     # ptr[0] = grad_input
 
-def tensor_hook(output,grad):
+def tensor_hook(data,grad):
+
+    output, cross_loss = data
 
     sigma = torch.cat((output[:,:int(output.shape[1]/2),:,:],output[:,:int(output.shape[1]/2),:,:]),1)
 
-    modified_grad = 0.5*torch.mul(torch.exp(-sigma),grad.pow(2))+0.5*sigma
+    modified_grad = 0.5*torch.mul(torch.exp(-sigma),cross_loss*grad.pow(2))+0.5*sigma
+
 
     return modified_grad
 
@@ -120,8 +123,8 @@ def train(cfg, writer, logger):
                                                        num_workers=cfg['training']['n_workers'])}
 
     # Setup Metrics
-    running_metrics_val = {env:runningScore(n_classes) for env in v_loader.keys()}
-    val_loss_meter = {env:averageMeter() for env in v_loader.keys()}
+    running_metrics_val = {env:runningScore(n_classes) for env in valloaders.keys()}
+    val_loss_meter = {env:averageMeter() for env in valloaders.keys()}
     
 
     start_iter = 0
@@ -356,6 +359,13 @@ def train(cfg, writer, logger):
                     else:
                         var_outputs_aux = {m:outputs_aux[m].mean(-1) for m in outputs_aux.keys()}
 
+            # # UNCERTAINTY
+            # # convert log variance to normal variance
+            # for m in mean_outputs.keys():
+            #     var_split = int(mean_outputs[m].shape[1]/2)
+            #     mean_outputs[m][:,:var_split,:,:] = torch.exp(mean_outputs[m][:,:var_split,:,:])
+
+
             # stack outputs from parallel legs
             intermediate = torch.cat(tuple([mean_outputs[m] for m in outputs.keys()]+[var_outputs[m] for m in outputs.keys()]),1)
 
@@ -365,8 +375,6 @@ def train(cfg, writer, logger):
 
             outputs = models['fuse'](intermediate)
 
-            ###
-            hooks = {m:mean_outputs[m].register_hook(partial(tensor_hook,mean_outputs[m])) for m in mean_outputs.keys()}
 
 
             # register hooks for modifying gradients
@@ -383,6 +391,9 @@ def train(cfg, writer, logger):
                 # print(outputs.cpu().numpy())
      
             loss = loss_fn(input=outputs,target=labels)
+
+            hooks = {m:mean_outputs[m].register_hook(partial(tensor_hook,(mean_outputs[m],loss))) for m in mean_outputs.keys()}
+
             loss.backward()
 
             [hooks[h].remove() for h in hooks.keys()]            
@@ -504,8 +515,8 @@ def train(cfg, writer, logger):
 
 
                     for k in valloaders.keys():
-                        writer.add_scalar('loss/val_loss', val_loss_meter[k].avg, i+1)
-                        logger.info("Iter %d Loss: %.4f" % (i + 1, val_loss_meter[k].avg))
+                        writer.add_scalar('loss/val_loss/{}'.format(k), val_loss_meter[k].avg, i+1)
+                        logger.info("%s Iter %d Loss: %.4f" % (k, i + 1, val_loss_meter[k].avg))
                 
                 for env,valloader in valloaders.items():
                     score, class_iou = running_metrics_val[env].get_scores()
@@ -518,7 +529,7 @@ def train(cfg, writer, logger):
                         logger.info('{}: {}'.format(k, v))
                         writer.add_scalar('val_metrics/{}/cls_{}'.format(env,k), v, i+1)
 
-                    val_loss_meter.reset()
+                    val_loss_meter[env].reset()
                     running_metrics_val[env].reset()
 
                 for m in models.keys():

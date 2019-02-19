@@ -33,7 +33,7 @@ from matplotlib.colors import Normalize
 
 def tensor_hook(data,grad):
     output, cross_loss = data
-    sigma = torch.cat((output[:,:int(output.shape[1]/2),:,:],output[:,:int(output.shape[1]/2),:,:]),1)
+    sigma = torch.cat((output[:,int(output.shape[1]/2):,:,:],output[:,int(output.shape[1]/2):,:,:]),1)
 
     # modified_grad = 0.5*torch.mul(torch.exp(-sigma),cross_loss)+0.5*torch.mul(torch.exp(-sigma),grad.pow(2))+0.5*sigma
     # modified_grad = 0.5*torch.mul(torch.exp(-sigma),cross_loss)+0.5*sigma
@@ -43,7 +43,7 @@ def tensor_hook(data,grad):
     return modified_grad
 
 
-def train(cfg, writer, logger):
+def train(cfg, writer, logger, logdir):
     
     # Setup seeds
     torch.manual_seed(cfg.get('seed', 1337))
@@ -83,7 +83,7 @@ def train(cfg, writer, logger):
     v_loader = {env:data_loader(
         data_path,
         is_transform=True,
-        split="val", subsplit=env, scale_quantity=0.5,
+        split="val", subsplit=env, scale_quantity=0.05,
         img_size=(cfg['data']['img_rows'],cfg['data']['img_cols']),) for env in ["fog_000",
                                                                                  # "fog_005",
                                                                                  # "fog_010",
@@ -313,8 +313,6 @@ def train(cfg, writer, logger):
                                     if not x_aux is None:
                                         outputs_aux[m] = x_aux.unsqueeze(-1)
                                 else:
-                                    print(x.shape)
-                                    print(outputs[m].shape)
                                     outputs[m] = torch.cat((outputs[m], x.unsqueeze(-1)),-1)
                                     if not x_aux is None:
                                         outputs_aux[m] = torch.cat((outputs_aux[m], x_aux.unsqueeze(-1)),-1)
@@ -435,6 +433,8 @@ def train(cfg, writer, logger):
                                       "d": depth,
                                       "fused": fused}
 
+                            orig = inputs.copy()
+
                             if images.shape[0]<=1:
                                 continue
 
@@ -479,16 +479,44 @@ def train(cfg, writer, logger):
 
                             # print(uncertainty_rgb.shape)
 
-                            # plt.figure()
-                            # plt.subplot(221)
-                            # plt.imshow(outputs_rgb[0,:3,:,:].permute(1,2,0).cpu().numpy())
-                            # plt.subplot(222)
-                            # plt.imshow(gt[0,:,:])
-                            # plt.subplot(223)
-                            # plt.imshow(pred[0,:,:])
-                            # plt.subplot(224)
-                            # plt.imshow(uncertainty_rgb.mean(1)[0,:,:].cpu().numpy())
-                            # plt.show()
+
+
+                            # Visualization
+                            if i_val % cfg['training']['png_frames'] == 0:
+                                fig, axes = plt.subplots(3,3)
+                                [axi.set_axis_off() for axi in axes.ravel()]
+
+                                axes[0,0].imshow(gt[0,:,:])
+                                axes[0,0].set_title("GT")
+
+                                axes[0,1].imshow(orig['rgb'][0,:,:,:].permute(1,2,0).cpu().numpy())
+                                axes[0,1].set_title("RGB")
+
+                                axes[0,2].imshow(orig['d'][0,:,:,:].permute(1,2,0).cpu().numpy())
+                                axes[0,2].set_title("D")
+
+                                if len(cfg['models'])>1 and cfg['models']['rgb']['learned_uncertainty'] == 'yes':            
+                                    channels = int(mean_outputs['rgb'].shape[1]/2)
+                                    axes[1,1].imshow(mean_outputs['rgb'][:,channels:,:,:].mean(1)[0,:,:].cpu().numpy())
+                                    axes[1,1].set_title("Aleatoric (RGB)")
+
+                                    axes[1,2].imshow(mean_outputs['d'][:,channels:,:,:].mean(1)[0,:,:].cpu().numpy())
+                                    axes[1,2].set_title("Aleatoric (D)")
+
+                                else:
+                                    channels = int(mean_outputs['rgb'].shape[1])
+
+                                if cfg['models']['rgb']['mcdo_passes']>1:
+                                    axes[2,1].imshow(std_outputs['rgb'][:,:channels,:,:].mean(1)[0,:,:].cpu().numpy())
+                                    axes[2,1].set_title("Epistemic (RGB)")
+
+                                    axes[2,2].imshow(std_outputs['d'][:,:channels,:,:].mean(1)[0,:,:].cpu().numpy())
+                                    axes[2,2].set_title("Epistemic (D)")
+
+                                path = "{}/{}".format(logdir,k)
+                                if not os.path.exists(path):
+                                    os.makedirs(path)
+                                plt.savefig("{}/{}_{}.png".format(path,i_val,i))
 
 
                             running_metrics_val[k].update(gt, pred)
@@ -563,6 +591,7 @@ if __name__ == "__main__":
     if not mcdo_model_name is None:
         name.append("{}reduction".format(cfg['models'][mcdo_model_name]['reduction']))
         name.append("{}passes".format(cfg['models'][mcdo_model_name]['mcdo_passes']))
+        name.append("{}learnedUncertainty".format(cfg['models'][mcdo_model_name]['learned_uncertainty']))
         name.append("{}mcdostart".format(cfg['models'][mcdo_model_name]['mcdo_start_iter']))
         name.append("pretrain" if not cfg['models'][mcdo_model_name]['resume'] is None else "fromscratch")
     name.append("_train_{}_".format(list(cfg['data']['train_subsplit'])[-1]))
@@ -581,4 +610,4 @@ if __name__ == "__main__":
     logger = get_logger(logdir)
     logger.info('Let the games begin')
 
-    train(cfg, writer, logger)
+    train(cfg, writer, logger, logdir)

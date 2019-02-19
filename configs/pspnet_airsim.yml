@@ -1,4 +1,4 @@
-id: "test"
+id: "viz"
 model:
     arch: pspnet
 ############
@@ -82,7 +82,7 @@ models:
         # start_layer: res_block2
         # end_layer: res_block4
         reduction: 0.5
-        mcdo_passes: 1
+        mcdo_passes: 5
         mcdo_start_iter: 0
         mcdo_backprop: True
         learned_uncertainty: "yes"
@@ -92,7 +92,7 @@ models:
         # start_layer: res_block2
         # end_layer: res_block4
         reduction: 0.5
-        mcdo_passes: 1
+        mcdo_passes: 5
         mcdo_start_iter: 0
         mcdo_backprop: True
         learned_uncertainty: "yes"        
@@ -113,12 +113,13 @@ data:
     train_split: train
     train_subsplit: ["fog_000","fog_005","fog_010","fog_020"] #,"fog_025", "fog_050","fog_100"]
     val_split: val
+    val_reduction: 0.25
     img_rows: 128 #512
     img_cols: 128 #512
 training:
     train_iters: 300000
-    batch_size: 2
-    val_interval: 50
+    batch_size: 16
+    val_interval: 5000
     png_frames: 50
     n_workers: 16
     print_interval: 50

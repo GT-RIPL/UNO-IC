@@ -27,6 +27,9 @@ from ptsemseg.optimizers import get_optimizer
 from tensorboardX import SummaryWriter
 from functools import partial
 
+
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 from matplotlib.colors import Normalize
@@ -76,14 +79,14 @@ def train(cfg, writer, logger, logdir):
         is_transform=True,
         split=cfg['data']['train_split'],
         subsplit=cfg['data']['train_subsplit'],
-        scale_quantity=0.1,
+        scale_quantity=0.05,
         img_size=(cfg['data']['img_rows'],cfg['data']['img_cols']),
         augmentations=data_aug)
 
     v_loader = {env:data_loader(
         data_path,
         is_transform=True,
-        split="val", subsplit=env, scale_quantity=0.5,
+        split="val", subsplit=env, scale_quantity=cfg['data']['val_reduction'],
         img_size=(cfg['data']['img_rows'],cfg['data']['img_cols']),) for env in ["fog_000",
                                                                                  # "fog_005",
                                                                                  # "fog_010",

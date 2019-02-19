@@ -1,3 +1,6 @@
+import matplotlib
+matplotlib.use('Agg')
+
 import os
 import sys
 import yaml
@@ -28,8 +31,6 @@ from tensorboardX import SummaryWriter
 from functools import partial
 
 
-import matplotlib
-matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 from matplotlib.colors import Normalize

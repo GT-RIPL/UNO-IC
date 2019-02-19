@@ -83,7 +83,7 @@ def train(cfg, writer, logger, logdir):
     v_loader = {env:data_loader(
         data_path,
         is_transform=True,
-        split="val", subsplit=env, scale_quantity=0.05,
+        split="val", subsplit=env, scale_quantity=0.5,
         img_size=(cfg['data']['img_rows'],cfg['data']['img_cols']),) for env in ["fog_000",
                                                                                  # "fog_005",
                                                                                  # "fog_010",

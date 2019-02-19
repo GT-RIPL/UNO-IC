@@ -497,6 +497,10 @@ def train(cfg, writer, logger, logdir):
 
                                 if len(cfg['models'])>1 and cfg['models']['rgb']['learned_uncertainty'] == 'yes':            
                                     channels = int(mean_outputs['rgb'].shape[1]/2)
+                                    
+                                    axes[1,0].imshow(pred[0,:,:])
+                                    axes[1,0].set_title("Pred")
+
                                     axes[1,1].imshow(mean_outputs['rgb'][:,channels:,:,:].mean(1)[0,:,:].cpu().numpy())
                                     axes[1,1].set_title("Aleatoric (RGB)")
 
@@ -507,11 +511,17 @@ def train(cfg, writer, logger, logdir):
                                     channels = int(mean_outputs['rgb'].shape[1])
 
                                 if cfg['models']['rgb']['mcdo_passes']>1:
+                                    axes[2,0].imshow(pred[0,:,:])
+                                    axes[2,0].set_title("Pred")
+
                                     axes[2,1].imshow(std_outputs['rgb'][:,:channels,:,:].mean(1)[0,:,:].cpu().numpy())
                                     axes[2,1].set_title("Epistemic (RGB)")
 
                                     axes[2,2].imshow(std_outputs['d'][:,:channels,:,:].mean(1)[0,:,:].cpu().numpy())
                                     axes[2,2].set_title("Epistemic (D)")
+
+
+                                    
 
                                 path = "{}/{}".format(logdir,k)
                                 if not os.path.exists(path):

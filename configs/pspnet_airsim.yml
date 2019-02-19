@@ -1,4 +1,4 @@
-id: "GAMUT_baseline"
+id: "test"
 model:
     arch: pspnet
 ############
@@ -55,7 +55,7 @@ model:
 ########################
 # Isolated MCDO Fusion #
 ########################
-start_layers: [convbnrelu1_1,res_block3,res_block4]
+start_layers: [convbnrelu1_1,res_block2,res_block3]
 models:
     rgb_static:
         in_channels: 3
@@ -78,7 +78,7 @@ models:
         learned_uncertainty: "no"        
         resume: None     
     rgb:
-        in_channels: 3
+        in_channels: -1
         # start_layer: res_block2
         # end_layer: res_block4
         reduction: 0.5
@@ -88,7 +88,7 @@ models:
         learned_uncertainty: "no"
         resume: None        
     d:
-        in_channels: 3
+        in_channels: -1
         # start_layer: res_block2
         # end_layer: res_block4
         reduction: 0.5
@@ -118,7 +118,7 @@ data:
 training:
     train_iters: 300000
     batch_size: 2
-    val_interval: 250
+    val_interval: 50
     n_workers: 16
     print_interval: 50
     optimizer:

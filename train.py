@@ -149,18 +149,20 @@ def train(cfg, writer, logger):
                     start_layer = "convbnrelu1_1"
                     end_layer = layers[layers.index(cfg['start_layers'][1])-1]
                 elif "fuse" == model:
-                    # start_layer = cfg['start_layers'][2]
-                    # end_layer = "classification"
-                    start_layer = cfg['start_layers'][1]
+                    start_layer = cfg['start_layers'][-1]
                     end_layer = "classification"
                 else:
-                    # start_layer = cfg['start_layers'][1]
-                    # end_layer = layers[layers.index(cfg['start_layers'][2])-1]
-                    start_layer = cfg['start_layers'][0]
-                    end_layer = layers[layers.index(cfg['start_layers'][1])-1]
+                    if len(cfg['start_layers']) == 3:
+                        start_layer = cfg['start_layers'][1]
+                        end_layer = layers[layers.index(cfg['start_layers'][2])-1]
+                    else:
+                        start_layer = cfg['start_layers'][0]
+                        end_layer = layers[layers.index(cfg['start_layers'][1])-1]
             else:
                 start_layer = attr['start_layer']
                 end_layer = attr['end_layer']
+
+        print(model,start_layer,end_layer)
 
         models[model] = get_model(cfg['model'], 
                                   n_classes, 
@@ -273,11 +275,13 @@ def train(cfg, writer, logger):
 
                 outputs = {}
                 outputs_aux = {}
-                if any("mcdo" in m for m in models.keys()):                
+                if any("_static" in m for m in models.keys()):                
                     outputs = {m:models[m+"_static"](inputs[m]) for m in ['rgb','d']}
                     inputs = outputs
 
                 # Start MCDO Style Training
+                outputs = {}
+                outputs_aux = {}                
                 for m in ['rgb','d']:
 
                     if i>cfg['models'][m]['mcdo_start_iter']:
@@ -309,6 +313,8 @@ def train(cfg, writer, logger):
                                     if not x_aux is None:
                                         outputs_aux[m] = x_aux.unsqueeze(-1)
                                 else:
+                                    print(x.shape)
+                                    print(outputs[m].shape)
                                     outputs[m] = torch.cat((outputs[m], x.unsqueeze(-1)),-1)
                                     if not x_aux is None:
                                         outputs_aux[m] = torch.cat((outputs_aux[m], x_aux.unsqueeze(-1)),-1)
@@ -372,6 +378,7 @@ def train(cfg, writer, logger):
             loss = loss_fn(input=outputs,target=labels)
 
             # register hooks for modifying gradients for learned uncertainty
+            # if cfg['rgb']
             # hooks = {m:mean_outputs[m].register_hook(partial(tensor_hook,(mean_outputs[m],loss))) for m in mean_outputs.keys()}
 
             loss.backward()
@@ -435,14 +442,14 @@ def train(cfg, writer, logger):
                             else:
 
 
-
                                 outputs = {}
                                 outputs_aux = {}
-                                if any("mcdo" in m for m in models.keys()):                
+                                if any("_static" in m for m in models.keys()):                
                                     outputs = {m:models[m+"_static"](inputs[m]) for m in ['rgb','d']}
                                     inputs = outputs
 
-
+                                outputs = {}
+                                outputs_aux = {}
                                 for m in ['rgb','d']:
                                     for mi in range(cfg['models'][m]['mcdo_passes']):
                                         x = models[m](inputs[m])
@@ -546,7 +553,7 @@ if __name__ == "__main__":
     with open(args.config) as fp:
         cfg = yaml.load(fp)
 
-    mcdo_model_name = next((s for s in list(cfg['models'].keys()) if "mcdo" in s), None)
+    mcdo_model_name = "rgb" #next((s for s in list(cfg['models'].keys()) if "mcdo" in s), None)
 
     name = [cfg['id']]
     name.append("{}x{}".format(cfg['data']['img_rows'],cfg['data']['img_cols']))

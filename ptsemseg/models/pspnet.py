@@ -93,6 +93,7 @@ class pspnet(nn.Module):
                                [      "cbr_final", int(4096*reduction),  int(512*reduction), 3, 1, 1, False],
                                [ "classification",  int(512*reduction),                None, self.n_classes, 1, 1, 0]]
 
+        print(start_layer,end_layer)
 
         # specify in_channels programmatically
         if in_channels == 0:

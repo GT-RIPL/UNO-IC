@@ -68,6 +68,7 @@ class airsimLoader(data.Dataset):
         subsplit=None,
         is_transform=False,
         img_size=(512, 512),
+        scale_quantity=1.0,
         augmentations=None,
         img_norm=True,
         version="airsim",
@@ -82,6 +83,7 @@ class airsimLoader(data.Dataset):
         """
         self.root = root
         self.split = split
+        self.subsplit = subsplit
         self.is_transform = is_transform
         self.augmentations = augmentations
         self.img_norm = img_norm
@@ -108,7 +110,11 @@ class airsimLoader(data.Dataset):
                 "No files for split=[%s] found in %s" % (self.split, self.root)
             )
 
-        print("Found %d %s images" % (len(self.imgs[self.split][self.image_modes[0]]), self.split))
+        print("{} {}: Found {} Images".format(self.split,self.subsplit,len(self.imgs[self.split][self.image_modes[0]])))
+        if scale_quantity != 1.0:
+            for image_mode in self.image_modes:
+                self.imgs[self.split][image_mode] = self.imgs[self.split][image_mode][::int(1/scale_quantity)]
+            print("{} {}: Reduced by {} to {} Images".format(self.split,self.subsplit,scale_quantity,len(self.imgs[self.split][self.image_modes[0]])))
 
         norm = mpl.colors.Normalize(vmin=0, vmax=255)
         cmap = cm.jet
@@ -185,8 +191,8 @@ class airsimLoader(data.Dataset):
         # aux = m.imresize(aux, (self.img_size[0], self.img_size[1]), "nearest", mode="F")
         # aux = aux.astype(int)
 
-        if not np.all(classes == np.unique(lbl)):
-            print("WARN: resizing labels yielded fewer classes")
+        # if not np.all(classes == np.unique(lbl)):
+        #     print("WARN: resizing labels yielded fewer classes")
 
         if not np.all(np.unique(lbl[lbl != self.ignore_index]) < self.n_classes):
             print("after det", classes, np.unique(lbl))

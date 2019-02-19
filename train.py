@@ -31,39 +31,14 @@ import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 from matplotlib.colors import Normalize
 
-def module_hook(mean_outputs,module, grad_input, grad_out):
-
-
-    print(mean_outputs.keys())
-
-    if isinstance(mean_outputs['rgb'],tuple):
-        rgb,_ = mean_outputs['rgb']
-        d,_ = mean_outputs['d']
-    else:
-        rgb = mean_outputs['rgb']
-        d = mean_outputs['d']
-
-    print(mean_outputs['rgb'].shape)
-
-
-    
-    print(len(list(grad_input)))
-    print(len(list(grad_out)))
-    # print(ptr)
-    # ptr[0] = grad_input
-
 def tensor_hook(data,grad):
-
     output, cross_loss = data
-
     sigma = torch.cat((output[:,:int(output.shape[1]/2),:,:],output[:,:int(output.shape[1]/2),:,:]),1)
 
     # modified_grad = 0.5*torch.mul(torch.exp(-sigma),cross_loss)+0.5*torch.mul(torch.exp(-sigma),grad.pow(2))+0.5*sigma
     # modified_grad = 0.5*torch.mul(torch.exp(-sigma),cross_loss)+0.5*sigma
     # modified_grad = torch.sum(0.5*torch.mul(torch.exp(-sigma),cross_loss)+0.5*sigma,dim=1)
     modified_grad = 0.5*torch.mul(torch.exp(-sigma),grad)+0.5*sigma
-
-    # print(grad.shape)
 
     return modified_grad
 
@@ -92,14 +67,23 @@ def train(cfg, writer, logger):
         is_transform=True,
         split=cfg['data']['train_split'],
         subsplit=cfg['data']['train_subsplit'],
-        # img_size=(512,512),
+        scale_quantity=1.0,
+        img_size=(cfg['data']['img_rows'],cfg['data']['img_cols']),
+        augmentations=data_aug)
+
+    tv_loader = data_loader(
+        data_path,
+        is_transform=True,
+        split=cfg['data']['train_split'],
+        subsplit=cfg['data']['train_subsplit'],
+        scale_quantity=0.1,
         img_size=(cfg['data']['img_rows'],cfg['data']['img_cols']),
         augmentations=data_aug)
 
     v_loader = {env:data_loader(
         data_path,
         is_transform=True,
-        split="val", subsplit=env,
+        split="val", subsplit=env, scale_quantity=0.1,
         img_size=(cfg['data']['img_rows'],cfg['data']['img_cols']),) for env in ["fog_000",
                                                                                  # "fog_005",
                                                                                  # "fog_010",
@@ -130,7 +114,7 @@ def train(cfg, writer, logger):
                                       num_workers=cfg['training']['n_workers']) for key in v_loader.keys()}
 
     # add training samples to validation sweep
-    valloaders = {**valloaders,'train':data.DataLoader(t_loader,
+    valloaders = {**valloaders,'train':data.DataLoader(tv_loader,
                                                        batch_size=cfg['training']['batch_size'], 
                                                        num_workers=cfg['training']['n_workers'])}
 
@@ -156,19 +140,27 @@ def train(cfg, writer, logger):
                "classification"]
 
     for model,attr in cfg["models"].items():
-        if "_static" in model:
+        if len(cfg['models'])==1:
             start_layer = "convbnrelu1_1"
-            end_layer = layers[layers.index(cfg['start_layers'][1])-1]
-        elif "fuse" == model:
-            # start_layer = cfg['start_layers'][2]
-            # end_layer = "classification"
-            start_layer = cfg['start_layers'][1]
             end_layer = "classification"
-        else:
-            # start_layer = cfg['start_layers'][1]
-            # end_layer = layers[layers.index(cfg['start_layers'][2])-1]
-            start_layer = cfg['start_layers'][0]
-            end_layer = layers[layers.index(cfg['start_layers'][1])-1]
+        else:    
+            if not cfg['start_layers'] is None:
+                if "_static" in model:
+                    start_layer = "convbnrelu1_1"
+                    end_layer = layers[layers.index(cfg['start_layers'][1])-1]
+                elif "fuse" == model:
+                    # start_layer = cfg['start_layers'][2]
+                    # end_layer = "classification"
+                    start_layer = cfg['start_layers'][1]
+                    end_layer = "classification"
+                else:
+                    # start_layer = cfg['start_layers'][1]
+                    # end_layer = layers[layers.index(cfg['start_layers'][2])-1]
+                    start_layer = cfg['start_layers'][0]
+                    end_layer = layers[layers.index(cfg['start_layers'][1])-1]
+            else:
+                start_layer = attr['start_layer']
+                end_layer = attr['end_layer']
 
         models[model] = get_model(cfg['model'], 
                                   n_classes, 
@@ -176,8 +168,6 @@ def train(cfg, writer, logger):
                                   in_channels=attr['in_channels'],
                                   start_layer=start_layer,
                                   end_layer=end_layer,
-                                  # start_layer=attr['start_layer'],
-                                  # end_layer=attr['end_layer'],
                                   mcdo_passes=attr['mcdo_passes'], 
                                   learned_uncertainty=attr['learned_uncertainty'],
                                   reduction=attr['reduction']).to(device)
@@ -273,34 +263,42 @@ def train(cfg, writer, logger):
             if images.shape[0]<=1:
                 continue
 
-            ###
 
             [optimizers[m].zero_grad() for m in models.keys()]
 
-            # outputs = models['fused'](inputs['fused'])
+            if any("input_fusion" in m for m in models.keys()):
+                outputs = models['input_fusion'](inputs['fused'])
 
+            else:
 
-            # outputs = {m:models[m+"_static"](inputs[m]) for m in ['rgb','d']}
-            # inputs = outputs
+                outputs = {}
+                outputs_aux = {}
+                if any("mcdo" in m for m in models.keys()):                
+                    outputs = {m:models[m+"_static"](inputs[m]) for m in ['rgb','d']}
+                    inputs = outputs
 
+                # Start MCDO Style Training
+                for m in ['rgb','d']:
 
-            # register hooks for modifying gradients     
-            # mean_outputs = {}       
-            # models['fuse'].register_backward_hook(partial(module_hook,mean_outputs))
-            # models['rgb'].register_backward_hook(partial(module_hook,mean_outputs))
+                    if i>cfg['models'][m]['mcdo_start_iter']:
+                        models[m].mcdo_passes = cfg['models'][m]['mcdo_passes']
 
-
-            outputs = {}
-            outputs_aux = {}
-
-            # Start MCDO Style Training
-            for m in ['rgb','d']:
-
-                if i>cfg['models'][m]['mcdo_start_iter']:
-                    models[m].mcdo_passes = cfg['models'][m]['mcdo_passes']
-
-                    if not cfg['models'][m]['mcdo_backprop']:
-                        with torch.no_grad():
+                        if not cfg['models'][m]['mcdo_backprop']:
+                            with torch.no_grad():
+                                for mi in range(models[m].mcdo_passes):
+                                    x = models[m](inputs[m])
+                                    x_aux = None
+                                    if isinstance(x,tuple):
+                                        x, x_aux = x
+                                    if not m in outputs:
+                                        outputs[m] = x.unsqueeze(-1)
+                                        if not x_aux is None:
+                                            outputs_aux[m] = x_aux.unsqueeze(-1)
+                                    else:
+                                        outputs[m] = torch.cat((outputs[m], x.unsqueeze(-1)),-1)
+                                        if not x_aux is None:
+                                            outputs_aux[m] = torch.cat((outputs_aux[m], x_aux.unsqueeze(-1)),-1)
+                        else:
                             for mi in range(models[m].mcdo_passes):
                                 x = models[m](inputs[m])
                                 x_aux = None
@@ -314,7 +312,11 @@ def train(cfg, writer, logger):
                                     outputs[m] = torch.cat((outputs[m], x.unsqueeze(-1)),-1)
                                     if not x_aux is None:
                                         outputs_aux[m] = torch.cat((outputs_aux[m], x_aux.unsqueeze(-1)),-1)
+
+
                     else:
+                        models[m].mcdo_passes = 1
+
                         for mi in range(models[m].mcdo_passes):
                             x = models[m](inputs[m])
                             x_aux = None
@@ -328,73 +330,38 @@ def train(cfg, writer, logger):
                                 outputs[m] = torch.cat((outputs[m], x.unsqueeze(-1)),-1)
                                 if not x_aux is None:
                                     outputs_aux[m] = torch.cat((outputs_aux[m], x_aux.unsqueeze(-1)),-1)
-
-
-                else:
-                    models[m].mcdo_passes = 1
-
-                    for mi in range(models[m].mcdo_passes):
-                        x = models[m](inputs[m])
-                        x_aux = None
-                        if isinstance(x,tuple):
-                            x, x_aux = x
-                        if not m in outputs:
-                            outputs[m] = x.unsqueeze(-1)
-                            if not x_aux is None:
-                                outputs_aux[m] = x_aux.unsqueeze(-1)
-                        else:
-                            outputs[m] = torch.cat((outputs[m], x.unsqueeze(-1)),-1)
-                            if not x_aux is None:
-                                outputs_aux[m] = torch.cat((outputs_aux[m], x_aux.unsqueeze(-1)),-1)
-                
-            mean_outputs = {}
-            var_outputs = {}
-            for m in outputs.keys():
-                mean_outputs[m] = outputs[m].mean(-1)
-                if models[m].mcdo_passes>1:
-                    var_outputs[m] = outputs[m].pow(2).mean(-1)-mean_outputs[m].pow(2)
-                else:
-                    var_outputs[m] = mean_outputs[m]  
-
-            # with torch.no_grad():
-            #     if cfg['models'][m]['mcdo_passes']>1:
-            #         var_outputs = {m:outputs[m].std(-1) for m in outputs.keys()}
-            #     else:
-            #         var_outputs = {m:outputs[m].mean(-1) for m in outputs.keys()}
-
-
-            if len(outputs_aux)>0:
-                mean_outputs_aux = {m:outputs_aux[m].mean(-1) for m in outputs_aux.keys()}
-                with torch.no_grad():
+                    
+                mean_outputs = {}
+                var_outputs = {}
+                for m in outputs.keys():
+                    mean_outputs[m] = outputs[m].mean(-1)
                     if models[m].mcdo_passes>1:
-                        var_outputs_aux = {m:outputs_aux[m].std(-1) for m in outputs_aux.keys()}
+                        var_outputs[m] = outputs[m].pow(2).mean(-1)-mean_outputs[m].pow(2)
                     else:
-                        var_outputs_aux = {m:outputs_aux[m].mean(-1) for m in outputs_aux.keys()}
+                        var_outputs[m] = mean_outputs[m]  
 
-            # # UNCERTAINTY
-            # # convert log variance to normal variance
-            # for m in mean_outputs.keys():
-            #     var_split = int(mean_outputs[m].shape[1]/2)
-            #     mean_outputs[m][:,:var_split,:,:] = torch.exp(mean_outputs[m][:,:var_split,:,:])
+                if len(outputs_aux)>0:
+                    mean_outputs_aux = {m:outputs_aux[m].mean(-1) for m in outputs_aux.keys()}
+                    with torch.no_grad():
+                        if models[m].mcdo_passes>1:
+                            var_outputs_aux = {m:outputs_aux[m].std(-1) for m in outputs_aux.keys()}
+                        else:
+                            var_outputs_aux = {m:outputs_aux[m].mean(-1) for m in outputs_aux.keys()}
 
-
-            # stack outputs from parallel legs
-            intermediate = torch.cat(tuple([mean_outputs[m] for m in outputs.keys()]+[var_outputs[m] for m in outputs.keys()]),1)
-
-            # save mean + std outputs to reference for backward_hook loss update
-            # ptrs['rgb'] = [10]
-
-
-            outputs = models['fuse'](intermediate)
+                # # UNCERTAINTY
+                # # convert log variance to normal variance
+                # for m in mean_outputs.keys():
+                #     var_split = int(mean_outputs[m].shape[1]/2)
+                #     mean_outputs[m][:,:var_split,:,:] = torch.exp(mean_outputs[m][:,:var_split,:,:])
 
 
+                # stack outputs from parallel legs
+                intermediate = torch.cat(tuple([mean_outputs[m] for m in outputs.keys()]+[var_outputs[m] for m in outputs.keys()]),1)
 
-            # register hooks for modifying gradients
-            # ptrs = {m:mean_outputs[m] for m in ['fuse']}
-            # [models[m].register_backward_hook(partial(module_hook,ptrs[m])) for m in ptrs.keys()]
+                outputs = models['fuse'](intermediate)
 
 
-
+ 
 
             # with torch.no_grad():
                 # print(mean_outputs['rgb'].cpu().numpy())
@@ -404,27 +371,12 @@ def train(cfg, writer, logger):
      
             loss = loss_fn(input=outputs,target=labels)
 
-            hooks = {m:mean_outputs[m].register_hook(partial(tensor_hook,(mean_outputs[m],loss))) for m in mean_outputs.keys()}
+            # register hooks for modifying gradients for learned uncertainty
+            # hooks = {m:mean_outputs[m].register_hook(partial(tensor_hook,(mean_outputs[m],loss))) for m in mean_outputs.keys()}
 
             loss.backward()
 
-            [hooks[h].remove() for h in hooks.keys()]            
-
-            # print(ptrs['fuse'][0])
-            # # print(list(ptrs['fuse'][0])[0].cpu().numpy().shape)
-
-            # print("outputs",outputs.shape)
-            # print("intermediate",intermediate.shape)
-
-
-
-            # # average gradients
-            # for m in ['rgb','d']:
-            #     for p in models[m].parameters():
-            #         if not p.grad is None:
-            #             p.grad *= 1./cfg['models'][m]['mcdo_passes']
-
-            # exit()
+            # [hooks[h].remove() for h in hooks.keys()]            
 
             [optimizers[m].step() for m in models.keys()]
 
@@ -477,30 +429,39 @@ def train(cfg, writer, logger):
                             if images.shape[0]<=1:
                                 continue
 
-                            # outputs = {m:models[m+"_static"](inputs[m]) for m in ['rgb','d']}
-                            # inputs = outputs
+                            if any("input_fusion" in m for m in models.keys()):
+                                outputs = models['input_fusion'](inputs['fused'])
 
-                            outputs = {}
-                            outputs_aux = {}
+                            else:
 
-                            for m in ['rgb','d']:
-                                for mi in range(cfg['models'][m]['mcdo_passes']):
-                                    x = models[m](inputs[m])
-                                    if not m in outputs:
-                                        outputs[m] = x.unsqueeze(-1)
-                                    else:
-                                        outputs[m] = torch.cat((outputs[m], x.unsqueeze(-1)),-1)
-                              
 
-                            mean_outputs = {m:outputs[m].mean(-1) for m in outputs.keys()}
-                            std_outputs = {m:outputs[m].mean(-1) for m in outputs.keys()}
 
-                            # stack outputs from parallel legs
-                            intermediate = torch.cat(tuple([mean_outputs[m] for m in outputs.keys()]+[std_outputs[m] for m in outputs.keys()]),1)
+                                outputs = {}
+                                outputs_aux = {}
+                                if any("mcdo" in m for m in models.keys()):                
+                                    outputs = {m:models[m+"_static"](inputs[m]) for m in ['rgb','d']}
+                                    inputs = outputs
 
-                            outputs = models['fuse'](intermediate)
 
-                            # outputs = models['fused'](inputs['fused'])
+                                for m in ['rgb','d']:
+                                    for mi in range(cfg['models'][m]['mcdo_passes']):
+                                        x = models[m](inputs[m])
+                                        if not m in outputs:
+                                            outputs[m] = x.unsqueeze(-1)
+                                        else:
+                                            outputs[m] = torch.cat((outputs[m], x.unsqueeze(-1)),-1)
+                                  
+
+                                mean_outputs = {m:outputs[m].mean(-1) for m in outputs.keys()}
+                                std_outputs = {m:outputs[m].mean(-1) for m in outputs.keys()}
+
+                                # stack outputs from parallel legs
+                                intermediate = torch.cat(tuple([mean_outputs[m] for m in outputs.keys()]+[std_outputs[m] for m in outputs.keys()]),1)
+
+                                outputs = models['fuse'](intermediate)
+
+
+
 
                             val_loss = loss_fn(input=outputs, target=labels)
 
@@ -585,20 +546,21 @@ if __name__ == "__main__":
     with open(args.config) as fp:
         cfg = yaml.load(fp)
 
-    run_id = "_".join([cfg['id'],
-                       "{}x{}".format(cfg['data']['img_rows'],cfg['data']['img_cols']),
-                       "{}reduction".format(cfg['models']['rgb']['reduction']),
-                       # "_{}-{}-{}_".format(cfg['start_layers'][0],cfg['start_layers'][1],cfg['start_layers'][2]),
-                       "_{}-{}_".format(cfg['start_layers'][0],cfg['start_layers'][1]),
-                       # "_rgbS{}->{}_".format(cfg['models']['rgb_static']['start_layer'],cfg['models']['rgb_static']['end_layer']),
-                       # "_rgbMCDO{}->{}_".format(cfg['models']['rgb']['start_layer'],cfg['models']['rgb']['end_layer']),
-                       # "_fuseS{}->{}_".format(cfg['models']['fuse']['start_layer'],cfg['models']['fuse']['end_layer']),
-                       "{}passes".format(cfg['models']['rgb']['mcdo_passes']),
-                       "{}mcdostart".format(cfg['models']['rgb']['mcdo_start_iter']),
-                       "pretrain" if not cfg['models']['rgb']['resume'] is None else "fromscratch", 
-                       "_train_{}_".format(list(cfg['data']['train_subsplit'])[-1]),
-                       "_test_all_",
-                       "01-16-2019"])
+    mcdo_model_name = next((s for s in list(cfg['models'].keys()) if "mcdo" in s), None)
+
+    name = [cfg['id']]
+    name.append("{}x{}".format(cfg['data']['img_rows'],cfg['data']['img_cols']))
+    name.append("_{}_".format("-".join(cfg['start_layers'])))
+    if not mcdo_model_name is None:
+        name.append("{}reduction".format(cfg['models'][mcdo_model_name]['reduction']))
+        name.append("{}passes".format(cfg['models'][mcdo_model_name]['mcdo_passes']))
+        name.append("{}mcdostart".format(cfg['models'][mcdo_model_name]['mcdo_start_iter']))
+        name.append("pretrain" if not cfg['models'][mcdo_model_name]['resume'] is None else "fromscratch")
+    name.append("_train_{}_".format(list(cfg['data']['train_subsplit'])[-1]))
+    name.append("_test_all_")
+    name.append("01-16-2019")
+
+    run_id = "_".join(name)
 
     # run_id = "mcdo_1pass_pretrain_alignedclasses_fused_fog_all_01-16-2019" #random.randint(1,100000)
     logdir = os.path.join('runs', os.path.basename(args.config)[:-4] , str(run_id))

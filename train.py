@@ -378,12 +378,14 @@ def train(cfg, writer, logger):
             loss = loss_fn(input=outputs,target=labels)
 
             # register hooks for modifying gradients for learned uncertainty
-            # if cfg['rgb']
-            # hooks = {m:mean_outputs[m].register_hook(partial(tensor_hook,(mean_outputs[m],loss))) for m in mean_outputs.keys()}
+            if len(cfg['models']>1) and cfg['models']['rgb']['learned_uncertainty'] == 'yes':            
+                hooks = {m:mean_outputs[m].register_hook(partial(tensor_hook,(mean_outputs[m],loss))) for m in mean_outputs.keys()}
 
             loss.backward()
 
-            # [hooks[h].remove() for h in hooks.keys()]            
+            # remove hooks for modifying gradients for learned uncertainty
+            if len(cfg['models']>1) and cfg['models']['rgb']['learned_uncertainty'] == 'yes':            
+                [hooks[h].remove() for h in hooks.keys()]            
 
             [optimizers[m].step() for m in models.keys()]
 

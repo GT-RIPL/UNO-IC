@@ -33,6 +33,7 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 from matplotlib.colors import Normalize
+plt.ioff()
 
 def tensor_hook(data,grad):
     output, cross_loss = data

@@ -58,8 +58,12 @@ def tensor_hook(data,grad):
 
     sigma = torch.cat((output[:,:int(output.shape[1]/2),:,:],output[:,:int(output.shape[1]/2),:,:]),1)
 
-    modified_grad = 0.5*torch.mul(torch.exp(-sigma),cross_loss*grad.pow(2))+0.5*sigma
+    # modified_grad = 0.5*torch.mul(torch.exp(-sigma),cross_loss)+0.5*torch.mul(torch.exp(-sigma),grad.pow(2))+0.5*sigma
+    # modified_grad = 0.5*torch.mul(torch.exp(-sigma),cross_loss)+0.5*sigma
+    # modified_grad = torch.sum(0.5*torch.mul(torch.exp(-sigma),cross_loss)+0.5*sigma,dim=1)
+    modified_grad = 0.5*torch.mul(torch.exp(-sigma),grad)+0.5*sigma
 
+    # print(grad.shape)
 
     return modified_grad
 
@@ -103,7 +107,15 @@ def train(cfg, writer, logger):
                                                                                  "fog_025",
                                                                                  "fog_050",
                                                                                  "fog_100",
+                                                                                 "fog_000__depth_additiveNoiseMag10",
+                                                                                 "fog_000__depth_additiveNoiseMag20",
+                                                                                 "fog_000__depth_illuminationChange50",
+                                                                                 "fog_000__depth_occlusion",
                                                                                  "fog_100__depth_noise_mag20",
+                                                                                 "fog_000__rgb_additiveNoiseMag10",
+                                                                                 "fog_000__rgb_additiveNoiseMag20",
+                                                                                 "fog_000__rgb_illuminationChange50",
+                                                                                 "fog_000__rgb_occlusion",
                                                                                  "fog_100__rgb_noise_mag20"]}
 
 

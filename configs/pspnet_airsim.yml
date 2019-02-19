@@ -1,4 +1,4 @@
-id: "learnedLossCombined"
+id: "GAMUT_learnedLossNoPowerOnGradient"
 model:
     arch: pspnet
 start_layers: [convbnrelu1_1,res_block3] #,res_block4]

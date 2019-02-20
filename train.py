@@ -39,11 +39,17 @@ plt.ioff()
 def tensor_hook(data,grad):
     output, cross_loss = data
     sigma = torch.cat((output[:,int(output.shape[1]/2):,:,:],output[:,int(output.shape[1]/2):,:,:]),1)
+    grad_mu = torch.cat((grad[:,:int(grad.shape[1]/2),:,:],grad[:,:int(grad.shape[1]/2),:,:]),1)
+
+    print(output.shape,sigma.shape,grad.shape,grad_mu.shape)
 
     # modified_grad = 0.5*torch.mul(torch.exp(-sigma),cross_loss)+0.5*torch.mul(torch.exp(-sigma),grad.pow(2))+0.5*sigma
     # modified_grad = 0.5*torch.mul(torch.exp(-sigma),cross_loss)+0.5*sigma
     # modified_grad = torch.sum(0.5*torch.mul(torch.exp(-sigma),cross_loss)+0.5*sigma,dim=1)
-    modified_grad = 0.5*torch.mul(torch.exp(-sigma),grad)+0.5*sigma
+    # modified_grad = 0.5*torch.mul(torch.exp(-sigma),grad)+0.5*sigma
+    modified_grad = 0.5*torch.mul(torch.exp(-sigma),grad_mu)+0.5*sigma
+
+    # only apply grad to mean, not also to std
 
     return modified_grad
 
@@ -532,7 +538,7 @@ def train(cfg, writer, logger, logdir):
                                 if not os.path.exists(path):
                                     os.makedirs(path)
                                 plt.savefig("{}/{}_{}.png".format(path,i_val,i))
-
+                                plt.close(fig)
 
                             running_metrics_val[k].update(gt, pred)
 

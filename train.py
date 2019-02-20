@@ -38,8 +38,25 @@ plt.ioff()
 
 def tensor_hook(data,grad):
     output, cross_loss = data
+
+    # sigma = output[:,int(output.shape[1]/2):,:,:]
+    # grad_mu = grad[:,:int(grad.shape[1]/2),:,:]
+    # grad_var = grad[:,int(grad.shape[1]/2):,:,:]
+
+    # modified_grad = torch.cat((0.5*torch.mul(torch.exp(-sigma),grad_mu)+0.5*sigma,grad_var),1)
+
     sigma = torch.cat((output[:,int(output.shape[1]/2):,:,:],output[:,int(output.shape[1]/2):,:,:]),1)
     grad_mu = torch.cat((grad[:,:int(grad.shape[1]/2),:,:],grad[:,:int(grad.shape[1]/2),:,:]),1)
+
+    # loss = (0.5*torch.mul(torch.exp(-sigma),grad_mu)+0.5*sigma).sum(-1).sum(-1).sum(-1)
+
+    # print(loss.shape)
+
+
+    # loss = loss.repeat(1,grad.shape[1],grad.shape[2],grad.shape[3])
+
+    # print(grad.shape)
+    # print(loss.shape)
 
     # print(output.shape,sigma.shape,grad.shape,grad_mu.shape)
 
@@ -49,7 +66,11 @@ def tensor_hook(data,grad):
     # modified_grad = 0.5*torch.mul(torch.exp(-sigma),grad)+0.5*sigma
     modified_grad = 0.5*torch.mul(torch.exp(-sigma),grad_mu)+0.5*sigma
 
+
     # only apply grad to mean, not also to std
+
+
+    # modified_grad = loss
 
     return modified_grad
 
@@ -486,15 +507,12 @@ def train(cfg, writer, logger, logdir):
                             val_loss = loss_fn(input=outputs, target=labels)
 
                             pred = outputs.data.max(1)[1].cpu().numpy()
+                            conf = outputs.data.max(1)[0].cpu().numpy()
                             gt = labels.data.cpu().numpy()
-
-                            # print(uncertainty_rgb.shape)
-
-
 
                             # Visualization
                             if i_val % cfg['training']['png_frames'] == 0:
-                                fig, axes = plt.subplots(3,3)
+                                fig, axes = plt.subplots(3,4)
                                 [axi.set_axis_off() for axi in axes.ravel()]
 
                                 axes[0,0].imshow(gt[0,:,:])
@@ -516,19 +534,21 @@ def train(cfg, writer, logger, logdir):
                                     axes[1,1].set_title("Aleatoric (RGB)")
 
                                     axes[1,2].imshow(mean_outputs['d'][:,channels:,:,:].mean(1)[0,:,:].cpu().numpy())
+                                    # axes[1,2].imshow(mean_outputs['rgb'][:,:channels,:,:].mean(1)[0,:,:].cpu().numpy())
                                     axes[1,2].set_title("Aleatoric (D)")
 
                                 else:
                                     channels = int(mean_outputs['rgb'].shape[1])
 
                                 if cfg['models']['rgb']['mcdo_passes']>1:
-                                    axes[2,0].imshow(pred[0,:,:])
-                                    axes[2,0].set_title("Pred")
+                                    axes[2,0].imshow(conf[0,:,:])
+                                    axes[2,0].set_title("Conf")
 
                                     axes[2,1].imshow(std_outputs['rgb'][:,:channels,:,:].mean(1)[0,:,:].cpu().numpy())
                                     axes[2,1].set_title("Epistemic (RGB)")
 
                                     axes[2,2].imshow(std_outputs['d'][:,:channels,:,:].mean(1)[0,:,:].cpu().numpy())
+                                    # axes[2,2].imshow(std_outputs['rgb'][:,channels:,:,:].mean(1)[0,:,:].cpu().numpy())
                                     axes[2,2].set_title("Epistemic (D)")
 
 

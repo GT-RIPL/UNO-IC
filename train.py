@@ -41,7 +41,7 @@ def tensor_hook(data,grad):
     sigma = torch.cat((output[:,int(output.shape[1]/2):,:,:],output[:,int(output.shape[1]/2):,:,:]),1)
     grad_mu = torch.cat((grad[:,:int(grad.shape[1]/2),:,:],grad[:,:int(grad.shape[1]/2),:,:]),1)
 
-    print(output.shape,sigma.shape,grad.shape,grad_mu.shape)
+    # print(output.shape,sigma.shape,grad.shape,grad_mu.shape)
 
     # modified_grad = 0.5*torch.mul(torch.exp(-sigma),cross_loss)+0.5*torch.mul(torch.exp(-sigma),grad.pow(2))+0.5*sigma
     # modified_grad = 0.5*torch.mul(torch.exp(-sigma),cross_loss)+0.5*sigma

@@ -1,4 +1,4 @@
-id: "viz_burn-in"
+id: "viz"
 model:
     arch: pspnet
 ############

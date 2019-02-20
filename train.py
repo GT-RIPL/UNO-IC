@@ -320,8 +320,18 @@ def train(cfg, writer, logger, logdir):
                         models[m].mcdo_passes = cfg['models'][m]['mcdo_passes']
 
                         if not cfg['models'][m]['mcdo_backprop']:
+
+                            x = models[m](inputs[m])
+                            x_aux = None
+                            if isinstance(x,tuple):
+                                x, x_aux = x
+                            outputs[m] = x.unsqueeze(-1)
+                            if not x_aux is None:
+                                outputs_aux[m] = x_aux.unsqueeze(-1)
+
+                                
                             with torch.no_grad():
-                                for mi in range(models[m].mcdo_passes):
+                                for mi in range(models[m].mcdo_passes-1):
                                     x = models[m](inputs[m])
                                     x_aux = None
                                     if isinstance(x,tuple):

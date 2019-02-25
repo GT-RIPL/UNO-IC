@@ -31,7 +31,9 @@ def multi_scale_cross_entropy2d(
     if scale_weight == None:  # scale_weight: torch tensor type
         n_inp = len(input)
         scale = 0.4
-        scale_weight = torch.pow(scale * torch.ones(n_inp), torch.arange(n_inp).float()).to('cuda' if target.is_cuda else 'cpu')
+        scale_weight = (scale*torch.ones(n_inp)).to('cuda' if target.is_cuda else 'cpu')
+        scale_weight[0] = 1.0
+        # scale_weight = torch.pow(scale * torch.ones(n_inp), torch.arange(n_inp).float()).to('cuda' if target.is_cuda else 'cpu')
 
     loss = 0.0
     for i, inp in enumerate(input):

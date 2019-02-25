@@ -648,6 +648,7 @@ if __name__ == "__main__":
         name.append("{}passes".format(cfg['models'][mcdo_model_name]['mcdo_passes']))
         name.append("{}learnedUncertainty".format(cfg['models'][mcdo_model_name]['learned_uncertainty']))
         name.append("{}mcdostart".format(cfg['models'][mcdo_model_name]['mcdo_start_iter']))
+        name.append("{}mcdobackprop".format(cfg['models'][mcdo_model_name]['mcdo_backprop']))
         name.append("pretrain" if not cfg['models'][mcdo_model_name]['resume'] is None else "fromscratch")
     name.append("_train_{}_".format(list(cfg['data']['train_subsplit'])[-1]))
     name.append("_test_all_")

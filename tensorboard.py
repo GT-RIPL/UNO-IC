@@ -30,6 +30,8 @@ for desired_dir in desired_dirs:
         if any([f in file for f in file_filter]):
             # print("\n".join(filter(None,file.split("_"))))
 
+            print(file)
+
             for event in tf.train.summary_iterator(file):
                 for value in event.summary.value:
 
@@ -144,16 +146,17 @@ df['full'] = df['block']+", "+df['passes']+" passes, "+df['mcdostart']+" burn-in
 df = df.sort_values(by=["test","block","passes","mcdostart"])
 
 df = df.set_index(["test"])
+df.to_csv('out.csv',index=False)
 
 df = df[((df["block"] == "N/A (Input Fusion Baseline)")) | 
-         # (df["block"] == "convbnrelu1_1-convbnrelu1_2-convbnrelu1_3") |
-         # (df["block"] == "convbnrelu1_1-convbnrelu1_3-res_block2") |
+         (df["block"] == "convbnrelu1_1-convbnrelu1_2-convbnrelu1_3") |
+         (df["block"] == "convbnrelu1_1-convbnrelu1_3-res_block2") |
          (df["block"] == "convbnrelu1_1-res_block2-res_block3") |
-         (df["block"] == "convbnrelu1_1-res_block2-res_block4") 
-         # (df["block"] == "convbnrelu1_1-res_block2-res_block5") |
-         # (df["block"] == "convbnrelu1_1-res_block2-pyramid_pooling") |
-         # (df["block"] == "convbnrelu1_1-res_block3-res_block4") |
-         # (df["block"] == "convbnrelu1_1-res_block3-res_block5")) |
+         (df["block"] == "convbnrelu1_1-res_block2-res_block4") |
+         (df["block"] == "convbnrelu1_1-res_block2-res_block5") |
+         (df["block"] == "convbnrelu1_1-res_block2-pyramid_pooling") |
+         (df["block"] == "convbnrelu1_1-res_block3-res_block4") |
+         (df["block"] == "convbnrelu1_1-res_block3-res_block5") #) |
 
          # ((df["block"] == "convbnrelu1_1-convbnrelu1_3") & (df['passes'] == "1")) |
          # ((df["block"] == "convbnrelu1_1-res_block2") & (df['passes'] == "1")) |

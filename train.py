@@ -233,18 +233,21 @@ def train(cfg, writer, logger, logdir):
         # loss_sig = # Loss Function for Aleatoric Uncertainty
         logger.info("Using loss {}".format(loss_fn))
 
-        print(attr['resume'])
-
         # Load pretrained weights
-        if attr['resume'] is not None and not "caffemodel" in attr['resume']:                
-            if os.path.isfile(attr['resume']):
+        if attr['resume'] is not None and not "caffemodel" in attr['resume']:
+
+            model_pkl = attr['resume']
+            if attr['resume']=='same_yaml':
+                model_pkl = "{}/{}_pspnet_airsim_best_model.pkl".format(logdir,model)
+
+            if os.path.isfile(model_pkl):
                 logger.info(
-                    "Loading model and optimizer from checkpoint '{}'".format(attr['resume'])
+                    "Loading model and optimizer from checkpoint '{}'".format(model_pkl)
                 )
-                checkpoint = torch.load(attr['resume'])
+                checkpoint = torch.load(model_pkl)
 
                 ###
-                pretrained_dict = torch.load(attr['resume'])['model_state']
+                pretrained_dict = torch.load(model_pkl)['model_state']
                 model_dict = models[model].state_dict()
 
                 # 1. filter out unnecessary keys
@@ -256,14 +259,14 @@ def train(cfg, writer, logger, logdir):
                 ###
 
 
-                # model.load_state_dict(checkpoint["model_state"])
-                # optimizer.load_state_dict(checkpoint["optimizer_state"])
-                # scheduler.load_state_dict(checkpoint["scheduler_state"])
-                # start_iter = checkpoint["epoch"]
-                start_iter = 0
-                logger.info("Loaded checkpoint '{}' (iter {})".format(attr['resume'], checkpoint["epoch"]))
+                models[model].load_state_dict(checkpoint["model_state"])
+                optimizers[model].load_state_dict(checkpoint["optimizer_state"])
+                schedulers[model].load_state_dict(checkpoint["scheduler_state"])
+                start_iter = checkpoint["epoch"]
+                # start_iter = 0
+                logger.info("Loaded checkpoint '{}' (iter {})".format(model_pkl, checkpoint["epoch"]))
             else:
-                logger.info("No checkpoint found at '{}'".format(attr['resume']))        
+                logger.info("No checkpoint found at '{}'".format(model_pkl))        
 
         # val_loss_meter[model] = averageMeter()
     # val_loss_meter = averageMeter()
@@ -655,7 +658,7 @@ if __name__ == "__main__":
     name = [cfg['id']]
     name.append("{}x{}".format(cfg['data']['img_rows'],cfg['data']['img_cols']))
     name.append("_{}_".format("-".join(cfg['start_layers'])))
-    name.append("_{}_".format("-".join(cfg['models'].keys())))
+    # name.append("_{}_".format("-".join(cfg['models'].keys())))
     if not mcdo_model_name is None:
         name.append("{}reduction".format(cfg['models'][mcdo_model_name]['reduction']))
         name.append("{}passes".format(cfg['models'][mcdo_model_name]['mcdo_passes']))

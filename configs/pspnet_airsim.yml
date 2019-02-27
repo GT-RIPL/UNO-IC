@@ -4,18 +4,18 @@ model:
 ############
 # BASELINE #
 ############
-# start_layers: None
-# models:
-#     input_fusion:
-#         in_channels: 4 #if receiving mean and variance from input legs
-#         # start_layer: res_block5 #res_block3 #res_block2
-#         # end_layer: classification        
-#         reduction: 0.5
-#         mcdo_passes: 1
-#         mcdo_start_iter: None
-#         mcdo_backprop: None
-#         learned_uncertainty: "no"        
-#         resume: None   
+start_layers: None
+models:
+    rgb_only: #rgb_only, d_only, input_fusion
+        in_channels: 3 #if receiving mean and variance from input legs
+        # start_layer: res_block5 #res_block3 #res_block2
+        # end_layer: classification        
+        reduction: 0.5
+        mcdo_passes: 1
+        mcdo_start_iter: None
+        mcdo_backprop: None
+        learned_uncertainty: "no"        
+        resume: None   
 ######################
 # Middle Fusion MCDO #
 ######################
@@ -55,58 +55,58 @@ model:
 ########################
 # Isolated MCDO Fusion #
 ########################
-start_layers: [convbnrelu1_1,res_block4,res_block5]
-models:
-    rgb_static:
-        in_channels: 3
-        # start_layer: convbnrelu1_1
-        # end_layer: convbnrelu1_3
-        reduction: 0.5
-        mcdo_passes: 1
-        mcdo_start_iter: None
-        mcdo_backprop: None
-        learned_uncertainty: "no"        
-        resume: None     
-    d_static:
-        in_channels: 3
-        # start_layer: convbnrelu1_1
-        # end_layer: convbnrelu1_3
-        reduction: 0.5
-        mcdo_passes: 1
-        mcdo_start_iter: 0
-        mcdo_backprop: None
-        learned_uncertainty: "no"        
-        resume: None     
-    rgb:
-        in_channels: -1
-        # start_layer: res_block2
-        # end_layer: res_block4
-        reduction: 0.5
-        mcdo_passes: 5
-        mcdo_start_iter: 0
-        mcdo_backprop: True
-        learned_uncertainty: "no"
-        resume: None        
-    d:
-        in_channels: -1
-        # start_layer: res_block2
-        # end_layer: res_block4
-        reduction: 0.5
-        mcdo_passes: 5
-        mcdo_start_iter: 0
-        mcdo_backprop: True
-        learned_uncertainty: "no"        
-        resume: None
-    fuse:
-        in_channels: 0 #if receiving mean and variance from input legs
-        # start_layer: res_block5 #res_block3 #res_block2
-        # end_layer: classification        
-        reduction: 0.5
-        mcdo_passes: 1
-        mcdo_start_iter: None
-        mcdo_backprop: None
-        learned_uncertainty: "no"        
-        resume: None   
+# start_layers: [convbnrelu1_1,res_block4,res_block5]
+# models:
+#     rgb_static:
+#         in_channels: 3
+#         # start_layer: convbnrelu1_1
+#         # end_layer: convbnrelu1_3
+#         reduction: 0.5
+#         mcdo_passes: 1
+#         mcdo_start_iter: None
+#         mcdo_backprop: None
+#         learned_uncertainty: "no"        
+#         resume: None     
+#     d_static:
+#         in_channels: 3
+#         # start_layer: convbnrelu1_1
+#         # end_layer: convbnrelu1_3
+#         reduction: 0.5
+#         mcdo_passes: 1
+#         mcdo_start_iter: 0
+#         mcdo_backprop: None
+#         learned_uncertainty: "no"        
+#         resume: None     
+#     rgb:
+#         in_channels: -1
+#         # start_layer: res_block2
+#         # end_layer: res_block4
+#         reduction: 0.5
+#         mcdo_passes: 5
+#         mcdo_start_iter: 0
+#         mcdo_backprop: True
+#         learned_uncertainty: "no"
+#         resume: None        
+#     d:
+#         in_channels: -1
+#         # start_layer: res_block2
+#         # end_layer: res_block4
+#         reduction: 0.5
+#         mcdo_passes: 5
+#         mcdo_start_iter: 0
+#         mcdo_backprop: True
+#         learned_uncertainty: "no"        
+#         resume: None
+#     fuse:
+#         in_channels: 0 #if receiving mean and variance from input legs
+#         # start_layer: res_block5 #res_block3 #res_block2
+#         # end_layer: classification        
+#         reduction: 0.5
+#         mcdo_passes: 1
+#         mcdo_start_iter: None
+#         mcdo_backprop: None
+#         learned_uncertainty: "no"        
+#         resume: None   
 data:
     dataset: airsim
     path: ../../ros/data/airsim

@@ -22,7 +22,7 @@ exclude = [
            'FULL_No1BackpassMCDO',
            'FULL_1.0reduce_',
            'GAMUT',
-           'HALF_GAMUT_learnedUncertainty'
+           'HALF_GAMUT_learnedUncertainty',
            '',
            ]
 
@@ -234,6 +234,8 @@ df['full'] = df['size']+", "+\
              df['learned_uncertainty'].map(str)+" learned_uncertainty ("+\
              df['unique_id'].map(str)+")"
 
+print(df['block'].unique())
+exit()
 
 df.to_csv('out.csv',index=False)
 

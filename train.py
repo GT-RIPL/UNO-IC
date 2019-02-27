@@ -123,15 +123,15 @@ def train(cfg, writer, logger, logdir):
                                                                                  "fog_025",
                                                                                  "fog_050",
                                                                                  "fog_100",
-                                                                                 "fog_000__depth_additiveNoiseMag10",
-                                                                                 "fog_000__depth_additiveNoiseMag20",
-                                                                                 "fog_000__depth_illuminationChange50",
-                                                                                 "fog_000__depth_occlusion",
+                                                                                 # "fog_000__depth_additiveNoiseMag10",
+                                                                                 # "fog_000__depth_additiveNoiseMag20",
+                                                                                 # "fog_000__depth_illuminationChange50",
+                                                                                 # "fog_000__depth_occlusion",
                                                                                  "fog_100__depth_noise_mag20",
-                                                                                 "fog_000__rgb_additiveNoiseMag10",
-                                                                                 "fog_000__rgb_additiveNoiseMag20",
-                                                                                 "fog_000__rgb_illuminationChange50",
-                                                                                 "fog_000__rgb_occlusion",
+                                                                                 # "fog_000__rgb_additiveNoiseMag10",
+                                                                                 # "fog_000__rgb_additiveNoiseMag20",
+                                                                                 # "fog_000__rgb_illuminationChange50",
+                                                                                 # "fog_000__rgb_occlusion",
                                                                                  "fog_100__rgb_noise_mag20"]}
 
 
@@ -302,6 +302,10 @@ def train(cfg, writer, logger, logdir):
 
             if any("input_fusion" in m for m in models.keys()):
                 outputs = models['input_fusion'](inputs['fused'])
+            elif any("rgb_only" in m for m in models.keys()):
+                outputs = models['rgb_only'](inputs['rgb'])
+            elif any("d_only" in m for m in models.keys()):
+                outputs = models['d_only'](inputs['d'])
 
             else:
 
@@ -486,6 +490,13 @@ def train(cfg, writer, logger, logdir):
                             if any("input_fusion" in m for m in models.keys()):
                                 outputs = models['input_fusion'](inputs['fused'])
 
+                            elif any("rgb_only" in m for m in models.keys()):
+                                outputs = models['rgb_only'](inputs['rgb'])
+
+                            elif any("d_only" in m for m in models.keys()):
+                                outputs = models['d_only'](inputs['d'])
+
+
                             else:
 
 
@@ -643,6 +654,7 @@ if __name__ == "__main__":
     name = [cfg['id']]
     name.append("{}x{}".format(cfg['data']['img_rows'],cfg['data']['img_cols']))
     name.append("_{}_".format("-".join(cfg['start_layers'])))
+    name.append("_{}_".format("-".join(cfg['models'].keys())))
     if not mcdo_model_name is None:
         name.append("{}reduction".format(cfg['models'][mcdo_model_name]['reduction']))
         name.append("{}passes".format(cfg['models'][mcdo_model_name]['mcdo_passes']))

@@ -213,6 +213,9 @@ def train(cfg, writer, logger, logdir):
         #         model_path=os.path.join(caffemodel_dir_path, "pspnet101_cityscapes.caffemodel")
         #     )  
 
+        if "caffemodel" in attr['resume']:
+            models[model].load_pretrained_model(model_path=attr['resume'])
+
 
         models[model] = torch.nn.DataParallel(models[model], device_ids=range(torch.cuda.device_count()))
 
@@ -230,8 +233,10 @@ def train(cfg, writer, logger, logdir):
         # loss_sig = # Loss Function for Aleatoric Uncertainty
         logger.info("Using loss {}".format(loss_fn))
 
+        print(attr['resume'])
+
         # Load pretrained weights
-        if attr['resume'] is not None:
+        if attr['resume'] is not None and not "caffemodel" in attr['resume']:                
             if os.path.isfile(attr['resume']):
                 logger.info(
                     "Loading model and optimizer from checkpoint '{}'".format(attr['resume'])
@@ -240,14 +245,14 @@ def train(cfg, writer, logger, logdir):
 
                 ###
                 pretrained_dict = torch.load(attr['resume'])['model_state']
-                model_dict = model.state_dict()
+                model_dict = models[model].state_dict()
 
                 # 1. filter out unnecessary keys
                 pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict}
                 # 2. overwrite entries in the existing state dict
                 model_dict.update(pretrained_dict) 
                 # 3. load the new state dict
-                model.load_state_dict(pretrained_dict)
+                models[model].load_state_dict(pretrained_dict)
                 ###
 
 
@@ -256,11 +261,7 @@ def train(cfg, writer, logger, logdir):
                 # scheduler.load_state_dict(checkpoint["scheduler_state"])
                 # start_iter = checkpoint["epoch"]
                 start_iter = 0
-                logger.info(
-                    "Loaded checkpoint '{}' (iter {})".format(
-                        attr['resume'], checkpoint["epoch"]
-                    )
-                )
+                logger.info("Loaded checkpoint '{}' (iter {})".format(attr['resume'], checkpoint["epoch"]))
             else:
                 logger.info("No checkpoint found at '{}'".format(attr['resume']))        
 

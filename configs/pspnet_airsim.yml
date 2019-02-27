@@ -15,7 +15,7 @@ models:
         mcdo_start_iter: None
         mcdo_backprop: None
         learned_uncertainty: "no"        
-        resume: None   
+        resume: ./models/pspnet101_cityscapes.caffemodel   
 ######################
 # Middle Fusion MCDO #
 ######################

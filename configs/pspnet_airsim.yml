@@ -118,7 +118,7 @@ data:
     img_cols: 128 #512
 training:
     train_iters: 300000
-    batch_size: 2
+    batch_size: 8
     val_interval: 1000
     png_frames: 50
     n_workers: 16

@@ -667,6 +667,7 @@ if __name__ == "__main__":
     name = [cfg['id']]
     name.append("{}x{}".format(cfg['data']['img_rows'],cfg['data']['img_cols']))
     name.append("_{}_".format("-".join(cfg['start_layers'])))
+    name.append("{}bs".format(cfg['training']['batch_size']))
     # name.append("_{}_".format("-".join(cfg['models'].keys())))
     if not mcdo_model_name is None:
         name.append("{}reduction".format(cfg['models'][mcdo_model_name]['reduction']))

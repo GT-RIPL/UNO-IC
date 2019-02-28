@@ -250,12 +250,20 @@ def train(cfg, writer, logger, logdir):
                 pretrained_dict = torch.load(model_pkl)['model_state']
                 model_dict = models[model].state_dict()
 
-                print(model,start_layer,end_layer)
+                # print(model,start_layer,end_layer)
+
 
                 # 1. filter out unnecessary keys
-                pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict or (model=="fuse" and not start_layer in k)}
+                pretrained_dict = {k: v.resize_(model_dict[k].shape) for k, v in pretrained_dict.items() if (k in model_dict)} # and ((model!="fuse") or (model=="fuse" and not start_layer in k))}
+
+
+                # print(pretrained_dict.keys())
+
                 # 2. overwrite entries in the existing state dict
                 model_dict.update(pretrained_dict) 
+
+                print(model_dict.keys())
+
                 # 3. load the new state dict
                 models[model].load_state_dict(pretrained_dict)
                 ###

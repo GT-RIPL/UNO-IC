@@ -116,7 +116,8 @@ for k,v in runs.items():
                                                  "correctedDropoutScalarLayerTest",
                                                  "onePassBackprop",
                                                  "output_fusion",
-                                                 "legFusion"
+                                                 "legFusion",
+                                                 "legFusion_pretrained",
                                                 ]]):
         v['std_config']['reduction'] = c['models']['fuse']['reduction']    
         v['std_config']['start_layers'] = c['start_layers']
@@ -266,54 +267,54 @@ df = df[
             (df['size'] == "128x128") &
             # (df['multipass_backprop'] == True)
             (df['size'] != "")
-        ) &
+        ) #&
         
-        (
-            (df["block"] == "input_fusion") | 
-            (df["block"] == "fused") | 
-            (df["block"] == "rgb_only") | 
-            (df["block"] == "d_only") | 
-            # (df["block"] == "convbnrelu1_1-convbnrelu1_2-convbnrelu1_3") |
-            # (df["block"] == "convbnrelu1_1-convbnrelu1_3-res_block2") |
-            # (df["block"] == "convbnrelu1_1-res_block2-res_block3") |
-            # (df["block"] == "convbnrelu1_1-res_block2-res_block4") |
-            # (df["block"] == "convbnrelu1_1-res_block2-res_block5") 
+        # (
+        #     (df["block"] == "input_fusion") | 
+        #     (df["block"] == "fused") | 
+        #     (df["block"] == "rgb_only") | 
+        #     (df["block"] == "d_only") | 
+        #     # (df["block"] == "convbnrelu1_1-convbnrelu1_2-convbnrelu1_3") |
+        #     # (df["block"] == "convbnrelu1_1-convbnrelu1_3-res_block2") |
+        #     # (df["block"] == "convbnrelu1_1-res_block2-res_block3") |
+        #     # (df["block"] == "convbnrelu1_1-res_block2-res_block4") |
+        #     # (df["block"] == "convbnrelu1_1-res_block2-res_block5") 
 
-        #     ((df["block"] == "convbnrelu1_1-convbnrelu1_3") & (df['mcdo_passes'] == "1")) |
-        #     ((df["block"] == "convbnrelu1_1-res_block2") & (df['mcdo_passes'] == "1")) |
-        #     ((df["block"] == "convbnrelu1_1-res_block3") & (df['mcdo_passes'] == "1")) |
-        #     ((df["block"] == "convbnrelu1_1-res_block5") & (df['mcdo_passes'] == "1")) |
-        #     ((df["block"] == "convbnrelu1_1-pyramid_pooling") & (df['mcdo_passes'] == "1")) |
-        #     ((df["block"] == "convbnrelu1_1-cbr_final") & (df['mcdo_passes'] == "1")) |
-        #     ((df["block"] == "convbnrelu1_1-classification") & (df['mcdo_passes'] == "1")) |
-        #     ((df["block"] == "convbnrelu1_1-convbnrelu1_3") & (df['mcdo_passes'] == "5")) |
-        #     ((df["block"] == "convbnrelu1_1-res_block2") & (df['mcdo_passes'] == "5")) |
-        #     ((df["block"] == "convbnrelu1_1-res_block3") & (df['mcdo_passes'] == "5")) |
-        #     ((df["block"] == "convbnrelu1_1-res_block5") & (df['mcdo_passes'] == "5")) |
-        #     ((df["block"] == "convbnrelu1_1-pyramid_pooling") & (df['mcdo_passes'] == "5")) |
-        #     ((df["block"] == "convbnrelu1_1-cbr_final") & (df['mcdo_passes'] == "5")) |
-        #     ((df["block"] == "convbnrelu1_1-classification") & (df['mcdo_passes'] == "5")) 
+        # #     ((df["block"] == "convbnrelu1_1-convbnrelu1_3") & (df['mcdo_passes'] == "1")) |
+        # #     ((df["block"] == "convbnrelu1_1-res_block2") & (df['mcdo_passes'] == "1")) |
+        # #     ((df["block"] == "convbnrelu1_1-res_block3") & (df['mcdo_passes'] == "1")) |
+        # #     ((df["block"] == "convbnrelu1_1-res_block5") & (df['mcdo_passes'] == "1")) |
+        # #     ((df["block"] == "convbnrelu1_1-pyramid_pooling") & (df['mcdo_passes'] == "1")) |
+        # #     ((df["block"] == "convbnrelu1_1-cbr_final") & (df['mcdo_passes'] == "1")) |
+        # #     ((df["block"] == "convbnrelu1_1-classification") & (df['mcdo_passes'] == "1")) |
+        # #     ((df["block"] == "convbnrelu1_1-convbnrelu1_3") & (df['mcdo_passes'] == "5")) |
+        # #     ((df["block"] == "convbnrelu1_1-res_block2") & (df['mcdo_passes'] == "5")) |
+        # #     ((df["block"] == "convbnrelu1_1-res_block3") & (df['mcdo_passes'] == "5")) |
+        # #     ((df["block"] == "convbnrelu1_1-res_block5") & (df['mcdo_passes'] == "5")) |
+        # #     ((df["block"] == "convbnrelu1_1-pyramid_pooling") & (df['mcdo_passes'] == "5")) |
+        # #     ((df["block"] == "convbnrelu1_1-cbr_final") & (df['mcdo_passes'] == "5")) |
+        # #     ((df["block"] == "convbnrelu1_1-classification") & (df['mcdo_passes'] == "5")) 
 
-            # (df["block"] == "convbnrelu1_1-convbnrelu1_3") | 
-            # (df["block"] == "convbnrelu1_1-res_block2") |
-            (df["block"] == "convbnrelu1_1-res_block3") |
-            (df["block"] == "convbnrelu1_1-res_block4") |
-            (df["block"] == "convbnrelu1_1-res_block5") |
-            # (df["block"] == "convbnrelu1_1-pyramid_pooling") |
-            # (df["block"] == "convbnrelu1_1-cbr_final") |
-            # (df["block"] == "convbnrelu1_1-classification") |      
-            (df['size'] == "")
-        ) &
+        #     # (df["block"] == "convbnrelu1_1-convbnrelu1_3") | 
+        #     # (df["block"] == "convbnrelu1_1-res_block2") |
+        #     (df["block"] == "convbnrelu1_1-res_block3") |
+        #     (df["block"] == "convbnrelu1_1-res_block4") |
+        #     (df["block"] == "convbnrelu1_1-res_block5") |
+        #     # (df["block"] == "convbnrelu1_1-pyramid_pooling") |
+        #     # (df["block"] == "convbnrelu1_1-cbr_final") |
+        #     # (df["block"] == "convbnrelu1_1-classification") |      
+        #     (df['size'] == "")
+        # ) &
 
-        (
-            (df['test'] == "fog_000") | 
-            (df['test'] == "fog_025") | 
-            (df['test'] == "fog_050") | 
-            (df['test'] == "fog_100") |
-            (df['test'] == "fog_100__depth_noise_mag20") |
-            (df['test'] == "fog_100__rgb_noise_mag20") |
-            (df['test'] == "combined")
-        )
+        # (
+        #     (df['test'] == "fog_000") | 
+        #     (df['test'] == "fog_025") | 
+        #     (df['test'] == "fog_050") | 
+        #     (df['test'] == "fog_100") |
+        #     (df['test'] == "fog_100__depth_noise_mag20") |
+        #     (df['test'] == "fog_100__rgb_noise_mag20") |
+        #     (df['test'] == "combined")
+        # )
 
         # ) #&
         ]

@@ -250,19 +250,26 @@ def train(cfg, writer, logger, logdir):
                 pretrained_dict = torch.load(model_pkl)['model_state']
                 model_dict = models[model].state_dict()
 
+                print(model,start_layer,end_layer)
+
                 # 1. filter out unnecessary keys
-                pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict}
+                pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict or (model=="fuse" and not start_layer in k)}
                 # 2. overwrite entries in the existing state dict
                 model_dict.update(pretrained_dict) 
                 # 3. load the new state dict
                 models[model].load_state_dict(pretrained_dict)
                 ###
 
+                # print(pretrained_dict)
 
-                models[model].load_state_dict(checkpoint["model_state"])
-                optimizers[model].load_state_dict(checkpoint["optimizer_state"])
-                schedulers[model].load_state_dict(checkpoint["scheduler_state"])
-                start_iter = checkpoint["epoch"]
+
+                if attr['resume']=='same_yaml':
+                    # models[model].load_state_dict(checkpoint["model_state"])
+                    optimizers[model].load_state_dict(checkpoint["optimizer_state"])
+                    schedulers[model].load_state_dict(checkpoint["scheduler_state"])
+                    start_iter = checkpoint["epoch"]
+                else:
+                    start_iter = 0
                 # start_iter = 0
                 logger.info("Loaded checkpoint '{}' (iter {})".format(model_pkl, checkpoint["epoch"]))
             else:

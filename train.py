@@ -559,12 +559,17 @@ def train(cfg, writer, logger, logdir):
                                 axes[0,2].imshow(orig['d'][0,:,:,:].permute(1,2,0).cpu().numpy())
                                 axes[0,2].set_title("D")
 
+
+                                axes[1,0].imshow(pred[0,:,:])
+                                axes[1,0].set_title("Pred")
+
+                                axes[2,0].imshow(conf[0,:,:])
+                                axes[2,0].set_title("Conf")
+
+
                                 if len(cfg['models'])>1:
                                     if cfg['models']['rgb']['learned_uncertainty'] == 'yes':            
                                         channels = int(mean_outputs['rgb'].shape[1]/2)
-                                        
-                                        axes[1,0].imshow(pred[0,:,:])
-                                        axes[1,0].set_title("Pred")
 
                                         axes[1,1].imshow(mean_outputs['rgb'][:,channels:,:,:].mean(1)[0,:,:].cpu().numpy())
                                         axes[1,1].set_title("Aleatoric (RGB)")
@@ -577,9 +582,6 @@ def train(cfg, writer, logger, logdir):
                                         channels = int(mean_outputs['rgb'].shape[1])
 
                                     if cfg['models']['rgb']['mcdo_passes']>1:
-                                        axes[2,0].imshow(conf[0,:,:])
-                                        axes[2,0].set_title("Conf")
-
                                         axes[2,1].imshow(std_outputs['rgb'][:,:channels,:,:].mean(1)[0,:,:].cpu().numpy())
                                         axes[2,1].set_title("Epistemic (RGB)")
 

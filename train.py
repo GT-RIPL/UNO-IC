@@ -123,15 +123,15 @@ def train(cfg, writer, logger, logdir):
                                                                                  "fog_025",
                                                                                  "fog_050",
                                                                                  "fog_100",
-                                                                                 # "fog_000__depth_additiveNoiseMag10",
-                                                                                 # "fog_000__depth_additiveNoiseMag20",
-                                                                                 # "fog_000__depth_illuminationChange50",
-                                                                                 # "fog_000__depth_occlusion",
+                                                                                 "fog_000__depth_additiveNoiseMag10",
+                                                                                 "fog_000__depth_additiveNoiseMag20",
+                                                                                 "fog_000__depth_illuminationChange50",
+                                                                                 "fog_000__depth_occlusion",
                                                                                  "fog_100__depth_noise_mag20",
-                                                                                 # "fog_000__rgb_additiveNoiseMag10",
-                                                                                 # "fog_000__rgb_additiveNoiseMag20",
-                                                                                 # "fog_000__rgb_illuminationChange50",
-                                                                                 # "fog_000__rgb_occlusion",
+                                                                                 "fog_000__rgb_additiveNoiseMag10",
+                                                                                 "fog_000__rgb_additiveNoiseMag20",
+                                                                                 "fog_000__rgb_illuminationChange50",
+                                                                                 "fog_000__rgb_occlusion",
                                                                                  "fog_100__rgb_noise_mag20"]}
 
 
@@ -203,6 +203,7 @@ def train(cfg, writer, logger, logdir):
                                   start_layer=start_layer,
                                   end_layer=end_layer,
                                   mcdo_passes=attr['mcdo_passes'], 
+                                  dropoutP=attr['dropoutP'],
                                   learned_uncertainty=attr['learned_uncertainty'],
                                   reduction=attr['reduction']).to(device)
 
@@ -680,6 +681,7 @@ if __name__ == "__main__":
     if not mcdo_model_name is None:
         name.append("{}reduction".format(cfg['models'][mcdo_model_name]['reduction']))
         name.append("{}passes".format(cfg['models'][mcdo_model_name]['mcdo_passes']))
+        name.append("{}dropoutP".format(cfg['models'][mcdo_model_name]['dropoutP']))
         name.append("{}learnedUncertainty".format(cfg['models'][mcdo_model_name]['learned_uncertainty']))
         name.append("{}mcdostart".format(cfg['models'][mcdo_model_name]['mcdo_start_iter']))
         name.append("{}mcdobackprop".format(cfg['models'][mcdo_model_name]['mcdo_backprop']))

@@ -56,6 +56,7 @@ class pspnet(nn.Module):
         input_size=(473, 473),
         version=None,
         mcdo_passes=1,
+        dropoutP=0.1,
         learned_uncertainty="none",
         in_channels=3,
         start_layer="convbnrelu1_1",
@@ -147,6 +148,7 @@ class pspnet(nn.Module):
         self.layer_dict = {row[0]:row[1:] for row in self.sub_layers}
 
         self.layers = {}
+        self.layers['dropoutMCDO'] = nn.Dropout2d(p=dropoutP, inplace=False)
         self.layers['dropout'] = nn.Dropout2d(p=0.1, inplace=False)
         for k,v in self.layer_dict.items():
             if ("convbnrelu" in k or "cbr_final" in k) and not v[0] is None:
@@ -217,15 +219,20 @@ class pspnet(nn.Module):
     def forward(self, x, dropout=False):
 
         # Turn on training to get weight dropout
+        if self.mcdo_passes>1:
+            dropout = self.dropoutMCDO
+        else:
+            dropout = self.dropout
+
         if self.training:
-            self.dropout.train(mode=True)
+            dropout.train(mode=True)            
             dropout_scalar = 1
         else:
             if self.mcdo_passes>1:
-                self.dropout.train(mode=True)
-                dropout_scalar = 1-self.dropout.p
+                dropout.train(mode=True)                
+                dropout_scalar = 1-dropout.p
             else:
-                self.dropout.eval()
+                dropout.eval()
                 dropout_scalar = 1
 
         inp_shape = x.shape[2:]
@@ -234,17 +241,17 @@ class pspnet(nn.Module):
         if 'convbnrelu1_1' in self.layers.keys():
             xprev = x            
             x = getattr(self,'convbnrelu1_1')(x) 
-            x = getattr(self,'dropout')(x) 
+            x = dropout(x) 
             x *= dropout_scalar
         if 'convbnrelu1_2' in self.layers.keys():
             xprev = x            
             x = getattr(self,'convbnrelu1_2')(x) 
-            x = getattr(self,'dropout')(x) 
+            x = dropout(x) 
             x *= dropout_scalar
         if 'convbnrelu1_3' in self.layers.keys():
             xprev = x
             x = getattr(self,'convbnrelu1_3')(x) 
-            x = getattr(self,'dropout')(x) 
+            x = dropout(x) 
             x *= dropout_scalar
             
             x = F.max_pool2d(x, 3, 2, 1)
@@ -253,42 +260,42 @@ class pspnet(nn.Module):
         if 'res_block2' in self.layers.keys():
             xprev = x
             x = getattr(self,'res_block2')(x)
-            x = getattr(self,'dropout')(x) 
+            x = dropout(x) 
             x *= dropout_scalar
         if 'res_block3' in self.layers.keys():
             xprev = x
             x = getattr(self,'res_block3')(x)
-            x = getattr(self,'dropout')(x) 
+            x = dropout(x) 
             x *= dropout_scalar
         if 'res_block4' in self.layers.keys():
             xprev = x
             x = getattr(self,'res_block4')(x)            
-            x = getattr(self,'dropout')(x) 
+            x = dropout(x) 
             x *= dropout_scalar
 
         if self.training and 'convbnrelu4_aux' in self.layers.keys():  # Auxiliary layers for training
             xprev = x            
             x_aux = getattr(self,'convbnrelu4_aux')(x)
-            x_aux = getattr(self,'dropout')(x_aux)
+            x_aux = dropout(x_aux)
             x_aux *= dropout_scalar
             x_aux = getattr(self,'aux_cls')(x_aux)
 
         if 'res_block5' in self.layers.keys():
             xprev = x
             x = getattr(self,'res_block5')(x)   
-            x = getattr(self,'dropout')(x) 
+            x = dropout(x) 
             x *= dropout_scalar
 
         if 'pyramid_pooling' in self.layers.keys():
             xprev = x            
             x = getattr(self,'pyramid_pooling')(x)   
-            x = getattr(self,'dropout')(x) 
+            x = dropout(x) 
             x *= dropout_scalar
 
         if 'cbr_final' in self.layers.keys():
             xprev = x
             x = getattr(self,'cbr_final')(x)   
-            x = getattr(self,'dropout')(x)   
+            x = dropout(x)   
             x *= dropout_scalar
 
         if 'classification' in self.layers.keys():

@@ -319,6 +319,8 @@ class pspnet(nn.Module):
         num_concretes = len([x for x in self.layers.keys() if 'concrete' in x])
         regularization = torch.zeros( num_concretes, device=x.device )
 
+
+
         ri = 0
 
         # H, W -> H/2, W/2
@@ -448,6 +450,7 @@ class pspnet(nn.Module):
 
             x = torch.cat((x,sigma),1)
 
+
         if self.mcdo_passes > 1:
             if self.training and 'convbnrelu4_aux' in self.layers.keys():
                 return (x, x_aux), regularization.sum()
@@ -455,9 +458,9 @@ class pspnet(nn.Module):
                 return x, regularization.sum()
         else:
             if self.training and 'convbnrelu4_aux' in self.layers.keys():
-                return (x, x_aux)
+                return (x, x_aux), torch.zeros( 1, device=x.device )
             else:  # eval mode
-                return x
+                return x, torch.zeros( 1, device=x.device )
 
 
 

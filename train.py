@@ -321,18 +321,18 @@ def train(cfg, writer, logger, logdir):
             [optimizers[m].zero_grad() for m in models.keys()]
 
             if any("input_fusion" in m for m in models.keys()):
-                outputs = models['input_fusion'](inputs['fused'])
+                outputs, _ = models['input_fusion'](inputs['fused'])
             elif any("rgb_only" in m for m in models.keys()):
-                outputs = models['rgb_only'](inputs['rgb'])
+                outputs, _ = models['rgb_only'](inputs['rgb'])
             elif any("d_only" in m for m in models.keys()):
-                outputs = models['d_only'](inputs['d'])
+                outputs, _ = models['d_only'](inputs['d'])
 
             else:
 
                 outputs = {}
                 outputs_aux = {}
                 if any("_static" in m for m in models.keys()):                
-                    outputs = {m:models[m+"_static"](inputs[m]) for m in ['rgb','d']}
+                    outputs = {m:list(models[m+"_static"](inputs[m]))[0] for m in ['rgb','d']}
                     inputs = outputs
 
                 # Start MCDO Style Training
@@ -345,7 +345,6 @@ def train(cfg, writer, logger, logdir):
                         models[m].mcdo_passes = cfg['models'][m]['mcdo_passes']
 
                         regs[m] = torch.zeros( models[m].mcdo_passes, device=device )
-
 
                         if not cfg['models'][m]['mcdo_backprop']:
                             x, regs[m][0] = models[m](inputs[m])
@@ -405,7 +404,8 @@ def train(cfg, writer, logger, logdir):
                                 outputs[m] = torch.cat((outputs[m], x.unsqueeze(-1)),-1)
                                 if not x_aux is None:
                                     outputs_aux[m] = torch.cat((outputs_aux[m], x_aux.unsqueeze(-1)),-1)
-                    
+                    reg = torch.stack([regs[m].sum() for m in regs.keys()]).sum()
+
                 mean_outputs = {}
                 var_outputs = {}
                 for m in outputs.keys():
@@ -433,7 +433,7 @@ def train(cfg, writer, logger, logdir):
                 # stack outputs from parallel legs
                 intermediate = torch.cat(tuple([mean_outputs[m] for m in outputs.keys()]+[var_outputs[m] for m in outputs.keys()]),1)
 
-                outputs = models['fuse'](intermediate)
+                outputs, _ = models['fuse'](intermediate)
 
                 # auxiliaring training loss
                 if len(outputs_aux)>0:
@@ -446,7 +446,7 @@ def train(cfg, writer, logger, logdir):
                 # print(intermediate.cpu().numpy().shape)
                 # print(outputs.cpu().numpy())
      
-            loss = loss_fn(input=outputs,target=labels) + np.sum([regs[m].sum() for m in regs.keys()])
+            loss = loss_fn(input=outputs,target=labels) + reg
 
             # register hooks for modifying gradients for learned uncertainty
             if len(cfg['models'])>1 and cfg['models']['rgb']['learned_uncertainty'] == 'yes':            
@@ -506,19 +506,21 @@ def train(cfg, writer, logger, logdir):
                                       "d": depth,
                                       "fused": fused}
 
+                            reg = torch.zeros(1,device=device )
+
                             orig = inputs.copy()
 
                             if images.shape[0]<=1:
                                 continue
 
                             if any("input_fusion" in m for m in models.keys()):
-                                outputs = models['input_fusion'](inputs['fused'])
+                                outputs, _ = models['input_fusion'](inputs['fused'])
 
                             elif any("rgb_only" in m for m in models.keys()):
-                                outputs = models['rgb_only'](inputs['rgb'])
+                                outputs, _ = models['rgb_only'](inputs['rgb'])
 
                             elif any("d_only" in m for m in models.keys()):
-                                outputs = models['d_only'](inputs['d'])
+                                outputs, _ = models['d_only'](inputs['d'])
 
 
                             else:
@@ -527,7 +529,7 @@ def train(cfg, writer, logger, logdir):
                                 outputs = {}
                                 outputs_aux = {}
                                 if any("_static" in m for m in models.keys()):                
-                                    outputs = {m:models[m+"_static"](inputs[m]) for m in ['rgb','d']}
+                                    outputs = {m:list(models[m+"_static"](inputs[m]))[0] for m in ['rgb','d']}
                                     inputs = outputs
 
                                 outputs = {}
@@ -541,7 +543,8 @@ def train(cfg, writer, logger, logdir):
                                             outputs[m] = x.unsqueeze(-1)
                                         else:
                                             outputs[m] = torch.cat((outputs[m], x.unsqueeze(-1)),-1)
-                                  
+                                reg = torch.stack([regs[m].sum() for m in regs.keys()]).sum()
+
 
                                 mean_outputs = {m:outputs[m].mean(-1) for m in outputs.keys()}
                                 std_outputs = {m:outputs[m].mean(-1) for m in outputs.keys()}
@@ -549,12 +552,12 @@ def train(cfg, writer, logger, logdir):
                                 # stack outputs from parallel legs
                                 intermediate = torch.cat(tuple([mean_outputs[m] for m in outputs.keys()]+[std_outputs[m] for m in outputs.keys()]),1)
 
-                                outputs = models['fuse'](intermediate)
+                                outputs, _ = models['fuse'](intermediate)
 
 
 
 
-                            val_loss = loss_fn(input=outputs, target=labels) + np.sum([regs[m].sum() for m in regs.keys()])
+                            val_loss = loss_fn(input=outputs, target=labels) + reg
 
                             pred = outputs.data.max(1)[1].cpu().numpy()
                             conf = outputs.data.max(1)[0].cpu().numpy()

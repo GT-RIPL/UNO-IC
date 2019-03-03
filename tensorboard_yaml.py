@@ -15,8 +15,8 @@ exclude = [
            'viz',
            'viz_conf',
            'viz_weirdLoss',
-           'isolated_layer_test',
-           'burn-in_test',
+           # 'isolated_layer_test',
+           # 'burn-in_test',
            # '02-14-2019_layer_test',
            # 'FULL_Baseline',
            # 'FULL',
@@ -74,7 +74,7 @@ for k,v in runs.items():
 
     v['std_config'] = {}
     v['std_config']['size'] = "{}x{}".format(c['data']['img_rows'],c['data']['img_cols'])
-
+    v['std_config']['id'] = v['raw_config']['id']
 
 
     if v['raw_config']['id']=="layer_test_baseline":
@@ -84,6 +84,7 @@ for k,v in runs.items():
         v['std_config']['mcdo_start_iter'] = c['models']['fused']['mcdo_start_iter']
         v['std_config']['multipass_backprop'] = False
         v['std_config']['learned_uncertainty'] = False
+        v['std_config']['dropoutP'] = 0.1
     elif any([s==v['raw_config']['id'] for s in ["layer_test",
                                                  "burn-in_test",
                                                  "02-14-2019_layer_test",
@@ -94,6 +95,7 @@ for k,v in runs.items():
         v['std_config']['mcdo_start_iter'] = c['models']['rgb']['mcdo_start_iter']
         v['std_config']['multipass_backprop'] = c['models']['rgb']['mcdo_backprop']
         v['std_config']['learned_uncertainty'] = False
+        v['std_config']['dropoutP'] = 0.1        
     elif any([s==v['raw_config']['id'] for s in ["isolated_layer_test",
                                                 ]]):
         v['std_config']['reduction'] = c['models']['fuse']['reduction']    
@@ -102,6 +104,7 @@ for k,v in runs.items():
         v['std_config']['mcdo_start_iter'] = c['models']['rgb']['mcdo_start_iter']
         v['std_config']['multipass_backprop'] = c['models']['rgb']['mcdo_backprop']
         v['std_config']['learned_uncertainty'] = False
+        v['std_config']['dropoutP'] = 0.1        
     elif any([s==v['raw_config']['id'] for s in ["isolated_layer_test_aux",
                                                  "isolated_layer_test1",
                                                  "HALF_GAMUT_learnedUncertainty",
@@ -118,6 +121,14 @@ for k,v in runs.items():
                                                  "output_fusion",
                                                  "legFusion",
                                                  "legFusion_pretrained",
+                                                 "legFusion_pretrained_LR5",
+                                                 "legFusion_pretrained_LR10",
+                                                 "legFusion_dropoutP",
+                                                 "isolated_layer_test_notpretrain",
+                                                 "isolated_layer_test_new_notpretrain",
+                                                 'isolated_layer_test_new',
+                                                 "isolated_layer_test_evalDropoutOnly_notpretrain",
+
                                                 ]]):
         v['std_config']['reduction'] = c['models']['fuse']['reduction']    
         v['std_config']['start_layers'] = c['start_layers']
@@ -128,6 +139,12 @@ for k,v in runs.items():
             v['std_config']['learned_uncertainty'] = False 
         else:
             v['std_config']['learned_uncertainty'] = True if c['models']['rgb']['learned_uncertainty']=='yes' else False
+
+        if not 'dropoutP' in c['models']['rgb'].keys():
+            v['std_config']['dropoutP'] = 0.1
+        else:
+            v['std_config']['dropoutP'] = c['models']['rgb']['dropoutP']
+
     elif any([s==v['raw_config']['id'] for s in ["GAMUT_baseline",
                                                  "FULL_Baseline",
                                                  "baseline_individual"
@@ -138,6 +155,7 @@ for k,v in runs.items():
         v['std_config']['mcdo_start_iter'] = c['models'][list(c['models'].keys())[0]]['mcdo_start_iter']
         v['std_config']['multipass_backprop'] = c['models'][list(c['models'].keys())[0]]['mcdo_backprop']
         v['std_config']['learned_uncertainty'] = True if c['models'][list(c['models'].keys())[0]]['learned_uncertainty']=='yes' else False
+        v['std_config']['dropoutP'] = 0.1
 
     else:
 
@@ -236,9 +254,11 @@ df = pd.DataFrame(data)
 df = df[(df.cls=="Mean_Acc____")]
 # df = df[(df.test=="fog_000")]
 
-df = df[['test','size','block','mcdo_passes','mcdo_start_iter','multipass_backprop','learned_uncertainty','mean','std','raw','iter']]
+df = df[['test','mean','std','raw','iter']+list(set(runs[list(runs)[0]]['std_config'])-set(['start_layers']))]
 
-df['unique_id'] = (df.groupby(['test','size','block','mcdo_passes','mcdo_start_iter','multipass_backprop','learned_uncertainty']).cumcount())
+print(list(runs[list(runs)[0]]['std_config']))
+
+df['unique_id'] = (df.groupby(['test']+list(set(runs[list(runs)[0]]['std_config'])-set(['start_layers']))).cumcount()) #,'size','block','mcdo_passes','mcdo_start_iter','multipass_backprop','learned_uncertainty']).cumcount())
 
 
 df['full'] = df['size']+", "+\
@@ -246,8 +266,11 @@ df['full'] = df['size']+", "+\
              df['mcdo_passes'].map(str)+" mcdo_passes, "+\
              df['mcdo_start_iter'].map(str)+" burn-in, "+\
              df['multipass_backprop'].map(str)+" multipass_backprop, "+\
-             df['learned_uncertainty'].map(str)+" learned_uncertainty ("+\
-             df['unique_id'].map(str)+")"
+             df['learned_uncertainty'].map(str)+" learned_uncertainty, "+\
+             df['dropoutP'].map(str)+" dropoutP ("+\
+             df['unique_id'].map(str)+")"+\
+             df['id'].map(str)
+
 
 # print(df['block'].unique())
 # exit()
@@ -256,7 +279,8 @@ df['full'] = df['size']+", "+\
 
 # exit()
 
-df = df.sort_values(by=['test','size','block','mcdo_passes','mcdo_start_iter','multipass_backprop','learned_uncertainty'])
+df = df.sort_values(by=['test']+list(set(runs[list(runs)[0]]['std_config'])-set(['start_layers'])))
+    #['test','size','block','mcdo_passes','mcdo_start_iter','multipass_backprop','learned_uncertainty'])
 
 
 
@@ -264,16 +288,30 @@ df = df.sort_values(by=['test','size','block','mcdo_passes','mcdo_start_iter','m
 
 df = df[ 
         (
-            (df['size'] == "128x128") &
+            (df['size'] == "512x512") &
             # (df['multipass_backprop'] == True)
             (df['size'] != "")
-        ) #&
         
+        
+        # ) & (
+        #     (df["block"] == "input_fusion") | 
+        #     (df["block"] == "fused") | 
+        #     (df["block"] == "rgb_only") | 
+        #     (df["block"] == "d_only") |         
+        #     (df['learned_uncertainty'] == True)
+
         # (
+        #     (df['raw'].str.contains('baseline')) |
+        #     (df['raw'].str.contains('correctedDropoutScalarLayerTest')) |
+        #     (df['raw'].str.contains('layer_test_128x128'))
+        # )
+
+        # ) & (
         #     (df["block"] == "input_fusion") | 
         #     (df["block"] == "fused") | 
         #     (df["block"] == "rgb_only") | 
         #     (df["block"] == "d_only") | 
+
         #     # (df["block"] == "convbnrelu1_1-convbnrelu1_2-convbnrelu1_3") |
         #     # (df["block"] == "convbnrelu1_1-convbnrelu1_3-res_block2") |
         #     # (df["block"] == "convbnrelu1_1-res_block2-res_block3") |
@@ -297,27 +335,25 @@ df = df[
 
         #     # (df["block"] == "convbnrelu1_1-convbnrelu1_3") | 
         #     # (df["block"] == "convbnrelu1_1-res_block2") |
-        #     (df["block"] == "convbnrelu1_1-res_block3") |
-        #     (df["block"] == "convbnrelu1_1-res_block4") |
-        #     (df["block"] == "convbnrelu1_1-res_block5") |
+        #     # (df["block"] == "convbnrelu1_1-res_block3") |
+        #     # (df["block"] == "convbnrelu1_1-res_block4") |
+        #     # (df["block"] == "convbnrelu1_1-res_block5") |
         #     # (df["block"] == "convbnrelu1_1-pyramid_pooling") |
         #     # (df["block"] == "convbnrelu1_1-cbr_final") |
         #     # (df["block"] == "convbnrelu1_1-classification") |      
         #     (df['size'] == "")
-        # ) &
 
-        # (
-        #     (df['test'] == "fog_000") | 
-        #     (df['test'] == "fog_025") | 
-        #     (df['test'] == "fog_050") | 
-        #     (df['test'] == "fog_100") |
-        #     (df['test'] == "fog_100__depth_noise_mag20") |
-        #     (df['test'] == "fog_100__rgb_noise_mag20") |
-        #     (df['test'] == "combined")
-        # )
+        ) & (
+            (df['test'] == "fog_000") | 
+            (df['test'] == "fog_025") | 
+            (df['test'] == "fog_050") | 
+            (df['test'] == "fog_100") |
+            (df['test'] == "fog_100__depth_noise_mag20") |
+            (df['test'] == "fog_100__rgb_noise_mag20") |
+            (df['test'] == "combined")
 
-        # ) #&
-        ]
+
+        )]
 
 df.to_csv('out.csv',index=False)
 
@@ -334,7 +370,7 @@ print(df)
 plt.figure()
 ax = plt.subplot2grid((4, 4), (0, 0), colspan=4, rowspan=2)
 # df.plot(kind='bar',ax=ax).legend(bbox_to_anchor=(1.0,0.99))
-df.plot(kind='bar',ax=ax).legend(bbox_to_anchor=(1.0,-0.2))
+df.plot(kind='bar',ax=ax).legend(bbox_to_anchor=(1.0,-0.2)) #,prop={'size':5})
 plt.xlabel("Test")
 plt.xticks(rotation=15)
 plt.ylabel("Mean Accuracy")

@@ -115,7 +115,7 @@ def train(cfg, writer, logger, logdir):
     v_loader = {env:data_loader(
         data_path,
         is_transform=True,
-        split="val", subsplit=env, scale_quantity=cfg['data']['val_reduction'],
+        split="val", subsplit=[env], scale_quantity=cfg['data']['val_reduction'],
         img_size=(cfg['data']['img_rows'],cfg['data']['img_cols']),) for env in ["fog_000",
                                                                                  # "fog_005",
                                                                                  # "fog_010",
@@ -337,15 +337,18 @@ def train(cfg, writer, logger, logdir):
 
                 # Start MCDO Style Training
                 outputs = {}
-                outputs_aux = {}                
+                outputs_aux = {}   
+                regs = {}             
                 for m in ['rgb','d']:
 
                     if i>cfg['models'][m]['mcdo_start_iter']:
                         models[m].mcdo_passes = cfg['models'][m]['mcdo_passes']
 
-                        if not cfg['models'][m]['mcdo_backprop']:
+                        regs[m] = torch.zeros( models[m].mcdo_passes, device=device )
 
-                            x = models[m](inputs[m])
+
+                        if not cfg['models'][m]['mcdo_backprop']:
+                            x, regs[m][0] = models[m](inputs[m])
                             x_aux = None
                             if isinstance(x,tuple):
                                 x, x_aux = x
@@ -356,7 +359,7 @@ def train(cfg, writer, logger, logdir):
 
                             with torch.no_grad():
                                 for mi in range(models[m].mcdo_passes-1):
-                                    x = models[m](inputs[m])
+                                    x, regs[m][mi+1] = models[m](inputs[m])
                                     x_aux = None
                                     if isinstance(x,tuple):
                                         x, x_aux = x
@@ -370,7 +373,7 @@ def train(cfg, writer, logger, logdir):
                                             outputs_aux[m] = torch.cat((outputs_aux[m], x_aux.unsqueeze(-1)),-1)
                         else:
                             for mi in range(models[m].mcdo_passes):
-                                x = models[m](inputs[m])
+                                x, regs[m][mi] = models[m](inputs[m])
                                 x_aux = None
                                 if isinstance(x,tuple):
                                     x, x_aux = x
@@ -387,8 +390,10 @@ def train(cfg, writer, logger, logdir):
                     else:
                         models[m].mcdo_passes = 1
 
+                        regs[m] = torch.zeros( models[m].mcdo_passes, device=device )
+
                         for mi in range(models[m].mcdo_passes):
-                            x = models[m](inputs[m])
+                            x, regs[m][mi] = models[m](inputs[m])
                             x_aux = None
                             if isinstance(x,tuple):
                                 x, x_aux = x
@@ -434,7 +439,6 @@ def train(cfg, writer, logger, logdir):
                 if len(outputs_aux)>0:
                     outputs = (outputs,*[mean_outputs_aux[m] for m in mean_outputs_aux.keys()])
 
- 
 
             # with torch.no_grad():
                 # print(mean_outputs['rgb'].cpu().numpy())
@@ -442,7 +446,7 @@ def train(cfg, writer, logger, logdir):
                 # print(intermediate.cpu().numpy().shape)
                 # print(outputs.cpu().numpy())
      
-            loss = loss_fn(input=outputs,target=labels)
+            loss = loss_fn(input=outputs,target=labels) + np.sum([regs[m].sum() for m in regs.keys()])
 
             # register hooks for modifying gradients for learned uncertainty
             if len(cfg['models'])>1 and cfg['models']['rgb']['learned_uncertainty'] == 'yes':            
@@ -528,9 +532,11 @@ def train(cfg, writer, logger, logdir):
 
                                 outputs = {}
                                 outputs_aux = {}
+                                regs = {}
                                 for m in ['rgb','d']:
+                                    regs[m] = torch.zeros( models[m].mcdo_passes, device=device )
                                     for mi in range(cfg['models'][m]['mcdo_passes']):
-                                        x = models[m](inputs[m])
+                                        x, regs[m][mi] = models[m](inputs[m])
                                         if not m in outputs:
                                             outputs[m] = x.unsqueeze(-1)
                                         else:
@@ -548,7 +554,7 @@ def train(cfg, writer, logger, logdir):
 
 
 
-                            val_loss = loss_fn(input=outputs, target=labels)
+                            val_loss = loss_fn(input=outputs, target=labels) + np.sum([regs[m].sum() for m in regs.keys()])
 
                             pred = outputs.data.max(1)[1].cpu().numpy()
                             conf = outputs.data.max(1)[0].cpu().numpy()

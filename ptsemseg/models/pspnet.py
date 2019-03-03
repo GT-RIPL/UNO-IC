@@ -9,6 +9,16 @@ from ptsemseg import caffe_pb2
 from ptsemseg.models.utils import *
 from ptsemseg.loss import *
 
+###
+# Concrete Dropout Import
+import torch
+from torch import nn
+from torch.nn import functional as F
+from torch import optim
+from torch.autograd import Variable
+import numpy as np
+###
+
 pspnet_specs = {
     "pascal": {
         "n_classes": 21,
@@ -32,6 +42,59 @@ pspnet_specs = {
     },     
 }
 
+class ConcreteDropout(nn.Module):
+    def __init__(self, weight_regularizer=1e-6,
+                 dropout_regularizer=1e-5, init_min=0.1, init_max=0.1):
+        super(ConcreteDropout, self).__init__()
+
+        
+        self.weight_regularizer = weight_regularizer
+        self.dropout_regularizer = dropout_regularizer
+        
+        init_min = np.log(init_min) - np.log(1. - init_min)
+        init_max = np.log(init_max) - np.log(1. - init_max)
+        
+        self.p_logit = nn.Parameter(torch.empty(1).uniform_(init_min, init_max))
+        
+    def forward(self, x, layer):
+        p = torch.sigmoid(self.p_logit)
+        
+        out = layer(self._concrete_dropout(x, p))
+        
+        sum_of_square = 0
+        for param in layer.parameters():
+            sum_of_square += torch.sum(torch.pow(param, 2))
+        
+        weights_regularizer = self.weight_regularizer * sum_of_square / (1 - p)
+        
+        dropout_regularizer = p * torch.log(p)
+        dropout_regularizer += (1. - p) * torch.log(1. - p)
+        
+        input_dimensionality = x[0].numel() # Number of elements of first item in batch
+        dropout_regularizer *= self.dropout_regularizer * input_dimensionality
+        
+        regularization = weights_regularizer + dropout_regularizer
+        return out, regularization
+        
+    def _concrete_dropout(self, x, p):
+        eps = 1e-7
+        temp = 0.1
+
+        unif_noise = torch.rand_like(x)
+
+        drop_prob = (torch.log(p + eps)
+                    - torch.log(1 - p + eps)
+                    + torch.log(unif_noise + eps)
+                    - torch.log(1 - unif_noise + eps))
+        
+        drop_prob = torch.sigmoid(drop_prob / temp)
+        random_tensor = 1 - drop_prob
+        retain_prob = 1 - p
+        
+        x  = torch.mul(x, random_tensor)
+        x /= retain_prob
+        
+        return x
 
 class pspnet(nn.Module):
 
@@ -94,7 +157,7 @@ class pspnet(nn.Module):
                                [      "cbr_final", int(4096*reduction),  int(512*reduction), 3, 1, 1, False],
                                [ "classification",  int(512*reduction),                None, self.n_classes, 1, 1, 0]]
 
-        print(start_layer,end_layer)
+        # print(start_layer,end_layer)
 
         # specify in_channels programmatically
         if in_channels == 0:
@@ -139,6 +202,8 @@ class pspnet(nn.Module):
                 self.sub_layers.append([row[0],None])
 
 
+        # print(in_channels,self.sub_layers)
+
         for i,row in enumerate(self.default_layers):
             if row[0]=="cbr_final":
                 if not row[1] is None and not self.sub_layers[i-1][1] is None:
@@ -146,6 +211,8 @@ class pspnet(nn.Module):
 
 
         self.layer_dict = {row[0]:row[1:] for row in self.sub_layers}
+
+        # print(self.layer_dict)
 
         self.layers = {}
         self.layers['dropoutMCDO'] = nn.Dropout2d(p=dropoutP, inplace=False)
@@ -158,12 +225,20 @@ class pspnet(nn.Module):
                                                      padding=v[3],
                                                      stride=v[4],
                                                      bias=v[5])
+                self.layers[k+"_concrete"] = ConcreteDropout()
+
             if "res_block" in k and not v[0] is None:
                 self.layers[k] = residualBlockPSP(v[3],v[0],v[2],v[1],v[4],v[5])
+                self.layers[k+"_concrete"] = ConcreteDropout()
+
             if "pyramid_pooling" in k and not v[0] is None:
                 self.layers[k] = pyramidPooling(v[0],v[2])
+                self.layers[k+"_concrete"] = ConcreteDropout()
+
             if ("classification" in k or "aux_cls" in k) and not v[0] is None:
                 self.layers[k] = nn.Conv2d(v[0],v[2],v[3],v[4],v[5])
+                # self.layers[k+"_concrete"] = ConcreteDropout()
+
 
         # set attributes from dictionary
         for k,v in self.layers.items():
@@ -214,94 +289,154 @@ class pspnet(nn.Module):
         # Define auxiliary loss function
         self.loss = multi_scale_cross_entropy2d
 
+        
+    def heteroscedastic_loss(self, true, mean, log_var):
+        precision = torch.exp(-log_var)
+        return torch.mean(torch.sum(precision * (true - mean)**2 + log_var, 1), 0)
 
 
     def forward(self, x, dropout=False):
 
-        # Turn on training to get weight dropout
-        if self.mcdo_passes>1:
-            dropout = self.dropoutMCDO
-        else:
-            dropout = self.dropout
+        # # Turn on training to get weight dropout
+        # if self.mcdo_passes>1:
+        #     dropout = self.dropoutMCDO
+        # else:
+        #     dropout = self.dropout
 
-        if self.training:
-            dropout.train(mode=True)            
-            dropout_scalar = 1
-        else:
-            if self.mcdo_passes>1:
-                dropout.train(mode=True)                
-                dropout_scalar = 1-dropout.p
-            else:
-                dropout.eval()
-                dropout_scalar = 1
+        # if self.training:
+        #     dropout.train(mode=True)            
+        #     dropout_scalar = 1
+        # else:
+        #     if self.mcdo_passes>1:
+        #         dropout.train(mode=True)                
+        #         dropout_scalar = 1-dropout.p
+        #     else:
+        #         dropout.eval()
+        #         dropout_scalar = 1
 
         inp_shape = x.shape[2:]
 
+        num_concretes = len([x for x in self.layers.keys() if 'concrete' in x])
+        regularization = torch.zeros( num_concretes, device=x.device )
+
+        ri = 0
+
         # H, W -> H/2, W/2
         if 'convbnrelu1_1' in self.layers.keys():
-            xprev = x            
-            x = getattr(self,'convbnrelu1_1')(x) 
-            x = dropout(x) 
-            x *= dropout_scalar
+            xprev = x                       
+            if self.mcdo_passes == 1:
+                x = getattr(self,'convbnrelu1_1')(x) 
+                x = self.dropout(x)
+            else:
+                x, regularization[ri] = getattr(self,'convbnrelu1_1_concrete')(x,getattr(self,'convbnrelu1_1')) 
+                ri += 1
+
+            # x *= dropout_scalar
         if 'convbnrelu1_2' in self.layers.keys():
             xprev = x            
-            x = getattr(self,'convbnrelu1_2')(x) 
-            x = dropout(x) 
-            x *= dropout_scalar
+            if self.mcdo_passes == 1:
+                x = getattr(self,'convbnrelu1_2')(x) 
+                x = self.dropout(x)
+            else:
+                x, regularization[ri] = getattr(self,'convbnrelu1_2_concrete')(x,getattr(self,'convbnrelu1_2')) 
+                ri += 1
+
+            # x *= dropout_scalar
         if 'convbnrelu1_3' in self.layers.keys():
             xprev = x
-            x = getattr(self,'convbnrelu1_3')(x) 
-            x = dropout(x) 
-            x *= dropout_scalar
+            if self.mcdo_passes == 1:
+                x = getattr(self,'convbnrelu1_3')(x) 
+                x = self.dropout(x)
+            else:
+                x, regularization[ri] = getattr(self,'convbnrelu1_3_concrete')(x,getattr(self,'convbnrelu1_3')) 
+                ri += 1
+            
+            # x *= dropout_scalar
             
             x = F.max_pool2d(x, 3, 2, 1)
 
         # # H/4, W/4 -> H/8, W/8
         if 'res_block2' in self.layers.keys():
-            xprev = x
-            x = getattr(self,'res_block2')(x)
-            x = dropout(x) 
-            x *= dropout_scalar
+            xprev = x                        
+            if self.mcdo_passes == 1:
+                x = getattr(self,'res_block2')(x)                
+                x = self.dropout(x)
+            else:
+                x, regularization[ri] = getattr(self,'res_block2_concrete')(x,getattr(self,'res_block2')) 
+                ri += 1            
+
+            # x *= dropout_scalar
         if 'res_block3' in self.layers.keys():
-            xprev = x
-            x = getattr(self,'res_block3')(x)
-            x = dropout(x) 
-            x *= dropout_scalar
+            xprev = x                   
+            if self.mcdo_passes == 1:
+                x = getattr(self,'res_block3')(x)                
+                x = self.dropout(x)
+            else:
+                x, regularization[ri] = getattr(self,'res_block3_concrete')(x,getattr(self,'res_block3')) 
+                ri += 1            
+
+            # x *= dropout_scalar
         if 'res_block4' in self.layers.keys():
             xprev = x
-            x = getattr(self,'res_block4')(x)            
-            x = dropout(x) 
-            x *= dropout_scalar
+            if self.mcdo_passes == 1:
+                x = getattr(self,'res_block4')(x)
+                x = self.dropout(x)
+            else:
+                x, regularization[ri] = getattr(self,'res_block4_concrete')(x,getattr(self,'res_block4')) 
+                ri += 1            
+
+            # x *= dropout_scalar
 
         if self.training and 'convbnrelu4_aux' in self.layers.keys():  # Auxiliary layers for training
             xprev = x            
-            x_aux = getattr(self,'convbnrelu4_aux')(x)
-            x_aux = dropout(x_aux)
-            x_aux *= dropout_scalar
+            if self.mcdo_passes == 1:
+                x_aux = getattr(self,'convbnrelu4_aux')(x)
+                x_aux = self.dropout(x_aux)
+            else:
+                x_aux, regularization[ri] = getattr(self,'convbnrelu4_aux_concrete')(x,getattr(self,'convbnrelu4_aux')) 
+                ri += 1       
+
+            # x_aux *= dropout_scalar
             x_aux = getattr(self,'aux_cls')(x_aux)
 
         if 'res_block5' in self.layers.keys():
-            xprev = x
-            x = getattr(self,'res_block5')(x)   
-            x = dropout(x) 
-            x *= dropout_scalar
+            xprev = x           
+            if self.mcdo_passes == 1:
+                x = getattr(self,'res_block5')(x)
+                x = self.dropout(x)
+            else:
+                x, regularization[ri] = getattr(self,'res_block5_concrete')(x,getattr(self,'res_block5')) 
+                ri += 1            
+
+            # x *= dropout_scalar
 
         if 'pyramid_pooling' in self.layers.keys():
-            xprev = x            
-            x = getattr(self,'pyramid_pooling')(x)   
-            x = dropout(x) 
-            x *= dropout_scalar
+            xprev = x                       
+            if self.mcdo_passes == 1:
+                x = getattr(self,'pyramid_pooling')(x)                   
+                x = self.dropout(x)
+            else:
+                x, regularization[ri] = getattr(self,'pyramid_pooling_concrete')(x,getattr(self,'pyramid_pooling')) 
+                ri += 1            
+
+            # x *= dropout_scalar
 
         if 'cbr_final' in self.layers.keys():
-            xprev = x
-            x = getattr(self,'cbr_final')(x)   
-            x = dropout(x)   
-            x *= dropout_scalar
+            xprev = x            
+            if self.mcdo_passes == 1:
+                x = getattr(self,'cbr_final')(x)                   
+                x = self.dropout(x)
+            else:
+                x, regularization[ri] = getattr(self,'cbr_final_concrete')(x,getattr(self,'cbr_final')) 
+                ri += 1            
+
+            # x *= dropout_scalar
 
         if 'classification' in self.layers.keys():
             xprev = x
             x = getattr(self,'classification')(x)   
             x = F.interpolate(x, size=self.input_size, mode='bilinear', align_corners=True)
+
 
         if self.learned_uncertainty == "yes":
             last_module = [s[0] for s in self.sub_layers if not s[1] is None][-1]
@@ -313,10 +448,16 @@ class pspnet(nn.Module):
 
             x = torch.cat((x,sigma),1)
 
-        if self.training and 'convbnrelu4_aux' in self.layers.keys():
-            return (x, x_aux)
-        else:  # eval mode
-            return x
+        if self.mcdo_passes > 1:
+            if self.training and 'convbnrelu4_aux' in self.layers.keys():
+                return (x, x_aux), regularization.sum()
+            else:  # eval mode
+                return x, regularization.sum()
+        else:
+            if self.training and 'convbnrelu4_aux' in self.layers.keys():
+                return (x, x_aux)
+            else:  # eval mode
+                return x
 
 
 

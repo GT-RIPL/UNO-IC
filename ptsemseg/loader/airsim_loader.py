@@ -538,9 +538,6 @@ class airsimLoader(data.Dataset):
             img_path, mask_path = self.imgs[self.split][camera]['scene'][index], self.imgs[self.split][camera]['segmentation'][index]
             img, mask = np.array(cv2.imread(img_path),dtype=np.uint8)[:,:,:3], np.array(cv2.imread(mask_path),dtype=np.uint8)[:,:,:3]
 
-    
-            
-
             depth_path = self.imgs[self.split][camera]['depth'][index]
             depth = np.array(cv2.imread(depth_path),dtype=np.uint8)[:,:,0]
             
@@ -552,17 +549,6 @@ class airsimLoader(data.Dataset):
             for i,name in self.id2name.items():
                 for color in self.name2color[name]:
                     lbl[(mask==color[::-1]).all(-1)] = i
-
-                    #print(i)
-
-
-
-            plt.figure()
-            plt.subplot(2,1,1)
-            plt.imshow(mask)
-            plt.subplot(2,1,2)
-            plt.imshow(lbl)
-            plt.savefig('mask{}.png'.format(camera), dpi=200)
 
             if self.augmentations is not None:
                 img, lbl, aux = self.augmentations(img, lbl, aux)

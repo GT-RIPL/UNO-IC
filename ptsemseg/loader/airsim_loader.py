@@ -14,6 +14,8 @@ from random import shuffle
 import random
 from torch.utils import data
 
+from tqdm import tqdm
+
 random.seed(42) 
 
 
@@ -50,17 +52,17 @@ def label_region_n_compute_distance(i,path_tuple):
 
 class airsimLoader(data.Dataset):
     
-    name2color = {"person":      [135, 169, 180],
-                  #"ground":      [106,16,239],
-                  "sidewalk":    [242, 107, 146], 
+    name2color = {"person":      [[135, 169, 180]],
+                  # "ground":      [[106,16,239]],
+                  "sidewalk":    [[242, 107, 146]], 
                   "road":        [[156,198,23],[43,79,150]],
-                  "sky":         [209,247,202],
+                  "sky":         [[209,247,202]],
                   "pole":        [[249,79,73],[72,137,21],[45,157,177],[67,266,253],[206,190,59]],
                   "building":    [[161,171,27],[61,212,54],[151,161,26]],
-                  "car":         [153,108,6],
-                  "bus":         [190,225,64],
-                  "truck":       [112,105,191],
-                  "vegetation":  [[29,26,199],[234,21,250],[145,71,201],[247,200,111]]
+                  "car":         [[153,108,6]],
+                  "bus":         [[190,225,64]],
+                  "truck":       [[112,105,191]],
+                  "vegetation":  [[29,26,199],[234,21,250],[145,71,201],[247,200,111]],
                  }
 
     name2id = {"person":      1,
@@ -300,7 +302,9 @@ class airsimLoader(data.Dataset):
         n = 0
         for split in self.splits: # [train, val]
             for subsplit in self.subsplits: # []
-                for subdir in self.split_subdirs[split]: # [trajectory ]
+
+                print("Processing trajectories in {} {}".format(split,subsplit))
+                for subdir in tqdm(self.split_subdirs[split]): # [trajectory ]
                     for file_path in glob.glob(os.path.join(root,'scene',subsplit,subdir,'back_lower','*.png'),recursive=True):
                         #print(file_path)
 
@@ -532,7 +536,10 @@ class airsimLoader(data.Dataset):
             #start_ts = time.time()
 
             img_path, mask_path = self.imgs[self.split][camera]['scene'][index], self.imgs[self.split][camera]['segmentation'][index]
-            img, mask = np.array(m.imread(img_path,mode='RGB'),dtype=np.uint8)[:,:,:3], np.array(m.imread(mask_path,mode='RGB'),dtype=np.uint8)[:,:,:3]
+            img, mask = np.array(cv2.imread(img_path),dtype=np.uint8)[:,:,:3], np.array(cv2.imread(mask_path),dtype=np.uint8)[:,:,:3]
+
+    
+            
 
             depth_path = self.imgs[self.split][camera]['depth'][index]
             depth = np.array(cv2.imread(depth_path),dtype=np.uint8)[:,:,0]
@@ -544,9 +551,18 @@ class airsimLoader(data.Dataset):
             lbl = self.ignore_index*np.ones((img.shape[0],img.shape[1]),dtype=np.uint8)
             for i,name in self.id2name.items():
                 for color in self.name2color[name]:
-                    lbl[(mask==color).all(-1)] = i
+                    lbl[(mask==color[::-1]).all(-1)] = i
 
                     #print(i)
+
+
+
+            plt.figure()
+            plt.subplot(2,1,1)
+            plt.imshow(mask)
+            plt.subplot(2,1,2)
+            plt.imshow(lbl)
+            plt.savefig('mask{}.png'.format(camera), dpi=200)
 
             if self.augmentations is not None:
                 img, lbl, aux = self.augmentations(img, lbl, aux)

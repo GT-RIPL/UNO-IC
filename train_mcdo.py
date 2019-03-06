@@ -99,7 +99,7 @@ def train(cfg, writer, logger, logdir):
         is_transform=True,
         split=cfg['data']['train_split'],
         subsplits=cfg['data']['train_subsplit'],
-        scale_quantity=1.0,
+        scale_quantity=cfg['data']['train_reduction'],
         img_size=(cfg['data']['img_rows'],cfg['data']['img_cols']),
         augmentations=data_aug)
 
@@ -116,10 +116,7 @@ def train(cfg, writer, logger, logdir):
         data_path,
         is_transform=True,
         split="val", subsplits=[env], scale_quantity=cfg['data']['val_reduction'],
-        img_size=(cfg['data']['img_rows'],cfg['data']['img_cols']),) for env in [
-                                                                                 "8camera_fog_000_dense",
-                                                                                 "8camera_rain_dense",
-                                                                                ]}
+        img_size=(cfg['data']['img_rows'],cfg['data']['img_cols']),) for env in cfg['data']['val_subsplit']}
 
     n_classes = t_loader.n_classes
     trainloader = data.DataLoader(t_loader,
@@ -156,6 +153,8 @@ def train(cfg, writer, logger, logdir):
               "pyramid_pooling",
                     "cbr_final",
                "classification"]
+
+    print(cfg['models'].keys())
 
     for model,attr in cfg["models"].items():
         if len(cfg['models'])==1:
@@ -678,10 +677,11 @@ if __name__ == "__main__":
     with open(args.config) as fp:
         cfg = yaml.load(fp)
 
-    mcdo_model_name = "rgb" if len(cfg['models'])>1 else None #next((s for s in list(cfg['models'].keys()) if "mcdo" in s), None)
+    mcdo_model_name = "rgb" if len(cfg['models'])>1 else list(cfg['models'].keys())[0] #next((s for s in list(cfg['models'].keys()) if "mcdo" in s), None)
 
     name = [cfg['id']]
     name.append("{}x{}".format(cfg['data']['img_rows'],cfg['data']['img_cols']))
+    name.append("_{}_".format("-".join(cfg['start_layers']) if len(cfg['models'])>1 else mcdo_model_name))
     name.append("_{}_".format("-".join(cfg['start_layers'])))
     name.append("{}bs".format(cfg['training']['batch_size']))
     # name.append("_{}_".format("-".join(cfg['models'].keys())))

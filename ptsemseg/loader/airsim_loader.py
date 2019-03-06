@@ -249,9 +249,13 @@ class airsimLoader(data.Dataset):
     ignore_index = 0
 
     mean_rgbd = {
-        "airsim": [103.939, 116.779, 123.68, 120.00],
+        # "airsim": [103.939, 116.779, 123.68, 120.00],
+        "airsim": [21,22,21,70]
     }  # pascal mean for PSPNet and ICNet pre-trained model
 
+    std_rgbd = {
+        "airsim": [8,7,8,37]
+    }
 
 
     def __init__(
@@ -291,6 +295,7 @@ class airsimLoader(data.Dataset):
         self.n_classes = 14
         self.img_size = (img_size if isinstance(img_size, tuple) else (img_size, img_size))
         self.mean = np.array(self.mean_rgbd[version])
+        self.std = np.array(self.std_rgbd[version])
         
         # split: train/val image_modes
         #self.imgs = {s:{image_mode:[] for image_mode in self.image_modes} for s in self.splits}
@@ -538,10 +543,19 @@ class airsimLoader(data.Dataset):
             img_path, mask_path = self.imgs[self.split][camera]['scene'][index], self.imgs[self.split][camera]['segmentation'][index]
             img, mask = np.array(cv2.imread(img_path),dtype=np.uint8)[:,:,:3], np.array(cv2.imread(mask_path),dtype=np.uint8)[:,:,:3]
 
-            depth_path = self.imgs[self.split][camera]['depth'][index]
-            depth = np.array(cv2.imread(depth_path),dtype=np.uint8)[:,:,0]
+            if any(['depth_encoded'==mode for mode in self.image_modes]):
+                depth_path = self.imgs[self.split][camera]['depth_encoded'][index]
+                depth_raw = np.array(cv2.imread(depth_path),dtype=np.uint8)
+                depth = np.array((256**3)*depth_raw[:,:,0]+
+                                 (256**2)*depth_raw[:,:,1]+
+                                 (256**1)*depth_raw[:,:,2]+
+                                 (256**0)*depth_raw[:,:,3],dtype=np.uint32).view(np.float32)
+            else:
+                depth_path = self.imgs[self.split][camera]['depth'][index]
+                depth = np.array(cv2.imread(depth_path),dtype=np.uint8)[:,:,:3]
             
             #print('read time',time.time()-start_ts)
+
             #start_ts = time.time()
 
             aux = depth
@@ -552,8 +566,6 @@ class airsimLoader(data.Dataset):
 
             if self.augmentations is not None:
                 img, lbl, aux = self.augmentations(img, lbl, aux)
-
-
 
             if self.is_transform:
                 img, lbl, aux = self.transform(img, lbl, aux)
@@ -574,28 +586,27 @@ class airsimLoader(data.Dataset):
         :param img:
         :param lbl:
         """
-        img = m.imresize(
-            img, (self.img_size[0], self.img_size[1])
-        )  # uint8 with RGB mode
-        aux = m.imresize(
-            aux, (self.img_size[0], self.img_size[1])
-        )  # uint8 with Depth mode
+        img = cv2.resize(img, (self.img_size[0], self.img_size[1]))  # uint8 with RGB mode
+        aux = cv2.resize(aux, (self.img_size[0], self.img_size[1]))  # uint8 with Depth mode
         img = img[:, :, ::-1]  # RGB -> BGR
         img = img.astype(np.float64)
         aux = aux.astype(np.float64)
-        img -= self.mean[:3]
-        aux -= self.mean[3:]
+        # img -= self.mean[:3]
+        # aux -= self.mean[3:]
         if self.img_norm:
-            # Resize scales images from 0 to 255, thus we need
-            # to divide by 255.0
-            img = img.astype(float) / 255.0
-            aux = aux.astype(float) / 255.0
+
+            img = np.divide((img.astype(float) - self.mean[:3]),self.std[:3])
+            aux = np.divide((aux.astype(float) - self.mean[3:]),self.std[3:])
+
         # NHWC -> NCHW
         img = img.transpose(2, 0, 1)
 
+        if not any(['depth_encoded'==mode for mode in self.image_modes]):
+            aux = aux.transpose(2, 0, 1)
+
         classes = np.unique(lbl)
         lbl = lbl.astype(float)
-        lbl = m.imresize(lbl, (self.img_size[0], self.img_size[1]), "nearest", mode="F")
+        lbl = cv2.resize(lbl, (self.img_size[0], self.img_size[1]), interpolation=cv2.INTER_NEAREST) #, "nearest", mode="F")
         lbl = lbl.astype(int)
 
         # aux = aux.astype(float)

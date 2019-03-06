@@ -292,10 +292,21 @@ def train(cfg, writer, logger, logdir):
 
             images = images.to(device)
             labels = labels.to(device)
-            aux = aux.unsqueeze(1).to(device)
+
+            if len(aux.shape)<len(images.shape):
+                aux = aux.unsqueeze(1).to(device)
+                depth = torch.cat((aux,aux,aux),1)
+            else:
+                aux = aux.to(device)
+                depth = torch.cat((aux[:,0,:,:].unsqueeze(1),
+                                   aux[:,1,:,:].unsqueeze(1),
+                                   aux[:,2,:,:].unsqueeze(1)),1)
+
+
 
             fused = torch.cat((images,aux),1)
-            depth = torch.cat((aux,aux,aux),1)
+
+
             rgb = torch.cat((images[:,0,:,:].unsqueeze(1),
                              images[:,1,:,:].unsqueeze(1),
                              images[:,2,:,:].unsqueeze(1)),1)
@@ -491,10 +502,18 @@ def train(cfg, writer, logger, logdir):
 
                             images = images.to(device)
                             labels = labels.to(device)
-                            aux = aux.unsqueeze(1).to(device)
+
+                            if len(aux.shape)<len(images.shape):
+                                aux = aux.unsqueeze(1).to(device)
+                                depth = torch.cat((aux,aux,aux),1)
+                            else:
+                                aux = aux.to(device)
+                                depth = torch.cat((aux[:,0,:,:].unsqueeze(1),
+                                                   aux[:,1,:,:].unsqueeze(1),
+                                                   aux[:,2,:,:].unsqueeze(1)),1)
 
                             fused = torch.cat((images,aux),1)
-                            depth = torch.cat((aux,aux,aux),1)
+
                             rgb = torch.cat((images[:,0,:,:].unsqueeze(1),
                                              images[:,1,:,:].unsqueeze(1),
                                              images[:,2,:,:].unsqueeze(1)),1)
@@ -568,7 +587,7 @@ def train(cfg, writer, logger, logdir):
                                 axes[0,0].imshow(gt[0,:,:])
                                 axes[0,0].set_title("GT")
 
-                                axes[0,1].imshow(orig['rgb'][0,:,:,:].permute(1,2,0).cpu().numpy())
+                                axes[0,1].imshow(orig['rgb'][0,:,:,:].permute(1,2,0).cpu().numpy()[:,:,0])
                                 axes[0,1].set_title("RGB")
 
                                 axes[0,2].imshow(orig['d'][0,:,:,:].permute(1,2,0).cpu().numpy())

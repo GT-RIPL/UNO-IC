@@ -292,7 +292,7 @@ class airsimLoader(data.Dataset):
         self.is_transform = is_transform
         self.augmentations = augmentations
         self.img_norm = img_norm
-        self.n_classes = 14
+        self.n_classes = 11
         self.img_size = (img_size if isinstance(img_size, tuple) else (img_size, img_size))
         self.mean = np.array(self.mean_rgbd[version])
         self.std = np.array(self.std_rgbd[version])

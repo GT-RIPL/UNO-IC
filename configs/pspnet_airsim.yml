@@ -6,8 +6,8 @@ model:
 ############
 start_layers: None
 models:
-    input_fusion:
-        in_channels: 6 #if receiving mean and variance from input legs
+    rgb_only:
+        in_channels: 3 #if receiving mean and variance from input legs
         # start_layer: res_block5 #res_block3 #res_block2
         # end_layer: classification        
         reduction: 0.5
@@ -130,7 +130,7 @@ data:
 training:
     train_iters: 300000
     batch_size: 8
-    val_interval: 50
+    val_interval: 1000
     png_frames: 50
     n_workers: 16
     print_interval: 50

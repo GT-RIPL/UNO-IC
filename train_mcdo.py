@@ -136,6 +136,8 @@ def train(cfg, writer, logger, logdir):
     # Setup Metrics
     running_metrics_val = {env:runningScore(n_classes) for env in valloaders.keys()}
     val_loss_meter = {env:averageMeter() for env in valloaders.keys()}
+    val_CE_loss_meter = {env:averageMeter() for env in valloaders.keys()}
+    val_REG_loss_meter = {env:averageMeter() for env in valloaders.keys()}
     
 
     start_iter = 0
@@ -302,10 +304,7 @@ def train(cfg, writer, logger, logdir):
                                    aux[:,1,:,:].unsqueeze(1),
                                    aux[:,2,:,:].unsqueeze(1)),1)
 
-
-
             fused = torch.cat((images,aux),1)
-
 
             rgb = torch.cat((images[:,0,:,:].unsqueeze(1),
                              images[:,1,:,:].unsqueeze(1),
@@ -449,7 +448,9 @@ def train(cfg, writer, logger, logdir):
                 # print(intermediate.cpu().numpy().shape)
                 # print(outputs.cpu().numpy())
      
-            loss = loss_fn(input=outputs,target=labels) + reg
+            CE_loss = loss_fn(input=outputs,target=labels)
+            REG_loss = reg
+            loss = CE_loss + REG_loss
 
             # register hooks for modifying gradients for learned uncertainty
             if len(cfg['models'])>1 and cfg['models']['rgb']['learned_uncertainty'] == 'yes':            
@@ -478,6 +479,8 @@ def train(cfg, writer, logger, logdir):
                 print(print_str)
                 logger.info(print_str)
                 writer.add_scalar('loss/train_loss', loss.item(), i+1)
+                writer.add_scalar('loss/train_CE_loss', CE_loss.item(), i+1)
+                writer.add_scalar('loss/train_REG_loss', REG_loss, i+1)
                 time_meter.reset()
 
 
@@ -572,8 +575,10 @@ def train(cfg, writer, logger, logdir):
 
 
 
-
-                            val_loss = loss_fn(input=outputs, target=labels) + reg
+     
+                            CE_loss = loss_fn(input=outputs,target=labels)
+                            REG_loss = reg
+                            val_loss = CE_loss + REG_loss
 
                             pred = outputs.data.max(1)[1].cpu().numpy()
                             conf = outputs.data.max(1)[0].cpu().numpy()
@@ -635,10 +640,14 @@ def train(cfg, writer, logger, logdir):
                             running_metrics_val[k].update(gt, pred)
 
                             val_loss_meter[k].update(val_loss.item())
+                            val_CE_loss_meter[k].update(CE_loss.item())
+                            val_REG_loss_meter[k].update(REG_loss)
 
 
                     for k in valloaders.keys():
                         writer.add_scalar('loss/val_loss/{}'.format(k), val_loss_meter[k].avg, i+1)
+                        writer.add_scalar('loss/val_CE_loss/{}'.format(k), val_CE_loss_meter[k].avg, i+1)
+                        writer.add_scalar('loss/val_REG_loss/{}'.format(k), val_REG_loss_meter[k].avg, i+1)
                         logger.info("%s Iter %d Loss: %.4f" % (k, i + 1, val_loss_meter[k].avg))
                 
                 for env,valloader in valloaders.items():

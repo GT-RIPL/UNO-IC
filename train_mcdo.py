@@ -432,8 +432,13 @@ def train(cfg, writer, logger, logdir):
                 #     mean_outputs[m][:,:var_split,:,:] = torch.exp(mean_outputs[m][:,:var_split,:,:])
 
 
-                # stack outputs from parallel legs
-                intermediate = torch.cat(tuple([mean_outputs[m] for m in outputs.keys()]+[var_outputs[m] for m in outputs.keys()]),1)
+                if cfg['models']['fuse']['in_channels'] == 0:
+                    # stack outputs from parallel legs
+                    intermediate = torch.cat(tuple([mean_outputs[m] for m in outputs.keys()]+[var_outputs[m] for m in outputs.keys()]),1)
+                if cfg['models']['fuse']['in_channels'] == -1:
+                    normalizer = 1./var_outputs["rgb"] + 1./var_outputs["d"]
+                    intermediate = ((mean_outputs["rgb"]/var_outputs["rgb"]) + (mean_outputs["d"]/var_outputs["d"]))/normalizer
+
 
                 outputs, _ = models['fuse'](intermediate)
 
@@ -564,12 +569,21 @@ def train(cfg, writer, logger, logdir):
                                             outputs[m] = torch.cat((outputs[m], x.unsqueeze(-1)),-1)
                                 reg = torch.stack([regs[m].sum() for m in regs.keys()]).sum()
 
+                                mean_outputs = {}
+                                var_outputs = {}
+                                for m in outputs.keys():
+                                    mean_outputs[m] = outputs[m].mean(-1)
+                                    if models[m].mcdo_passes>1:
+                                        var_outputs[m] = outputs[m].pow(2).mean(-1)-mean_outputs[m].pow(2)
+                                    else:
+                                        var_outputs[m] = mean_outputs[m]  
 
-                                mean_outputs = {m:outputs[m].mean(-1) for m in outputs.keys()}
-                                std_outputs = {m:outputs[m].mean(-1) for m in outputs.keys()}
-
-                                # stack outputs from parallel legs
-                                intermediate = torch.cat(tuple([mean_outputs[m] for m in outputs.keys()]+[std_outputs[m] for m in outputs.keys()]),1)
+                                if cfg['models']['fuse']['in_channels'] == 0:
+                                    # stack outputs from parallel legs
+                                    intermediate = torch.cat(tuple([mean_outputs[m] for m in outputs.keys()]+[var_outputs[m] for m in outputs.keys()]),1)
+                                if cfg['models']['fuse']['in_channels'] == -1:
+                                    normalizer = 1./var_outputs["rgb"] + 1./var_outputs["d"]
+                                    intermediate = ((mean_outputs["rgb"]/var_outputs["rgb"]) + (mean_outputs["d"]/var_outputs["d"]))/normalizer
 
                                 outputs, _ = models['fuse'](intermediate)
 

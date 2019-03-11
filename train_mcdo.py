@@ -582,8 +582,8 @@ def train(cfg, writer, logger, logdir):
                                     # stack outputs from parallel legs
                                     intermediate = torch.cat(tuple([mean_outputs[m] for m in outputs.keys()]+[var_outputs[m] for m in outputs.keys()]),1)
                                 if cfg['models']['fuse']['in_channels'] == -1:
-                                    normalizer = var_outputs["rgb"] + var_outputs["d"]
-                                    intermediate = ((mean_outputs["rgb"]*var_outputs["d"]) + (mean_outputs["d"]*var_outputs["rgb"]))/normalizer
+                                    # normalizer = var_outputs["rgb"] + var_outputs["d"]
+                                    intermediate = ((mean_outputs["rgb"]*var_outputs["d"]) + (mean_outputs["d"]*var_outputs["rgb"]))
 
                                 outputs, _ = models['fuse'](intermediate)
 

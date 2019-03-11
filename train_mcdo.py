@@ -436,8 +436,8 @@ def train(cfg, writer, logger, logdir):
                     # stack outputs from parallel legs
                     intermediate = torch.cat(tuple([mean_outputs[m] for m in outputs.keys()]+[var_outputs[m] for m in outputs.keys()]),1)
                 if cfg['models']['fuse']['in_channels'] == -1:
-                    normalizer = 1./var_outputs["rgb"] + 1./var_outputs["d"]
-                    intermediate = ((mean_outputs["rgb"]/var_outputs["rgb"]) + (mean_outputs["d"]/var_outputs["d"]))/normalizer
+                    # normalizer = var_outputs["rgb"] + var_outputs["d"]
+                    intermediate = ((mean_outputs["rgb"]*var_outputs["d"]) + (mean_outputs["d"]*var_outputs["rgb"]))
 
 
                 outputs, _ = models['fuse'](intermediate)
@@ -449,13 +449,13 @@ def train(cfg, writer, logger, logdir):
 
             # with torch.no_grad():
                 # print(mean_outputs['rgb'].cpu().numpy())
-                # print(std_outputs['rgb'].cpu().numpy())
+                # print(var_outputs['rgb'].cpu().numpy())
                 # print(intermediate.cpu().numpy().shape)
                 # print(outputs.cpu().numpy())
      
             CE_loss = loss_fn(input=outputs,target=labels)
             REG_loss = reg
-            loss = CE_loss + REG_loss
+            loss = CE_loss + 1e6*REG_loss
 
             # register hooks for modifying gradients for learned uncertainty
             if len(cfg['models'])>1 and cfg['models']['rgb']['learned_uncertainty'] == 'yes':            
@@ -582,8 +582,8 @@ def train(cfg, writer, logger, logdir):
                                     # stack outputs from parallel legs
                                     intermediate = torch.cat(tuple([mean_outputs[m] for m in outputs.keys()]+[var_outputs[m] for m in outputs.keys()]),1)
                                 if cfg['models']['fuse']['in_channels'] == -1:
-                                    normalizer = 1./var_outputs["rgb"] + 1./var_outputs["d"]
-                                    intermediate = ((mean_outputs["rgb"]/var_outputs["rgb"]) + (mean_outputs["d"]/var_outputs["d"]))/normalizer
+                                    normalizer = var_outputs["rgb"] + var_outputs["d"]
+                                    intermediate = ((mean_outputs["rgb"]*var_outputs["d"]) + (mean_outputs["d"]*var_outputs["rgb"]))/normalizer
 
                                 outputs, _ = models['fuse'](intermediate)
 
@@ -592,7 +592,7 @@ def train(cfg, writer, logger, logdir):
      
                             CE_loss = loss_fn(input=outputs,target=labels)
                             REG_loss = reg
-                            val_loss = CE_loss + REG_loss
+                            val_loss = CE_loss + 1e6*REG_loss
 
                             pred = outputs.data.max(1)[1].cpu().numpy()
                             conf = outputs.data.max(1)[0].cpu().numpy()
@@ -603,8 +603,8 @@ def train(cfg, writer, logger, logdir):
                                 fig, axes = plt.subplots(3,4)
                                 [axi.set_axis_off() for axi in axes.ravel()]
 
-                                gt_norm = gt[0,:,:]
-                                pred_norm = pred[0,:,:]
+                                gt_norm = gt[0,:,:].copy()
+                                pred_norm = pred[0,:,:].copy()
 
                                 gt_norm[0,0] = 0
                                 gt_norm[0,1] = n_classes
@@ -642,11 +642,11 @@ def train(cfg, writer, logger, logdir):
                                         channels = int(mean_outputs['rgb'].shape[1])
 
                                     if cfg['models']['rgb']['mcdo_passes']>1:
-                                        axes[2,1].imshow(std_outputs['rgb'][:,:channels,:,:].mean(1)[0,:,:].cpu().numpy())
+                                        axes[2,1].imshow(var_outputs['rgb'][:,:channels,:,:].mean(1)[0,:,:].cpu().numpy())
                                         axes[2,1].set_title("Epistemic (RGB)")
 
-                                        axes[2,2].imshow(std_outputs['d'][:,:channels,:,:].mean(1)[0,:,:].cpu().numpy())
-                                        # axes[2,2].imshow(std_outputs['rgb'][:,channels:,:,:].mean(1)[0,:,:].cpu().numpy())
+                                        axes[2,2].imshow(var_outputs['d'][:,:channels,:,:].mean(1)[0,:,:].cpu().numpy())
+                                        # axes[2,2].imshow(var_outputs['rgb'][:,channels:,:,:].mean(1)[0,:,:].cpu().numpy())
                                         axes[2,2].set_title("Epistemic (D)")
 
 
@@ -731,7 +731,7 @@ if __name__ == "__main__":
     name = [cfg['id']]
     name.append("{}x{}".format(cfg['data']['img_rows'],cfg['data']['img_cols']))
     name.append("_{}_".format("-".join(cfg['start_layers']) if len(cfg['models'])>1 else mcdo_model_name))
-    name.append("_{}_".format("-".join(cfg['start_layers'])))
+    # name.append("_{}_".format("-".join(cfg['start_layers'])))
     name.append("{}bs".format(cfg['training']['batch_size']))
     # name.append("_{}_".format("-".join(cfg['models'].keys())))
     if not mcdo_model_name is None:
@@ -739,6 +739,7 @@ if __name__ == "__main__":
         name.append("{}passes".format(cfg['models'][mcdo_model_name]['mcdo_passes']))
         name.append("{}dropoutP".format(cfg['models'][mcdo_model_name]['dropoutP']))
         name.append("{}learnedUncertainty".format(cfg['models'][mcdo_model_name]['learned_uncertainty']))
+        name.append("{}".format("StackedFuse" if cfg['models']['fuse']['in_channels']) else "MultipliedFuse")
         name.append("{}mcdostart".format(cfg['models'][mcdo_model_name]['mcdo_start_iter']))
         name.append("{}mcdobackprop".format(cfg['models'][mcdo_model_name]['mcdo_backprop']))
         name.append("pretrain" if not cfg['models'][mcdo_model_name]['resume'] is None else "fromscratch")

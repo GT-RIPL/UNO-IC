@@ -589,7 +589,15 @@ def train(cfg, writer, logger, logdir):
                                 fig, axes = plt.subplots(3,4)
                                 [axi.set_axis_off() for axi in axes.ravel()]
 
-                                axes[0,0].imshow(gt[0,:,:])
+                                gt_norm = gt[0,:,:]
+                                pred_norm = pred[0,:,:]
+
+                                gt_norm[0,0] = 0
+                                gt_norm[0,1] = n_classes
+                                pred_norm[0,0] = 0
+                                pred_norm[0,1] = n_classes
+
+                                axes[0,0].imshow(gt_norm)
                                 axes[0,0].set_title("GT")
 
                                 axes[0,1].imshow(orig['rgb'][0,:,:,:].permute(1,2,0).cpu().numpy()[:,:,0])
@@ -598,8 +606,7 @@ def train(cfg, writer, logger, logdir):
                                 axes[0,2].imshow(orig['d'][0,:,:,:].permute(1,2,0).cpu().numpy())
                                 axes[0,2].set_title("D")
 
-
-                                axes[1,0].imshow(pred[0,:,:])
+                                axes[1,0].imshow(pred_norm)
                                 axes[1,0].set_title("Pred")
 
                                 axes[2,0].imshow(conf[0,:,:])

@@ -28,36 +28,36 @@ def main():
     topic_folders = [
                      # DroneHigh Left
                      ("/airsim/DroneHigh/vision/left/pose", "pose"),
-                     ("/airsim/DroneHigh/vision/left/scene", "scene"),
-                     ("/airsim/DroneHigh/vision/left/segmentation", "segmentation"),
+                     ("/airsim/DroneHigh/vision/left/Scene", "scene"),
+                     ("/airsim/DroneHigh/vision/left/Segmentation", "segmentation"),
                      ("/airsim/DroneHigh/vision/left/DepthPerspective", "depth"),
                      ("/airsim/DroneHigh/vision/left/DepthPerspective_Encoded", "depth_encoded"),
 
                      # DroneHigh Right
                      ("/airsim/DroneHigh/vision/right/pose", "pose"),
-                     ("/airsim/DroneHigh/vision/right/scene", "scene"),
-                     ("/airsim/DroneHigh/vision/right/segmentation", "segmentation"),
+                     ("/airsim/DroneHigh/vision/right/Scene", "scene"),
+                     ("/airsim/DroneHigh/vision/right/Segmentation", "segmentation"),
                      ("/airsim/DroneHigh/vision/right/DepthPerspective", "depth"),
                      ("/airsim/DroneHigh/vision/right/DepthPerspective_Encoded", "depth_encoded"),
                      
                      # DroneLow Back
                      ("/airsim/DroneLow/vision/back/pose", "pose"),
-                     ("/airsim/DroneLow/vision/back/scene", "scene"),
-                     ("/airsim/DroneLow/vision/back/segmentation", "segmentation"),
+                     ("/airsim/DroneLow/vision/back/Scene", "scene"),
+                     ("/airsim/DroneLow/vision/back/Segmentation", "segmentation"),
                      ("/airsim/DroneLow/vision/back/DepthPerspective", "depth"),
                      ("/airsim/DroneLow/vision/back/DepthPerspective_Encoded", "depth_encoded"),
 
                      # DroneLow Frone
                      ("/airsim/DroneLow/vision/front/pose", "pose"),
-                     ("/airsim/DroneLow/vision/front/scene", "scene"),
-                     ("/airsim/DroneLow/vision/front/segmentation", "segmentation"),
+                     ("/airsim/DroneLow/vision/front/Scene", "scene"),
+                     ("/airsim/DroneLow/vision/front/Segmentation", "segmentation"),
                      ("/airsim/DroneLow/vision/front/DepthPerspective", "depth"),
                      ("/airsim/DroneLow/vision/front/DepthPerspective_Encoded", "depth_encoded"),
 
                      # DroneOverhead Overhead
                      ("/airsim/DroneOverhead/vision/overhead/pose", "pose"),
-                     ("/airsim/DroneOverhead/vision/overhead/scene", "scene"),
-                     ("/airsim/DroneOverhead/vision/overhead/segmentation", "segmentation"),
+                     ("/airsim/DroneOverhead/vision/overhead/Scene", "scene"),
+                     ("/airsim/DroneOverhead/vision/overhead/Segmentation", "segmentation"),
                      ("/airsim/DroneOverhead/vision/overhead/DepthPerspective", "depth"),
                      ("/airsim/DroneOverhead/vision/overhead/DepthPerspective_Encoded", "depth_encoded"),
                      ]

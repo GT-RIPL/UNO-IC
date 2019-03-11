@@ -1,4 +1,4 @@
-id: "MAGNUS_baseline"
+id: "test"
 model:
     arch: pspnet
 ############
@@ -123,7 +123,14 @@ data:
     train_subsplit: ['8camera_fog_000_dense','8camera_fog_050_dense']
     train_reduction: 1.0
     val_split: val
-    val_subsplit: ['8camera_fog_000_dense','8camera_fog_050_dense','8camera_fog_100_dense','8camera_rain_dense']    
+    val_subsplit: [
+                   '8camera_fog_000_dense',
+                   '8camera_fog_050_dense',
+                   '8camera_fog_100_dense',
+                   '8camera_rain_dense',
+                   '8camera_fog_100_dense__rgb_blackoutNoiseMag20',
+                   '8camera_fog_100_dense__depth_blackoutNoiseMag20',
+                  ]    
     val_reduction: 1.0
     img_rows: 128 #512
     img_cols: 128 #512

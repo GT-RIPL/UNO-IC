@@ -747,8 +747,8 @@ if __name__ == "__main__":
         name.append("{}".format("StackedFuse" if cfg['models']['fuse']['in_channels']==0 else "MultipliedFuse"))
 
 
-    name.append("_train_{}_".format(list(cfg['data']['train_subsplit'])[-1]))
-    name.append("_test_all_")
+    # name.append("_train_{}_".format(list(cfg['data']['train_subsplit'])[-1]))
+    # name.append("_test_all_")
     name.append("01-16-2019")
 
     run_id = "_".join(name)

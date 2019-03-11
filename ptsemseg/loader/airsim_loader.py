@@ -13,7 +13,7 @@ import copy
 from random import shuffle
 import random
 from torch.utils import data
-
+import yaml
 from tqdm import tqdm
 
 random.seed(42) 
@@ -300,6 +300,7 @@ class airsimLoader(data.Dataset):
         # split: train/val image_modes
         #self.imgs = {s:{image_mode:[] for image_mode in self.image_modes} for s in self.splits}
         self.imgs = {s:{c:{image_mode:[] for image_mode in self.image_modes} for c in self.cam_pos} for s in self.splits}
+        self.dgrd = {s:{c:{image_mode:[] for image_mode in self.image_modes} for c in self.cam_pos} for s in self.splits}
 
         # print(self.splits,self.subsplits,self.split_subdirs[split])
 
@@ -310,15 +311,22 @@ class airsimLoader(data.Dataset):
 
                 print("Processing trajectories in {} {}".format(split,subsplit))
                 for subdir in tqdm(self.split_subdirs[split]): # [trajectory ]
-                    for file_path in glob.glob(os.path.join(root,'scene',subsplit,subdir,'back_lower','*.png'),recursive=True):
+                    
+                    if len(subsplit.split("__"))==2:
+                        condition = subsplit.split("__")[0]
+                        degradation = subsplit.split("__")[1]
+                    else:
+                        condition = subsplit
+                        degradation = None
+
+                    for file_path in glob.glob(os.path.join(root,'scene',condition,subdir,'back_lower','*.png'),recursive=True):
                         #print(file_path)
 
                         ext = file_path.replace(root+"/scene/",'')
                         env = ext.split("/")[1]
                         file_name = ext.split("/")[3]
 
-                        #print(file_name)
-                        list_of_all_cams_n_modal = [os.path.exists(os.path.join(root,modal,subsplit,subdir,cam,file_name)) for modal in self.image_modes for cam in self.cam_pos]
+                        list_of_all_cams_n_modal = [os.path.exists(os.path.join(root,modal,condition,subdir,cam,file_name)) for modal in self.image_modes for cam in self.cam_pos]
                         n = n+1
                         #print(list_of_all_cams_n_modal)
                         if all(list_of_all_cams_n_modal):
@@ -328,10 +336,11 @@ class airsimLoader(data.Dataset):
                             for comb_modal in self.image_modes:
                                 img_row_list = []
                                 for comb_cam in self.cam_pos:
-                                    file_path = os.path.join(root,comb_modal,subsplit, subdir,comb_cam,file_name)
+                                    file_path = os.path.join(root,comb_modal,condition,subdir,comb_cam,file_name)
                                     #img = m.imread(file_path)
 
                                     self.imgs[split][comb_cam][comb_modal].append(file_path)
+                                    self.dgrd[split][comb_cam][comb_modal].append(degradation)
 
                     '''
                     if all([os.path.exists(os.path.join(root,image_mode,ext)) for image_mode in self.image_modes]):
@@ -540,6 +549,9 @@ class airsimLoader(data.Dataset):
 
             #start_ts = time.time()
 
+
+
+
             img_path, mask_path = self.imgs[self.split][camera]['scene'][index], self.imgs[self.split][camera]['segmentation'][index]
             img, mask = np.array(cv2.imread(img_path),dtype=np.uint8)[:,:,:3], np.array(cv2.imread(mask_path),dtype=np.uint8)[:,:,:3]
 
@@ -558,7 +570,12 @@ class airsimLoader(data.Dataset):
 
             #start_ts = time.time()
 
-            aux = depth
+            degradation = self.dgrd[self.split][camera]['scene'][index]
+            if not degradation is None:
+                img, depth = self.degradation(degradation, img, depth)
+
+
+            aux = depth            
             lbl = self.ignore_index*np.ones((img.shape[0],img.shape[1]),dtype=np.uint8)
             for i,name in self.id2name.items():
                 for color in self.name2color[name]:
@@ -578,6 +595,80 @@ class airsimLoader(data.Dataset):
             #print('append time',time.time()-start_ts)
 
         return img_list, lbl_list, aux_list
+
+
+    def degradation(self, degradation, img, depth):
+
+        degradation = yaml.load((degradation))
+
+        if degradation['type'] == 'blackoutNoise':
+        
+            rgb_corr = np.zeros(img.shape,dtype=np.uint8)
+            d_corr = np.zeros(depth.shape,dtype=np.uint8)
+
+            m = (int(degradation['value']),int(degradation['value']),int(degradation['value'])) 
+            s = (int(degradation['value']),int(degradation['value']),int(degradation['value']))
+
+            rgb_corr = np.clip(cv2.randn(rgb_corr,m,s),0,255)
+            d_corr = np.clip(cv2.randn(d_corr,m,s),0,255)
+
+
+        elif degradation['type'] == 'additiveGaussianNoise':
+
+            m = (int(degradation['value']),int(degradation['value']),int(degradation['value'])) 
+            s = (int(degradation['value']),int(degradation['value']),int(degradation['value']))
+            corr = cv2.randn(np.zeros(img.shape,dtype=np.uint8),m,s)
+
+            rgb_corr = np.clip(img.copy()+corr,0,255)
+            d_corr = np.clip(depth.copy()+corr,0,255)
+
+        elif degradation['type'] == 'occlusion':
+
+            mask = np.ones(img.shape,dtype=np.uint8)
+
+            x = int(img.shape[0]*np.random.rand())
+            y = int(img.shape[1]*np.random.rand())
+            r = int((min(img.shape[:2])/4)*np.random.rand()+(min(img.shape[:2])/4))
+
+            cv2.circle(mask,(x,y),r,0,-1)
+
+            corr_rgb = np.clip(img.copy()*mask,0,255)
+            corr_d = np.clip(depth.copy()*mask,0,255)
+
+        else:
+
+            print("Corruption Type Not Implemented")
+            rgb_corr = img
+            d_corr = depth
+
+        # elif degradation['type'] == 'brightnessCircle':          
+
+            # orig = cv2.imread(file)
+            # hsv = cv2.cvtColor(orig,cv2.COLOR_BGR2HSV)
+            # corr = np.zeros(hsv.shape[:2],dtype=np.uint8)
+
+            # x = int(hsv.shape[0]*np.random.rand())
+            # y = int(hsv.shape[1]*np.random.rand())
+            # r = int((min(hsv.shape[:2])/2)*np.random.rand()+(min(hsv.shape[:2])/4))
+
+            # cv2.circle(corr,(x,y),r,noise_amount,-1)
+
+            # hsv[:,:,2] = np.array(hsv[:,:,2])+corr 
+
+            # print(x,y,r)
+
+
+            # img = cv2.cvtColor(np.array(np.clip(hsv,0,255),np.uint8),cv2.COLOR_HSV2BGR)
+
+
+
+
+        if "rgb" in degradation['channel']:
+            img = rgb_corr
+        if "d" in degradation['channel']:
+            depth = d_corr
+
+        return img, depth
 
 
     def transform(self, img, lbl, aux):

@@ -46,7 +46,7 @@ models:
         learned_uncertainty: "no"        
         resume: None #models/d_only_pspnet_airsim_best_model.pkl
     fuse:
-        in_channels: -1
+        in_channels: 0
         # start_layer: res_block5 #res_block3 #res_block2
         # end_layer: classification        
         reduction: 0.5
@@ -121,19 +121,19 @@ models:
 #         resume: None   
 data:
     dataset: airsim
-    path: ../../ros/data/airsim_03-05-2019/airsim_data
+    path: /mnt/HDD/datasets/airsim/bags/airsim_data
     train_split: train
-    train_subsplit: ['8camera_fog_000_dense','8camera_fog_050_dense']
+    train_subsplit: ["8camera_fog_100_dense__{'channel':'rgb','type':'blackoutNoise','value':'20'}"] #['8camera_fog_000_dense','8camera_fog_050_dense']
     train_reduction: 1.0
     val_split: val
-    val_subsplit: [
-                   '8camera_fog_000_dense',
-                   '8camera_fog_050_dense',
-                   '8camera_fog_100_dense',
-                   '8camera_rain_dense',
-                   '8camera_fog_100_dense__rgb_blackoutNoiseMag20',
-                   '8camera_fog_100_dense__depth_blackoutNoiseMag20',
-                  ]    
+    val_subsplit: ["8camera_fog_100_dense__{'channel':'rgb','type':'blackoutNoise','value':'20'}"]
+                  #  '8camera_fog_000_dense',
+                  #  '8camera_fog_050_dense',
+                  #  '8camera_fog_100_dense',
+                  #  '8camera_rain_dense',
+                  #  '8camera_fog_100_dense__rgb_blackoutNoiseMag20',
+                  #  '8camera_fog_100_dense__depth_blackoutNoiseMag20',
+                  # ]    
     val_reduction: 1.0
     img_rows: 128 #512
     img_cols: 128 #512

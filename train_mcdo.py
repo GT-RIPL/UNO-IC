@@ -739,10 +739,14 @@ if __name__ == "__main__":
         name.append("{}passes".format(cfg['models'][mcdo_model_name]['mcdo_passes']))
         name.append("{}dropoutP".format(cfg['models'][mcdo_model_name]['dropoutP']))
         name.append("{}learnedUncertainty".format(cfg['models'][mcdo_model_name]['learned_uncertainty']))
-        name.append("{}".format("StackedFuse" if cfg['models']['fuse']['in_channels']) else "MultipliedFuse")
         name.append("{}mcdostart".format(cfg['models'][mcdo_model_name]['mcdo_start_iter']))
         name.append("{}mcdobackprop".format(cfg['models'][mcdo_model_name]['mcdo_backprop']))
         name.append("pretrain" if not cfg['models'][mcdo_model_name]['resume'] is None else "fromscratch")
+
+    if any(["fuse"==m for m in cfg['models'].keys()]):
+        name.append("{}".format("StackedFuse" if cfg['models']['fuse']['in_channels']==0 else "MultipliedFuse"))
+
+
     name.append("_train_{}_".format(list(cfg['data']['train_subsplit'])[-1]))
     name.append("_test_all_")
     name.append("01-16-2019")

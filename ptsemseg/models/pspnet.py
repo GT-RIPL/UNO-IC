@@ -225,15 +225,15 @@ class pspnet(nn.Module):
                                                      padding=v[3],
                                                      stride=v[4],
                                                      bias=v[5])
-                self.layers[k+"_concrete"] = ConcreteDropout()
+                # self.layers[k+"_concrete"] = ConcreteDropout()
 
             if "res_block" in k and not v[0] is None:
                 self.layers[k] = residualBlockPSP(v[3],v[0],v[2],v[1],v[4],v[5])
-                self.layers[k+"_concrete"] = ConcreteDropout()
+                # self.layers[k+"_concrete"] = ConcreteDropout()
 
             if "pyramid_pooling" in k and not v[0] is None:
                 self.layers[k] = pyramidPooling(v[0],v[2])
-                self.layers[k+"_concrete"] = ConcreteDropout()
+                # self.layers[k+"_concrete"] = ConcreteDropout()
 
             if ("classification" in k or "aux_cls" in k) and not v[0] is None:
                 self.layers[k] = nn.Conv2d(v[0],v[2],v[3],v[4],v[5])
@@ -297,22 +297,22 @@ class pspnet(nn.Module):
 
     def forward(self, x, dropout=False):
 
-        # # Turn on training to get weight dropout
-        # if self.mcdo_passes>1:
-        #     dropout = self.dropoutMCDO
-        # else:
-        #     dropout = self.dropout
+        # Turn on training to get weight dropout
+        if self.mcdo_passes>1:
+            dropout = self.dropoutMCDO
+        else:
+            dropout = self.dropout
 
-        # if self.training:
-        #     dropout.train(mode=True)            
-        #     dropout_scalar = 1
-        # else:
-        #     if self.mcdo_passes>1:
-        #         dropout.train(mode=True)                
-        #         dropout_scalar = 1-dropout.p
-        #     else:
-        #         dropout.eval()
-        #         dropout_scalar = 1
+        if self.training:
+            dropout.train(mode=True)            
+            dropout_scalar = 1
+        else:
+            if self.mcdo_passes>1:
+                dropout.train(mode=True)                
+                dropout_scalar = 1-dropout.p
+            else:
+                dropout.eval()
+                dropout_scalar = 1
 
         inp_shape = x.shape[2:]
 
@@ -326,32 +326,38 @@ class pspnet(nn.Module):
         # H, W -> H/2, W/2
         if 'convbnrelu1_1' in self.layers.keys():
             xprev = x                       
-            if self.mcdo_passes == 1:
-                x = getattr(self,'convbnrelu1_1')(x) 
-                x = self.dropout(x)
-            else:
-                x, regularization[ri] = getattr(self,'convbnrelu1_1_concrete')(x,getattr(self,'convbnrelu1_1')) 
-                ri += 1
+            x = getattr(self,'convbnrelu1_1')(x) 
+            x = dropout(x)
+            # if self.mcdo_passes == 1:
+            #     x = getattr(self,'convbnrelu1_1')(x) 
+            #     x = self.dropout(x)
+            # else:
+            #     x, regularization[ri] = getattr(self,'convbnrelu1_1_concrete')(x,getattr(self,'convbnrelu1_1')) 
+            #     ri += 1
 
             # x *= dropout_scalar
         if 'convbnrelu1_2' in self.layers.keys():
             xprev = x            
-            if self.mcdo_passes == 1:
-                x = getattr(self,'convbnrelu1_2')(x) 
-                x = self.dropout(x)
-            else:
-                x, regularization[ri] = getattr(self,'convbnrelu1_2_concrete')(x,getattr(self,'convbnrelu1_2')) 
-                ri += 1
+            x = getattr(self,'convbnrelu1_2')(x) 
+            x = dropout(x)
+            # if self.mcdo_passes == 1:
+            #     x = getattr(self,'convbnrelu1_2')(x) 
+            #     x = self.dropout(x)
+            # else:
+            #     x, regularization[ri] = getattr(self,'convbnrelu1_2_concrete')(x,getattr(self,'convbnrelu1_2')) 
+            #     ri += 1
 
             # x *= dropout_scalar
         if 'convbnrelu1_3' in self.layers.keys():
             xprev = x
-            if self.mcdo_passes == 1:
-                x = getattr(self,'convbnrelu1_3')(x) 
-                x = self.dropout(x)
-            else:
-                x, regularization[ri] = getattr(self,'convbnrelu1_3_concrete')(x,getattr(self,'convbnrelu1_3')) 
-                ri += 1
+            x = getattr(self,'convbnrelu1_3')(x) 
+            x = dropout(x)
+            # if self.mcdo_passes == 1:
+            #     x = getattr(self,'convbnrelu1_3')(x) 
+            #     x = self.dropout(x)
+            # else:
+            #     x, regularization[ri] = getattr(self,'convbnrelu1_3_concrete')(x,getattr(self,'convbnrelu1_3')) 
+            #     ri += 1
             
             # x *= dropout_scalar
             
@@ -360,77 +366,91 @@ class pspnet(nn.Module):
         # # H/4, W/4 -> H/8, W/8
         if 'res_block2' in self.layers.keys():
             xprev = x                        
-            if self.mcdo_passes == 1:
-                x = getattr(self,'res_block2')(x)                
-                x = self.dropout(x)
-            else:
-                x, regularization[ri] = getattr(self,'res_block2_concrete')(x,getattr(self,'res_block2')) 
-                ri += 1            
+            x = getattr(self,'res_block2')(x)                
+            x = dropout(x)
+            # if self.mcdo_passes == 1:
+            #     x = getattr(self,'res_block2')(x)                
+            #     x = self.dropout(x)
+            # else:
+            #     x, regularization[ri] = getattr(self,'res_block2_concrete')(x,getattr(self,'res_block2')) 
+            #     ri += 1            
 
             # x *= dropout_scalar
         if 'res_block3' in self.layers.keys():
             xprev = x                   
-            if self.mcdo_passes == 1:
-                x = getattr(self,'res_block3')(x)                
-                x = self.dropout(x)
-            else:
-                x, regularization[ri] = getattr(self,'res_block3_concrete')(x,getattr(self,'res_block3')) 
-                ri += 1            
+            x = getattr(self,'res_block3')(x)                
+            x = dropout(x)
+            # if self.mcdo_passes == 1:
+            #     x = getattr(self,'res_block3')(x)                
+            #     x = self.dropout(x)
+            # else:
+            #     x, regularization[ri] = getattr(self,'res_block3_concrete')(x,getattr(self,'res_block3')) 
+            #     ri += 1            
 
             # x *= dropout_scalar
         if 'res_block4' in self.layers.keys():
             xprev = x
-            if self.mcdo_passes == 1:
-                x = getattr(self,'res_block4')(x)
-                x = self.dropout(x)
-            else:
-                x, regularization[ri] = getattr(self,'res_block4_concrete')(x,getattr(self,'res_block4')) 
-                ri += 1            
+            x = getattr(self,'res_block4')(x)
+            x = dropout(x)
+            # if self.mcdo_passes == 1:
+            #     x = getattr(self,'res_block4')(x)
+            #     x = self.dropout(x)
+            # else:
+            #     x, regularization[ri] = getattr(self,'res_block4_concrete')(x,getattr(self,'res_block4')) 
+            #     ri += 1            
 
             # x *= dropout_scalar
 
         if self.training and 'convbnrelu4_aux' in self.layers.keys():  # Auxiliary layers for training
             xprev = x            
-            if self.mcdo_passes == 1:
-                x_aux = getattr(self,'convbnrelu4_aux')(x)
-                x_aux = self.dropout(x_aux)
-            else:
-                x_aux, regularization[ri] = getattr(self,'convbnrelu4_aux_concrete')(x,getattr(self,'convbnrelu4_aux')) 
-                ri += 1       
+            x_aux = getattr(self,'convbnrelu4_aux')(x)
+            x_aux = dropout(x_aux)
+            # if self.mcdo_passes == 1:
+            #     x_aux = getattr(self,'convbnrelu4_aux')(x)
+            #     x_aux = self.dropout(x_aux)
+            # else:
+            #     x_aux, regularization[ri] = getattr(self,'convbnrelu4_aux_concrete')(x,getattr(self,'convbnrelu4_aux')) 
+            #     ri += 1       
 
             # x_aux *= dropout_scalar
             x_aux = getattr(self,'aux_cls')(x_aux)
 
         if 'res_block5' in self.layers.keys():
             xprev = x           
-            if self.mcdo_passes == 1:
-                x = getattr(self,'res_block5')(x)
-                x = self.dropout(x)
-            else:
-                x, regularization[ri] = getattr(self,'res_block5_concrete')(x,getattr(self,'res_block5')) 
-                ri += 1            
+            x = getattr(self,'res_block5')(x)
+            x = dropout(x)
+            # if self.mcdo_passes == 1:
+            #     x = getattr(self,'res_block5')(x)
+            #     x = self.dropout(x)
+            # else:
+            #     x, regularization[ri] = getattr(self,'res_block5_concrete')(x,getattr(self,'res_block5')) 
+            #     ri += 1            
 
             # x *= dropout_scalar
 
         if 'pyramid_pooling' in self.layers.keys():
             xprev = x                       
-            if self.mcdo_passes == 1:
-                x = getattr(self,'pyramid_pooling')(x)                   
-                x = self.dropout(x)
-            else:
-                x, regularization[ri] = getattr(self,'pyramid_pooling_concrete')(x,getattr(self,'pyramid_pooling')) 
-                ri += 1            
+            x = getattr(self,'pyramid_pooling')(x)                   
+            x = dropout(x)
+            # if self.mcdo_passes == 1:
+            #     x = getattr(self,'pyramid_pooling')(x)                   
+            #     x = self.dropout(x)
+            # else:
+            #     x, regularization[ri] = getattr(self,'pyramid_pooling_concrete')(x,getattr(self,'pyramid_pooling')) 
+            #     ri += 1            
 
             # x *= dropout_scalar
 
         if 'cbr_final' in self.layers.keys():
             xprev = x            
-            if self.mcdo_passes == 1:
-                x = getattr(self,'cbr_final')(x)                   
-                x = self.dropout(x)
-            else:
-                x, regularization[ri] = getattr(self,'cbr_final_concrete')(x,getattr(self,'cbr_final')) 
-                ri += 1            
+            x = getattr(self,'cbr_final')(x)                   
+            x = dropout(x)
+            # if self.mcdo_passes == 1:
+            #     x = getattr(self,'cbr_final')(x)                   
+            #     x = self.dropout(x)
+            # else:
+            #     x, regularization[ri] = getattr(self,'cbr_final_concrete')(x,getattr(self,'cbr_final')) 
+            #     ri += 1            
 
             # x *= dropout_scalar
 

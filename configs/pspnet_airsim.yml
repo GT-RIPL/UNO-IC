@@ -46,7 +46,7 @@ models:
         learned_uncertainty: "no"        
         resume: None #models/d_only_pspnet_airsim_best_model.pkl
     fuse:
-        in_channels: 0
+        in_channels: -1
         # start_layer: res_block5 #res_block3 #res_block2
         # end_layer: classification        
         reduction: 0.5

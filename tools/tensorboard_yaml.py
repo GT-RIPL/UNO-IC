@@ -25,6 +25,11 @@ exclude = [
            # 'FULL_1.0reduce_',
            # 'GAMUT',
            # 'HALF_GAMUT_learnedUncertainty',
+           "legFusion_concreteDropoutSloppy",
+           "MAGNUS_legFusion_concreteDropoutSloppy",
+           "MAGNUS_baseline",
+           "MAGNUS_legFusion",
+           "MAGNUS_reweightedLoss",
            '',
            ]
 
@@ -236,14 +241,15 @@ for run in runs.keys():
         avg = np.mean(y[i:])
         std = np.std(y[i:])
 
+        print(conditions)
 
         data.append({**conditions,
-                   **{"raw":run,
-                      "cls":scope,
-                      "test":test,
-                      "mean":avg,
-                      "std":std},
-                      "iter":x[-1]})
+                     **{"raw":run,
+                        "cls":scope,
+                        "test":test,
+                        "mean":avg,
+                        "std":std},
+                        "iter":x[-1]})
 
 
 
@@ -288,7 +294,7 @@ df = df.sort_values(by=['test']+list(set(runs[list(runs)[0]]['std_config'])-set(
 
 df = df[ 
         (
-            (df['size'] == "512x512") &
+            (df['size'] == "128x128") &
             # (df['multipass_backprop'] == True)
             (df['size'] != "")
         
@@ -378,7 +384,7 @@ plt.show()
 
 print(df)
 
-# df.to_csv('out.csv',index=False)
+df.to_csv('out.csv',index=False)
 
 
 

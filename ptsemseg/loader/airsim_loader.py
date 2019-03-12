@@ -380,11 +380,16 @@ class airsimLoader(data.Dataset):
 
         # Merge across regions
         train_path_list = []
+        recal_path_list = []
         val_path_list = []
         test_path_list = []
         for region in ['skyscraper','suburban','shopping']:
             for train_one_path in dataset_div['train'][region][1]:
                 train_path_list.append(self.tuple_to_folder_name(train_one_path))
+
+            for recal_one_path in dataset_div['recal'][region][1]:
+                recal_path_list.append(self.tuple_to_folder_name(recal_one_path))
+            
             
             for val_one_path in dataset_div['val'][region][1]:
                 val_path_list.append(self.tuple_to_folder_name(val_one_path))
@@ -395,8 +400,10 @@ class airsimLoader(data.Dataset):
 
         split_subdirs = {}
         split_subdirs['train'] = train_path_list
+        split_subdirs['recal'] = recal_path_list
         split_subdirs['val'] = val_path_list
         split_subdirs['test'] = test_path_list
+        
 
         return split_subdirs
 
@@ -405,8 +412,10 @@ class airsimLoader(data.Dataset):
         region_dict = {'skyscraper':[0,[]],'suburban':[0,[]],'shopping':[0,[]]}
         test_ratio = 0.2
         val_ratio = 0.2
+        recal_ratio = 0.1
 
         dataset_div= {'train':{'skyscraper':[0,[]],'suburban':[0,[]],'shopping':[0,[]]},
+                      'recal':{'skyscraper':[0,[]],'suburban':[0,[]],'shopping':[0,[]]},
                       'val'  :{'skyscraper':[0,[]],'suburban':[0,[]],'shopping':[0,[]]},
                       'test' :{'skyscraper':[0,[]],'suburban':[0,[]],'shopping':[0,[]]}}
 
@@ -423,6 +432,7 @@ class airsimLoader(data.Dataset):
 
         for region_type, distance_and_path_list in region_dict.items():
             total_distance = distance_and_path_list[0]
+            recal_distance = total_distance*recal_ratio
             test_distance = total_distance*test_ratio
             val_distance = total_distance*val_ratio
 
@@ -432,6 +442,13 @@ class airsimLoader(data.Dataset):
             # shuffle(tem_list)
 
             sum_distance = 0 
+
+            # Recal Set
+            while sum_distance < recal_distance*0.8:
+                path = tem_list.pop()
+                sum_distance += path[3]
+                dataset_div['recal'][region_type][0] = dataset_div['recal'][region_type][0] + path[3]
+                dataset_div['recal'][region_type][1].append(path)
 
             # Test Set
             while sum_distance < test_distance*0.8:
@@ -459,13 +476,13 @@ class airsimLoader(data.Dataset):
                 print(distance_and_path_list[0])
             print('=========================================')
 
-        color=['red','green','blue']
+        color=['red','yellow','green','blue']
         ## Visualiaztion with respect to region
         fig, ax = plt.subplots(figsize=(30, 15))
         div_type = 'train'
 
         vis_txt_height = 800
-        for div_type in ['train','val','test']:
+        for div_type in ['train','recal','val','test']:
             for region in ['skyscraper','suburban','shopping']:
                 vis_path_list = dataset_div[div_type][region][1]
                 for path in vis_path_list:
@@ -498,7 +515,7 @@ class airsimLoader(data.Dataset):
         fig, ax = plt.subplots(figsize=(30, 15))
         div_type = 'train'
         vis_txt_height = 800
-        for div_type in ['train','val','test']:
+        for div_type in ['train','recal','val','test']:
             for region in ['skyscraper','suburban','shopping']:
                 vis_path_list = dataset_div[div_type][region][1]
                 for path in vis_path_list:
@@ -507,6 +524,8 @@ class airsimLoader(data.Dataset):
 
                     if div_type == 'train':
                         ax.plot(x, y, color='red', zorder=1, lw=3)
+                    elif div_type == 'recal':
+                        ax.plot(x, y, color='yellow', zorder=1, lw=3)
                     elif div_type == 'val':
                         ax.plot(x, y, color='blue', zorder=1, lw=3)
                     elif div_type == 'test':
@@ -518,6 +537,8 @@ class airsimLoader(data.Dataset):
                 distance = dataset_div[div_type][region][0]
                 if div_type == 'train':
                     ax.annotate(div_type+' - '+ region+': '+str(distance), (-800, vis_txt_height),fontsize=20,color='red')
+                elif div_type == 'recal':
+                    ax.annotate(div_type+' - '+ region+': '+str(distance), (-800, vis_txt_height),fontsize=20,color='yellow')
                 elif div_type == 'val':
                     ax.annotate(div_type+' - '+ region+': '+str(distance), (-800, vis_txt_height),fontsize=20,color='blue')
                 elif div_type == 'test':

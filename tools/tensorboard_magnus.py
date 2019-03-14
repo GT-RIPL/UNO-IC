@@ -9,10 +9,12 @@ import pandas as pd
 import yaml
 import os
 
-exclude = [
+include = [
            'run1',
            'run2',
-           # 'run3',
+           'run3',
+           'run4',
+           'run5',
            ]
 
 run_comments = {
@@ -23,7 +25,7 @@ run_comments = {
             "MAGNUS_legFusion_128x128__convbnrelu1_1-classification___convbnrelu1_1-classification__4bs_0.5reduction_1passes_0.1dropoutP_nolearnedUncertainty_0mcdostart_Falsemcdobackprop_pretrain__train_8camera_fog_050_dense___test_all__01-16-2019",
         ],
         "text":
-            """No rgb/d/rgbd degradations""",
+            """No rgb/d/rgbd degradations; prior to adding recalibration split""",
     },
     "run2": {
         "names": [
@@ -33,7 +35,7 @@ run_comments = {
             "MAGNUS_reweightedLoss_128x128__input_fusion__8bs_0.5reduction_1passes_0.1dropoutP_nolearnedUncertainty_0mcdostart_Nonemcdobackprop_pretrain__train_8camera_fog_050_dense___test_all__01-16-2019",
         ],
         "text":
-            """rgb/d degradation; ripl-w2""",
+            """rgb/d degradation; ripl-w2; prior to adding recalibration split""",
     },
     "run3": {
         "names": [
@@ -43,8 +45,42 @@ run_comments = {
             "MAGNUS_reweightedLoss_128x128__input_fusion__8bs_0.5reduction_1passes_0.1dropoutP_nolearnedUncertainty_0mcdostart_Nonemcdobackprop_pretrain_01-16-2019",
         ],
         "text":
-            """rgb/d/rgbd degradation; ripl-w1""",
+            """rgb/d/rgbd degradation; ripl-w1; prior to adding recalibration split""",
     },    
+    "run4": {
+        "names": [
+            "MAGNUS_attemptingVarianceFusion_128x128__convbnrelu1_1-classification__8bs_0.5reduction_5passes_0.1dropoutP_nolearnedUncertainty_0mcdostart_Falsemcdobackprop_pretrain_MultipliedFuse_01-16-2019",
+            "MAGNUS_attemptingVarianceFusion_128x128__convbnrelu1_1-res_block3__8bs_0.5reduction_5passes_0.1dropoutP_nolearnedUncertainty_0mcdostart_Falsemcdobackprop_pretrain_MultipliedFuse_01-16-2019",
+        ],
+        "text":
+            """
+                rgb/d/rgbd degradation; ripl-w2; added recalibration split; adjusted color means to reflect entire dataset; 
+                classification fusion seems to do well on ood data; however, it looks like it is simply fitting to one class / not learning anything useful; 
+                mcdo on res_block3 seems better; it is not overfitting (shows true degradation in rgbd setting)
+            """,
+    },
+    "run5": {
+        "names": [
+            "MAGNUS_attemptingVarianceFusionPretrain_128x128__convbnrelu1_1-classification__8bs_0.5reduction_5passes_0.1dropoutP_nolearnedUncertainty_0mcdostart_Falsemcdobackprop_pretrain_MultipliedFuse_01-16-2019",
+            "MAGNUS_attemptingVarianceFusionPretrain_128x128__convbnrelu1_1-res_block3__8bs_0.5reduction_5passes_0.1dropoutP_nolearnedUncertainty_0mcdostart_Falsemcdobackprop_pretrain_MultipliedFuse_01-16-2019",
+        ],
+        "text":
+            """
+                rgb/d/rgbd degradation; ripl-w2; added recalibration split; adjusted color means to reflect entire dataset;                 
+                trying pretraining for mcdo
+            """,
+    },    
+    "run6": {
+        "names": [
+            "MAGNUS_attemptingVarianceFusionPretrain_128x128__convbnrelu1_1-classification__8bs_0.5reduction_1passes_0.1dropoutP_nolearnedUncertainty_0mcdostart_Falsemcdobackprop_pretrain_MultipliedFuse_01-16-2019",
+            "MAGNUS_attemptingVarianceFusionPretrain_128x128__convbnrelu1_1-res_block3__8bs_0.5reduction_1passes_0.1dropoutP_nolearnedUncertainty_0mcdostart_Falsemcdobackprop_pretrain_MultipliedFuse_01-16-2019",
+        ],
+        "text":
+            """
+                rgb/d/rgbd degradation; ripl-w2; added recalibration split; adjusted color means to reflect entire dataset;                 
+                trying pretraining for non-mcdo fusion (stacked outputs from each leg)
+            """,
+    },        
 }
 
 
@@ -61,7 +97,7 @@ for i,file in enumerate(glob.glob("./**/*tfevents*",recursive=True)):
     with open(yaml_file,"r") as f:
         configs = yaml.load(f)
 
-    if any([file.split("/")[-2] in vv['names'] and kk in exclude for kk,vv in run_comments.items()]):
+    if any([file.split("/")[-2] in vv['names'] and not kk in include for kk,vv in run_comments.items()]):
         continue
         
     name = configs['id']
@@ -102,10 +138,11 @@ for k,v in runs.items():
     v['std_config']['size'] = "{}x{}".format(c['data']['img_rows'],c['data']['img_cols'])
     v['std_config']['id'] = v['raw_config']['id']
   
-    if any([s==v['raw_config']['id'] for s in [
+    if True or any([s==v['raw_config']['id'] for s in [
                                                "MAGNUS_baseline",
                                                "MAGNUS_legFusion",
                                                "MAGNUS_reweightedLoss",
+                                               "MAGNUS_attemptingVarianceFusion",
                                               ]]):
 
 
@@ -128,6 +165,13 @@ for k,v in runs.items():
         v['std_config']['multipass_backprop'] = c['models'][model]['mcdo_backprop']
         v['std_config']['learned_uncertainty'] = True if c['models'][model]['learned_uncertainty']=='yes' else False
         v['std_config']['dropoutP'] = c['models'][model]['dropoutP']
+        v['std_config']['pretrained'] = str(c['models'][model]['resume']) != "None"
+
+        # print(v['raw_config']['id'])
+        # print(v['std_config'])
+        # print(c['models'][model]['resume'])
+        # input()
+
 
     else:
 
@@ -207,12 +251,16 @@ for run in runs.keys():
         avg = np.mean(y[i:])
         std = np.std(y[i:])
 
+        test_pretty = filter(None,test.split("_"))
+        test_pretty = [s for s in test_pretty if s not in ["8camera","dense"]]
+        test_pretty = "\n".join(test_pretty)
+
 
 
         data.append({**conditions.copy(),
                      **{"raw":run,
                         "cls":scope,
-                        "test":test,
+                        "test":test_pretty,
                         "mean":avg,
                         "std":std},
                         "iter":x[-1]})
@@ -239,6 +287,7 @@ df['unique_id'] = (df.groupby(id_fields).cumcount())
 df['full'] = df['size']+", "+\
              df['block']+", "+\
              df['mcdo_passes'].map(str)+" mcdo_passes, "+\
+             df['pretrained'].map(str)+" pretrained, "+\
              df['mcdo_start_iter'].map(str)+" burn-in, "+\
              df['multipass_backprop'].map(str)+" multipass_backprop, "+\
              df['learned_uncertainty'].map(str)+" learned_uncertainty, "+\
@@ -272,11 +321,11 @@ df = df[
         #     (df['raw'].str.contains('layer_test_128x128'))
         # )
 
-        # ) & (
-        #     (df["block"] == "input_fusion") | 
-        #     (df["block"] == "fused") | 
-        #     (df["block"] == "rgb_only") | 
-        #     (df["block"] == "d_only") | 
+        ) & (
+            (df["block"] == "input_fusion") | 
+            (df["block"] == "fused") | 
+            (df["block"] == "rgb_only") | 
+            (df["block"] == "d_only") | 
 
         #     # (df["block"] == "convbnrelu1_1-convbnrelu1_2-convbnrelu1_3") |
         #     # (df["block"] == "convbnrelu1_1-convbnrelu1_3-res_block2") |
@@ -306,8 +355,8 @@ df = df[
         #     # (df["block"] == "convbnrelu1_1-res_block5") |
         #     # (df["block"] == "convbnrelu1_1-pyramid_pooling") |
         #     # (df["block"] == "convbnrelu1_1-cbr_final") |
-        #     # (df["block"] == "convbnrelu1_1-classification") |      
-        #     (df['size'] == "")
+            (df["block"] == "convbnrelu1_1-classification") |      
+            (df['size'] == "")
 
         ###################
         # Test Conditions #
@@ -339,9 +388,10 @@ print(df)
 plt.figure()
 ax = plt.subplot2grid((4, 4), (0, 0), colspan=4, rowspan=2)
 # df.plot(kind='bar',ax=ax).legend(bbox_to_anchor=(1.0,0.99))
-df.plot(kind='bar',ax=ax).legend(bbox_to_anchor=(1.0,-0.3)) #,prop={'size':5})
+df.plot(kind='bar',ax=ax).legend(bbox_to_anchor=(1.0,-0.5)) #,prop={'size':5})
 plt.xlabel("Test")
-plt.xticks(rotation=10)
+plt.xticks(rotation=00)
+# plt.xticks(rotation=45)
 plt.ylabel("Mean Accuracy")
 plt.show()
 

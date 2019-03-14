@@ -79,7 +79,7 @@ class airsimLoader(data.Dataset):
 
     id2name = {i:name for name,i in name2id.items()}
 
-    splits = ['train','val']
+    splits = ['train','val','recal']
     image_modes = ['scene','depth','segmentation']
 
     # weathers = ['8camera_fog_000_dense', '8camera_rain_dense']
@@ -250,11 +250,11 @@ class airsimLoader(data.Dataset):
 
     mean_rgbd = {
         # "airsim": [103.939, 116.779, 123.68, 120.00],
-        "airsim": [21,22,21,70]
+        "airsim": [21,22,21,45]
     }  # pascal mean for PSPNet and ICNet pre-trained model
 
     std_rgbd = {
-        "airsim": [8,7,8,37]
+        "airsim": [8,7,8,36]
     }
 
 

@@ -33,8 +33,16 @@ def main():
 
     averages = {}
 
+    i = 0
+
     for root, dirnames, filenames in os.walk('airsim_data'):
         for filename in fnmatch.filter(filenames, '*.png'):
+
+            i+=1
+            if i % 1e3 != 0:
+                continue
+            else:
+                i = 0
 
 
 
@@ -50,8 +58,8 @@ def main():
             if not condition in averages[mode].keys():
                 averages[mode][condition] = []
 
-            if len(averages[mode][condition])>100:
-                continue
+            # if len(averages[mode][condition])>100:
+            #     continue
 
 
             img = cv2.imread(file_path)
@@ -61,11 +69,12 @@ def main():
             # plt.show()
 
             avg = np.divide(np.sum(img,axis=(0,1)),1.*np.prod(list(img.shape[:2])))
-            print("{} {} {} {}: {}".format(mode,condition,trajectory,camera,avg))
+            # print("{} {} {} {}: {}".format(mode,condition,trajectory,camera,avg))
 
 
             averages[mode][condition].append([avg])
 
+            print("{} {}: {} {}".format(mode,condition,np.mean(np.array(averages[mode][condition]),axis=0),np.std(np.array(averages[mode][condition]),axis=0)))
 
 
             # print(filename,mode,condition,trajectory,)

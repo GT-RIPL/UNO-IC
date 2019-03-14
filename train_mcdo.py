@@ -74,6 +74,105 @@ def tensor_hook(data,grad):
 
     return modified_grad
 
+def parseEightCameras(images,labels,aux,device):
+
+    # Stack 8 Cameras into 1 for MCDO Dataset Testing
+    images = torch.cat(images,0)
+    labels = torch.cat(labels,0)
+    aux = torch.cat(aux,0)
+
+    images = images.to(device)
+    labels = labels.to(device)
+
+    if len(aux.shape)<len(images.shape):
+        aux = aux.unsqueeze(1).to(device)
+        depth = torch.cat((aux,aux,aux),1)
+    else:
+        aux = aux.to(device)
+        depth = torch.cat((aux[:,0,:,:].unsqueeze(1),
+                           aux[:,1,:,:].unsqueeze(1),
+                           aux[:,2,:,:].unsqueeze(1)),1)
+
+    fused = torch.cat((images,aux),1)
+
+    rgb = torch.cat((images[:,0,:,:].unsqueeze(1),
+                     images[:,1,:,:].unsqueeze(1),
+                     images[:,2,:,:].unsqueeze(1)),1)
+
+    inputs = {"rgb": rgb,
+              "d": depth,
+              "fused": fused}
+
+    return inputs, labels
+
+# def runModel(models,inputs,cfg,model,input,passes):
+
+#     models[m].mcdo_passes = cfg['models'][m]['mcdo_passes']
+
+#     regs[m] = torch.zeros( models[m].mcdo_passes, device=device )
+
+#         if not cfg['models'][m]['mcdo_backprop']:
+#             x, regs[m][0] = models[m](inputs[m])
+#             x_aux = None
+#             if isinstance(x,tuple):
+#                 x, x_aux = x
+#             outputs[m] = x.unsqueeze(-1)
+#             if not x_aux is None:
+#                 outputs_aux[m] = x_aux.unsqueeze(-1)
+
+
+#             with torch.no_grad():
+#                 for mi in range(models[m].mcdo_passes-1):
+#                     x, regs[m][mi+1] = models[m](inputs[m])
+#                     x_aux = None
+#                     if isinstance(x,tuple):
+#                         x, x_aux = x
+#                     if not m in outputs:
+#                         outputs[m] = x.unsqueeze(-1)
+#                         if not x_aux is None:
+#                             outputs_aux[m] = x_aux.unsqueeze(-1)
+#                     else:
+#                         outputs[m] = torch.cat((outputs[m], x.unsqueeze(-1)),-1)
+#                         if not x_aux is None:
+#                             outputs_aux[m] = torch.cat((outputs_aux[m], x_aux.unsqueeze(-1)),-1)
+#         else:
+#             for mi in range(models[m].mcdo_passes):
+#                 x, regs[m][mi] = models[m](inputs[m])
+#                 x_aux = None
+#                 if isinstance(x,tuple):
+#                     x, x_aux = x
+#                 if not m in outputs:
+#                     outputs[m] = x.unsqueeze(-1)
+#                     if not x_aux is None:
+#                         outputs_aux[m] = x_aux.unsqueeze(-1)
+#                 else:
+#                     outputs[m] = torch.cat((outputs[m], x.unsqueeze(-1)),-1)
+#                     if not x_aux is None:
+#                         outputs_aux[m] = torch.cat((outputs_aux[m], x_aux.unsqueeze(-1)),-1)
+
+
+#     else:
+#         models[m].mcdo_passes = 1
+
+#         regs[m] = torch.zeros( models[m].mcdo_passes, device=device )
+
+#         for mi in range(models[m].mcdo_passes):
+#             x, regs[m][mi] = models[m](inputs[m])
+#             x_aux = None
+#             if isinstance(x,tuple):
+#                 x, x_aux = x
+#             if not m in outputs:
+#                 outputs[m] = x.unsqueeze(-1)
+#                 if not x_aux is None:
+#                     outputs_aux[m] = x_aux.unsqueeze(-1)
+#             else:
+#                 outputs[m] = torch.cat((outputs[m], x.unsqueeze(-1)),-1)
+#                 if not x_aux is None:
+#                     outputs_aux[m] = torch.cat((outputs_aux[m], x_aux.unsqueeze(-1)),-1)
+
+
+#     return mean_output, var_output, regs
+
 
 def train(cfg, writer, logger, logdir):
     
@@ -103,6 +202,15 @@ def train(cfg, writer, logger, logdir):
         img_size=(cfg['data']['img_rows'],cfg['data']['img_cols']),
         augmentations=data_aug)
 
+    r_loader = data_loader(
+        data_path,
+        is_transform=True,
+        split="recal",
+        subsplits=cfg['data']['train_subsplit'],
+        scale_quantity=cfg['data']['train_reduction'],
+        img_size=(cfg['data']['img_rows'],cfg['data']['img_cols']),
+        augmentations=data_aug)
+
     tv_loader = data_loader(
         data_path,
         is_transform=True,
@@ -120,6 +228,11 @@ def train(cfg, writer, logger, logdir):
 
     n_classes = t_loader.n_classes
     trainloader = data.DataLoader(t_loader,
+                                  batch_size=cfg['training']['batch_size'], 
+                                  num_workers=cfg['training']['n_workers'], 
+                                  shuffle=True)
+
+    recalloader = data.DataLoader(r_loader,
                                   batch_size=cfg['training']['batch_size'], 
                                   num_workers=cfg['training']['n_workers'], 
                                   shuffle=True)
@@ -284,49 +397,23 @@ def train(cfg, writer, logger, logdir):
             i += 1
             start_ts = time.time()
 
-            # Stack 8 Cameras into 1 for MCDO Dataset Testing
-            images = torch.cat(images,0)
-            labels = torch.cat(labels,0)
-            aux = torch.cat(aux,0)
-
-            [schedulers[m].step() for m in models.keys()]
-            [models[m].train() for m in models.keys()]
-
-            images = images.to(device)
-            labels = labels.to(device)
-
-            if len(aux.shape)<len(images.shape):
-                aux = aux.unsqueeze(1).to(device)
-                depth = torch.cat((aux,aux,aux),1)
-            else:
-                aux = aux.to(device)
-                depth = torch.cat((aux[:,0,:,:].unsqueeze(1),
-                                   aux[:,1,:,:].unsqueeze(1),
-                                   aux[:,2,:,:].unsqueeze(1)),1)
-
-            fused = torch.cat((images,aux),1)
-
-            rgb = torch.cat((images[:,0,:,:].unsqueeze(1),
-                             images[:,1,:,:].unsqueeze(1),
-                             images[:,2,:,:].unsqueeze(1)),1)
-
-            inputs = {"rgb": rgb,
-                      "d": depth,
-                      "fused": fused}
+            inputs, labels = parseEightCameras( images, labels, aux, device )
 
             reg = torch.zeros(1,device=device )
 
-            if images.shape[0]<=1:
+            if labels.shape[0]<=1:
                 continue
 
-
+            [schedulers[m].step() for m in models.keys()]
+            [models[m].train() for m in models.keys()]
             [optimizers[m].zero_grad() for m in models.keys()]
 
-            if any("input_fusion" in m for m in models.keys()):
+
+            if any("input_fusion" == m for m in models.keys()):
                 outputs, _ = models['input_fusion'](inputs['fused'])
-            elif any("rgb_only" in m for m in models.keys()):
+            elif any("rgb_only" == m for m in models.keys()):
                 outputs, _ = models['rgb_only'](inputs['rgb'])
-            elif any("d_only" in m for m in models.keys()):
+            elif any("d_only" == m for m in models.keys()):
                 outputs, _ = models['d_only'](inputs['d'])
 
             else:
@@ -415,15 +502,15 @@ def train(cfg, writer, logger, logdir):
                     if models[m].mcdo_passes>1:
                         var_outputs[m] = outputs[m].pow(2).mean(-1)-mean_outputs[m].pow(2)
                     else:
-                        var_outputs[m] = mean_outputs[m]  
+                        var_outputs[m] = torch.ones(mean_outputs[m].shape,device=device) #mean_outputs[m]  
 
                 if len(outputs_aux)>0:
                     mean_outputs_aux = {m:outputs_aux[m].mean(-1) for m in outputs_aux.keys()}
                     with torch.no_grad():
                         if models[m].mcdo_passes>1:
-                            var_outputs_aux = {m:outputs_aux[m].std(-1) for m in outputs_aux.keys()}
+                            var_outputs_aux = {m:outputs[m].pow(2).mean(-1)-mean_outputs[m].pow(2) for m in outputs_aux.keys()}
                         else:
-                            var_outputs_aux = {m:outputs_aux[m].mean(-1) for m in outputs_aux.keys()}
+                            var_outputs_aux = {m:torch.ones(mean_outputs[m].shape,device=device) for m in outputs_aux.keys()}
 
                 # # UNCERTAINTY
                 # # convert log variance to normal variance
@@ -504,52 +591,27 @@ def train(cfg, writer, logger, logdir):
                     for k,valloader in valloaders.items():
                         for i_val, (images, labels, aux) in tqdm(enumerate(valloader)):
                             
-                            # Stack 8 Cameras into 1 for MCDO Dataset Testing
-                            images = torch.cat(images,0)
-                            labels = torch.cat(labels,0)
-                            aux = torch.cat(aux,0)
-
-                            images = images.to(device)
-                            labels = labels.to(device)
-
-                            if len(aux.shape)<len(images.shape):
-                                aux = aux.unsqueeze(1).to(device)
-                                depth = torch.cat((aux,aux,aux),1)
-                            else:
-                                aux = aux.to(device)
-                                depth = torch.cat((aux[:,0,:,:].unsqueeze(1),
-                                                   aux[:,1,:,:].unsqueeze(1),
-                                                   aux[:,2,:,:].unsqueeze(1)),1)
-
-                            fused = torch.cat((images,aux),1)
-
-                            rgb = torch.cat((images[:,0,:,:].unsqueeze(1),
-                                             images[:,1,:,:].unsqueeze(1),
-                                             images[:,2,:,:].unsqueeze(1)),1)
-
-                            inputs = {"rgb": rgb,
-                                      "d": depth,
-                                      "fused": fused}
+                            inputs, labels = parseEightCameras( images, labels, aux, device )
 
                             reg = torch.zeros(1,device=device )
 
                             orig = inputs.copy()
 
-                            if images.shape[0]<=1:
+                            if labels.shape[0]<=1:
                                 continue
 
-                            if any("input_fusion" in m for m in models.keys()):
+
+                            if any("input_fusion" == m for m in models.keys()):
                                 outputs, _ = models['input_fusion'](inputs['fused'])
 
-                            elif any("rgb_only" in m for m in models.keys()):
+                            elif any("rgb_only" == m for m in models.keys()):
                                 outputs, _ = models['rgb_only'](inputs['rgb'])
 
-                            elif any("d_only" in m for m in models.keys()):
+                            elif any("d_only" == m for m in models.keys()):
                                 outputs, _ = models['d_only'](inputs['d'])
 
 
                             else:
-
 
                                 outputs = {}
                                 outputs_aux = {}
@@ -577,7 +639,7 @@ def train(cfg, writer, logger, logdir):
                                     if models[m].mcdo_passes>1:
                                         var_outputs[m] = outputs[m].pow(2).mean(-1)-mean_outputs[m].pow(2)
                                     else:
-                                        var_outputs[m] = mean_outputs[m]  
+                                        var_outputs[m] = torch.ones(mean_outputs[m].shape,device=device) #mean_outputs[m]  
 
                                 if cfg['models']['fuse']['in_channels'] == 0:
                                     # stack outputs from parallel legs
@@ -600,6 +662,80 @@ def train(cfg, writer, logger, logdir):
                             pred = outputs.data.max(1)[1].cpu().numpy()
                             conf = outputs.data.max(1)[0].cpu().numpy()
                             gt = labels.data.cpu().numpy()
+
+
+
+                            # print("EVALUATING CALIBRATION")
+                            # # Evaluate Calibration
+                            # for i_recal, (images_recal, labels_recal, aux_recal) in tqdm(enumerate(recalloader)):                            
+
+                            #     inputs_recal, labels_recal = parseEightCameras( images_recal, labels_recal, aux_recal, device )
+
+                            #     reg = torch.zeros(1,device=device )
+
+                            #     orig = inputs.copy()
+
+                            #     if labels.shape[0]<=1:
+                            #         continue
+
+
+                            #     if any("input_fusion" == m for m in models.keys()):
+                            #         outputs, _ = models['input_fusion'](inputs['fused'])
+
+                            #     elif any("rgb_only" == m for m in models.keys()):
+                            #         outputs, _ = models['rgb_only'](inputs['rgb'])
+
+                            #     elif any("d_only" == m for m in models.keys()):
+                            #         outputs, _ = models['d_only'](inputs['d'])
+
+
+                            #     else:
+
+                            #         outputs = {}
+                            #         outputs_aux = {}
+                            #         if any("_static" in m for m in models.keys()):                
+                            #             outputs = {m:list(models[m+"_static"](inputs[m]))[0] for m in ['rgb','d']}
+                            #             inputs = outputs
+
+                            #         outputs = {}
+                            #         outputs_aux = {}
+                            #         regs = {}
+                            #         for m in ['rgb','d']:
+                            #             regs[m] = torch.zeros( models[m].mcdo_passes, device=device )
+                            #             for mi in range(cfg['models'][m]['mcdo_passes']):
+                            #                 x, regs[m][mi] = models[m](inputs[m])
+                            #                 if not m in outputs:
+                            #                     outputs[m] = x.unsqueeze(-1)
+                            #                 else:
+                            #                     outputs[m] = torch.cat((outputs[m], x.unsqueeze(-1)),-1)
+                            #         reg = torch.stack([regs[m].sum() for m in regs.keys()]).sum()
+
+                            #         mean_outputs = {}
+                            #         var_outputs = {}
+                            #         for m in outputs.keys():
+                            #             mean_outputs[m] = outputs[m].mean(-1)
+                            #             if models[m].mcdo_passes>1:
+                            #                 var_outputs[m] = outputs[m].pow(2).mean(-1)-mean_outputs[m].pow(2)
+                            #             else:
+                            #                 var_outputs[m] = mean_outputs[m]  
+
+                            #         if cfg['models']['fuse']['in_channels'] == 0:
+                            #             # stack outputs from parallel legs
+                            #             intermediate = torch.cat(tuple([mean_outputs[m] for m in outputs.keys()]+[var_outputs[m] for m in outputs.keys()]),1)
+                            #         if cfg['models']['fuse']['in_channels'] == -1:
+                            #             normalizer = var_outputs["rgb"] + var_outputs["d"]
+                            #             normalizer[normalizer==0] = 1
+                            #             intermediate = ((mean_outputs["rgb"]*var_outputs["d"]) + (mean_outputs["d"]*var_outputs["rgb"]))/normalizer
+
+
+                            #         outputs, _ = models['fuse'](intermediate)
+
+
+                            # exit()
+
+
+
+
 
                             # Visualization
                             if i_val % cfg['training']['png_frames'] == 0:

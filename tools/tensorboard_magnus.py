@@ -10,11 +10,13 @@ import yaml
 import os
 
 include = [
-           'run1',
-           'run2',
+           #'run1',
+           #'run2',
            'run3',
            'run4',
            'run5',
+           'run6',
+           'run7',
            ]
 
 run_comments = {
@@ -41,7 +43,7 @@ run_comments = {
         "names": [
             "MAGNUS_reweightedLoss_128x128__rgb_only__8bs_0.5reduction_1passes_0.1dropoutP_nolearnedUncertainty_0mcdostart_Nonemcdobackprop_pretrain_01-16-2019",
             "MAGNUS_reweightedLoss_128x128__d_only__8bs_0.5reduction_1passes_0.1dropoutP_nolearnedUncertainty_0mcdostart_Nonemcdobackprop_pretrain_01-16-2019",
-            "MAGNUS_reweightedLoss_128x128__convbnrelu1_1-classification__8bs_0.5reduction_5passes_0.1dropoutP_nolearnedUncertainty_0mcdostart_Falsemcdobackprop_pretrain_StackedFuse_01-16-2019",
+            #"MAGNUS_reweightedLoss_128x128__convbnrelu1_1-classification__8bs_0.5reduction_5passes_0.1dropoutP_nolearnedUncertainty_0mcdostart_Falsemcdobackprop_pretrain_StackedFuse_01-16-2019",
             "MAGNUS_reweightedLoss_128x128__input_fusion__8bs_0.5reduction_1passes_0.1dropoutP_nolearnedUncertainty_0mcdostart_Nonemcdobackprop_pretrain_01-16-2019",
         ],
         "text":
@@ -72,8 +74,8 @@ run_comments = {
     },    
     "run6": {
         "names": [
-            "MAGNUS_attemptingVarianceFusionPretrain_128x128__convbnrelu1_1-classification__8bs_0.5reduction_1passes_0.1dropoutP_nolearnedUncertainty_0mcdostart_Falsemcdobackprop_pretrain_MultipliedFuse_01-16-2019",
-            "MAGNUS_attemptingVarianceFusionPretrain_128x128__convbnrelu1_1-res_block3__8bs_0.5reduction_1passes_0.1dropoutP_nolearnedUncertainty_0mcdostart_Falsemcdobackprop_pretrain_MultipliedFuse_01-16-2019",
+            "MAGNUS_attemptingVarianceFusionPretrain_128x128__convbnrelu1_1-classification__8bs_0.5reduction_1passes_0.1dropoutP_nolearnedUncertainty_0mcdostart_Falsemcdobackprop_pretrain_StackedFuse_01-16-2019",
+            "MAGNUS_attemptingVarianceFusionPretrain_128x128__convbnrelu1_1-res_block3__8bs_0.5reduction_1passes_0.1dropoutP_nolearnedUncertainty_0mcdostart_Falsemcdobackprop_pretrain_StackedFuse_01-16-2019",
         ],
         "text":
             """
@@ -83,15 +85,14 @@ run_comments = {
     },        
     "run7": {
         "names": [
-            "MAGNUS_attemptingVarianceFusionPretrain_128x128__convbnrelu1_1-classification__8bs_0.5reduction_1passes_0.1dropoutP_nolearnedUncertainty_0mcdostart_Falsemcdobackprop_pretrain_MultipliedFuse_01-16-2019",
-            "MAGNUS_attemptingVarianceFusionPretrain_128x128__convbnrelu1_1-res_block3__8bs_0.5reduction_1passes_0.1dropoutP_nolearnedUncertainty_0mcdostart_Falsemcdobackprop_pretrain_MultipliedFuse_01-16-2019",
+            "MAGNUS_attemptingVarianceFusionPretrain1_128x128__convbnrelu1_1-classification__8bs_0.5reduction_1passes_0.1dropoutP_nolearnedUncertainty_0mcdostart_Falsemcdobackprop_pretrain_StackedFuse_01-16-2019",
+            "MAGNUS_equalWeightingFusionBaseline_128x128__convbnrelu1_1-classification__8bs_0.5reduction_1passes_0.1dropoutP_nolearnedUncertainty_0mcdostart_Falsemcdobackprop_pretrain_MultipliedFuse_01-16-2019",
         ],
         "text":
             """
-                rgb/d/rgbd degradation; ripl-w2; added recalibration split; adjusted color means to reflect entire dataset;                 
-                trying pretraining for non-mcdo fusion (stacked outputs from each leg)
+                trying pretraining for non-mcdo fusion; trying stacking outputs from each leg and equal weight sum of outputs from each leg
             """,
-    },    
+    },  
     "run8": {
         "names": [
             "MAGNUS_correctingComputationGraph_128x128_Mode__rgb_only__8bs_0.5reduction_5passes_0.1dropoutP_nolearnedUncertainty_0mcdostart_Nonemcdobackprop_pretrain_01-16-2019",
@@ -103,7 +104,7 @@ run_comments = {
                 found possible mistake in computational graph (gradients not passing through mean/std functions);
                 attempting fix
             """,
-    },
+    },    
 }
 
 
@@ -154,7 +155,18 @@ for i,file in enumerate(glob.glob("./**/*tfevents*",recursive=True)):
 
 
 #standardize config
+del_runs = []
 for k,v in runs.items():
+    if not any([v['raw_config']['file_only'] in vv["names"] for kk,vv in run_comments.items()]):
+        del_runs.append(k)
+
+for k in del_runs:
+    del runs[k]
+
+
+#standardize config
+for k,v in runs.items():
+
     c = v['raw_config']
 
     v['std_config'] = {}
@@ -184,6 +196,7 @@ for k,v in runs.items():
         v['std_config']['reduction'] = c['models'][model]['reduction']    
         # v['std_config']['start_layers'] = c['start_layers']
         v['std_config']['mcdo_passes'] = c['models'][model]['mcdo_passes']
+        v['std_config']['fuse_mech'] = "ModeSummed" if "fuse" in c['models'].keys() and c['models']['fuse']['in_channels']==-1 else "ModeStacked"
         v['std_config']['mcdo_start_iter'] = c['models'][model]['mcdo_start_iter']
         v['std_config']['multipass_backprop'] = c['models'][model]['mcdo_backprop']
         v['std_config']['learned_uncertainty'] = True if c['models'][model]['learned_uncertainty']=='yes' else False
@@ -265,12 +278,12 @@ for run in runs.keys():
 
         # print(runs[run]['raw_config']['file'])
 
-        if 1000*(x[-1] // 1000) <= 10000:
+        if 500*(x[-1] // 500) <= 5000:
             continue
 
         # RESULTS
         # avg + std of last 50k iterations
-        i = x.index(int(1000*(x[-1] // 1000))-10000)
+        i = x.index(int(500*(x[-1] // 500))-5000)
         avg = np.mean(y[i:])
         std = np.std(y[i:])
 
@@ -310,6 +323,7 @@ df['unique_id'] = (df.groupby(id_fields).cumcount())
 df['full'] = df['size']+", "+\
              df['block']+", "+\
              df['mcdo_passes'].map(str)+" mcdo_passes, "+\
+             df['fuse_mech'].map(str)+" fuse_mech, "+\
              df['pretrained'].map(str)+" pretrained, "+\
              df['mcdo_start_iter'].map(str)+" burn-in, "+\
              df['multipass_backprop'].map(str)+" multipass_backprop, "+\
@@ -328,6 +342,10 @@ df = df[
         (
             (df['size'] == "128x128") &
             # (df['multipass_backprop'] == True)
+            (df['pretrained'] == True) &
+            (df['fuse_mech'] == "ModeSummed") &
+            (df["block"] == "convbnrelu1_1-classification") &    
+
             (df['size'] != "")
         
         
@@ -344,7 +362,7 @@ df = df[
         #     (df['raw'].str.contains('layer_test_128x128'))
         # )
 
-        ) & (
+        ) | (
             (df["block"] == "input_fusion") | 
             (df["block"] == "fused") | 
             (df["block"] == "rgb_only") | 
@@ -373,12 +391,12 @@ df = df[
 
         #     # (df["block"] == "convbnrelu1_1-convbnrelu1_3") | 
         #     # (df["block"] == "convbnrelu1_1-res_block2") |
-        #     # (df["block"] == "convbnrelu1_1-res_block3") |
+            # (df["block"] == "convbnrelu1_1-res_block3") |
         #     # (df["block"] == "convbnrelu1_1-res_block4") |
         #     # (df["block"] == "convbnrelu1_1-res_block5") |
         #     # (df["block"] == "convbnrelu1_1-pyramid_pooling") |
         #     # (df["block"] == "convbnrelu1_1-cbr_final") |
-            (df["block"] == "convbnrelu1_1-classification") |      
+            # (df["block"] == "convbnrelu1_1-classification") |      
             (df['size'] == "")
 
         ###################

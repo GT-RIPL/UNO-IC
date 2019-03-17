@@ -158,7 +158,6 @@ class pspnet(nn.Module):
                                ["pyramid_pooling", int(2048*reduction),                None, [6,3,2,1]],
                                [      "cbr_final", int(4096*reduction),  int(512*reduction), 3, 1, 1, False],
                                [ "classification",  int(512*reduction),                None, self.n_classes, 1, 1, 0]]
-
         # print(start_layer,end_layer)
 
         # specify in_channels programmatically
@@ -460,7 +459,6 @@ class pspnet(nn.Module):
             xprev = x
             x = getattr(self,'classification')(x)   
             x = F.interpolate(x, size=self.input_size, mode='bilinear', align_corners=True)
-
 
         if self.learned_uncertainty == "yes":
             last_module = [s[0] for s in self.sub_layers if not s[1] is None][-1]

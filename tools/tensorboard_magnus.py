@@ -81,6 +81,29 @@ run_comments = {
                 trying pretraining for non-mcdo fusion (stacked outputs from each leg)
             """,
     },        
+    "run7": {
+        "names": [
+            "MAGNUS_attemptingVarianceFusionPretrain_128x128__convbnrelu1_1-classification__8bs_0.5reduction_1passes_0.1dropoutP_nolearnedUncertainty_0mcdostart_Falsemcdobackprop_pretrain_MultipliedFuse_01-16-2019",
+            "MAGNUS_attemptingVarianceFusionPretrain_128x128__convbnrelu1_1-res_block3__8bs_0.5reduction_1passes_0.1dropoutP_nolearnedUncertainty_0mcdostart_Falsemcdobackprop_pretrain_MultipliedFuse_01-16-2019",
+        ],
+        "text":
+            """
+                rgb/d/rgbd degradation; ripl-w2; added recalibration split; adjusted color means to reflect entire dataset;                 
+                trying pretraining for non-mcdo fusion (stacked outputs from each leg)
+            """,
+    },    
+    "run8": {
+        "names": [
+            "MAGNUS_correctingComputationGraph_128x128_Mode__rgb_only__8bs_0.5reduction_5passes_0.1dropoutP_nolearnedUncertainty_0mcdostart_Nonemcdobackprop_pretrain_01-16-2019",
+            "MAGNUS_correctingComputationGraph_128x128_rgb-dMode__convbnrelu1_1-classification__8bs_0.5reduction_5passes_0.1dropoutP_nolearnedUncertainty_0mcdostart_Falsemcdobackprop_pretrain_MultipliedFuse_01-16-2019",
+            "MAGNUS_correctingComputationGraph_128x128_rgb-dMode__convbnrelu1_1-classification__8bs_0.5reduction_5passes_0.1dropoutP_nolearnedUncertainty_0mcdostart_Falsemcdobackprop_pretrain_StackedFuse_01-16-2019",
+        ],
+        "text":
+            """
+                found possible mistake in computational graph (gradients not passing through mean/std functions);
+                attempting fix
+            """,
+    },
 }
 
 

@@ -105,6 +105,213 @@ def parseEightCameras(images,labels,aux,device):
 
     return inputs, labels
 
+def runModel(models,inputs,device):
+
+    reg = torch.zeros(1,device=device )
+
+    model2input = [
+                   ("input_fusion","fused"),
+                   ("rgb_only","rgb"),
+                   ("d_only","d"),
+                   ("rgb_static","rgb"),
+                   ("d_static","d"),
+                   ("rgb","rgb"),
+                   ("d","d"),
+                   ("fuse","fuse"),
+                  ]
+
+    # Relevant Models
+    m2i = [(m,mi) for m,mi in model2input if m in models.keys()]
+
+    # Relevant Modes
+    modes = [mode for mode in ['rgb','d'] if any([mode==m for m in models.keys()])]
+
+    mean_outputs = {}; var_outputs = {}; regs = {}; outputs = {}; outputs_aux = {}
+
+
+    ####################################################
+    # Single Model: RGB Only, Depth Only, Input Fusion #
+    ####################################################
+    if len(m2i)==1:     
+        model,input = m2i[0]  
+
+        if int(cfg['models'][model]['mcdo_passes'])==1:
+            outputs, _ = models[model](inputs[input])
+        else:
+
+            outputs = {}; outputs_aux = {}; regs = {}             
+
+            # Set Number of MCDO Passes
+            models[model].mcdo_passes = cfg['models'][model]['mcdo_passes']
+            regs[model] = torch.zeros( models[model].mcdo_passes, device=device )
+
+            # Perform One Forward Pass with Gradients
+            x, regs[model][0] = models[model](inputs[input])
+            x_aux = None
+            if isinstance(x,tuple):
+                x, x_aux = x
+            outputs[model] = x.unsqueeze(-1)
+            if not x_aux is None:
+                outputs_aux[model] = x_aux.unsqueeze(-1)
+
+            o = x
+            oa = x_aux
+
+            # And Remaining Forward Passes without Gradients
+            with torch.no_grad():
+                for mi in range(models[model].mcdo_passes-1):
+                    x, regs[model][mi+1] = models[model](inputs[input])
+                    x_aux = None
+                    if isinstance(x,tuple):
+                        x, x_aux = x
+                    if not model in outputs:
+                        outputs[model] = x.unsqueeze(-1)
+                        if not x_aux is None:
+                            outputs_aux[model] = x_aux.unsqueeze(-1)
+                    else:
+                        outputs[model] = torch.cat((outputs[model], x.unsqueeze(-1)),-1)
+                        if not x_aux is None:
+                            outputs_aux[model] = torch.cat((outputs_aux[model], x_aux.unsqueeze(-1)),-1)
+
+            reg = torch.stack([regs[m].sum() for m in regs.keys()]).sum()
+
+            # Calculate Statistics on Multiple Passes
+            # mean_outputs = {}; var_outputs = {}
+            for m in outputs.keys():
+                mean_outputs[m] = outputs[m].mean(-1)
+                if models[m].mcdo_passes>1:
+                    var_outputs[m] = outputs[m].pow(2).mean(-1)-mean_outputs[m].pow(2)
+                else:
+                    var_outputs[m] = torch.ones(mean_outputs[m].shape,device=device) #mean_outputs[m]  
+
+            if len(outputs_aux)>0:
+                mean_outputs_aux = {m:outputs_aux[m].mean(-1) for m in outputs_aux.keys()}
+                with torch.no_grad():
+                    if models[m].mcdo_passes>1:
+                        var_outputs_aux = {m:outputs[m].pow(2).mean(-1)-mean_outputs[m].pow(2) for m in outputs_aux.keys()}
+                    else:
+                        var_outputs_aux = {m:torch.ones(mean_outputs[m].shape,device=device) for m in outputs_aux.keys()}
+
+            # # UNCERTAINTY
+            # # convert log variance to normal variance
+            # for m in mean_outputs.keys():
+            #     var_split = int(mean_outputs[m].shape[1]/2)
+            #     mean_outputs[m][:,:var_split,:,:] = torch.exp(mean_outputs[m][:,:var_split,:,:])
+
+            # auxiliaring training loss
+            if len(outputs_aux)>0:
+                # outputs = (outputs[model],*[mean_outputs_aux[m] for m in mean_outputs_aux.keys()])
+                outputs = (o,oa)
+            else:
+                outputs = o
+
+
+
+    ###################################################
+    # Multiple Models: Middle Fusion, Isolated Fusion #
+    ###################################################
+    else:
+
+        ####################################
+        # Single Pass Prelude to MCDO Legs #
+        ####################################
+        outputs = {}
+        outputs_aux = {}
+        if any("_static" in m for m in models.keys()):                
+            outputs = {m:list(models[m+"_static"](inputs[m]))[0] for m in modes}
+            inputs = outputs
+
+        ###########################
+        # Multiple Pass MCDO Legs #
+        ###########################
+        outputs = {}; outputs_aux = {}; regs = {};
+        o = {}; oa = {}           
+        for m in modes:
+
+            # Set Number of MCDO Passes
+            models[m].mcdo_passes = cfg['models'][m]['mcdo_passes']
+            regs[m] = torch.zeros( models[m].mcdo_passes, device=device )
+
+            # Perform One Forward Pass with Gradients
+            x, regs[m][0] = models[m](inputs[m])
+            x_aux = None
+            if isinstance(x,tuple):
+                x, x_aux = x
+            outputs[m] = x.unsqueeze(-1)
+            if not x_aux is None:
+                outputs_aux[m] = x_aux.unsqueeze(-1)
+
+            o[m] = x
+            oa[m] = x_aux
+
+            # And Remaining Forward Passes without Gradients
+            with torch.no_grad():
+                for mi in range(models[m].mcdo_passes-1):
+                    x, regs[m][mi+1] = models[m](inputs[m])
+                    x_aux = None
+                    if isinstance(x,tuple):
+                        x, x_aux = x
+                    if not m in outputs:
+                        outputs[m] = x.unsqueeze(-1)
+                        if not x_aux is None:
+                            outputs_aux[m] = x_aux.unsqueeze(-1)
+                    else:
+                        outputs[m] = torch.cat((outputs[m], x.unsqueeze(-1)),-1)
+                        if not x_aux is None:
+                            outputs_aux[m] = torch.cat((outputs_aux[m], x_aux.unsqueeze(-1)),-1)
+
+            reg = torch.stack([regs[m].sum() for m in regs.keys()]).sum()
+
+        # Calculate Statistics on Multiple Passes
+        # mean_outputs = {}; var_outputs = {}
+        for m in outputs.keys():
+            mean_outputs[m] = outputs[m].mean(-1)
+            if models[m].mcdo_passes>1:
+                var_outputs[m] = outputs[m].pow(2).mean(-1)-mean_outputs[m].pow(2)
+            else:
+                var_outputs[m] = torch.ones(mean_outputs[m].shape,device=device) #mean_outputs[m]  
+
+        if len(outputs_aux)>0:
+            mean_outputs_aux = {m:outputs_aux[m].mean(-1) for m in outputs_aux.keys()}
+            with torch.no_grad():
+                if models[m].mcdo_passes>1:
+                    var_outputs_aux = {m:outputs[m].pow(2).mean(-1)-mean_outputs[m].pow(2) for m in outputs_aux.keys()}
+                else:
+                    var_outputs_aux = {m:torch.ones(mean_outputs[m].shape,device=device) for m in outputs_aux.keys()}
+
+        # # UNCERTAINTY
+        # # convert log variance to normal variance
+        # for m in mean_outputs.keys():
+        #     var_split = int(mean_outputs[m].shape[1]/2)
+        #     mean_outputs[m][:,:var_split,:,:] = torch.exp(mean_outputs[m][:,:var_split,:,:])
+
+
+        ###############################################
+        # Weight Fusion (Channel Stack, Weighted Sum) #
+        ###############################################
+        if cfg['models']['fuse']['in_channels'] == 0:
+            # stack outputs from parallel legs
+            intermediate = torch.cat(tuple([o[m] for m in outputs.keys()]+[var_outputs[m] for m in outputs.keys()]),1)
+        if cfg['models']['fuse']['in_channels'] == -1:
+            if len(modes)==1:
+                intermediate = o[list(o.keys())[0]]
+            else:
+                normalizer = var_outputs["rgb"] + var_outputs["d"]
+                normalizer[normalizer==0] = 1
+                intermediate = ((o["rgb"]*var_outputs["d"]) + (o["d"]*var_outputs["rgb"]))/normalizer
+
+        ################
+        # Fusion Trunk #
+        ################
+        outputs, _ = models['fuse'](intermediate)
+
+        # auxiliaring training loss
+        if len(outputs_aux)>0:
+            outputs = (outputs,*[oa[m] for m in mean_outputs_aux.keys()])
+
+    return outputs, reg, (mean_outputs,var_outputs)
+
+
 # def runModel(models,inputs,cfg,model,input,passes):
 
 #     models[m].mcdo_passes = cfg['models'][m]['mcdo_passes']
@@ -269,7 +476,6 @@ def train(cfg, writer, logger, logdir):
                     "cbr_final",
                "classification"]
 
-    print(cfg['models'].keys())
 
     for model,attr in cfg["models"].items():
         if len(cfg['models'])==1:
@@ -351,26 +557,14 @@ def train(cfg, writer, logger, logdir):
                 pretrained_dict = torch.load(model_pkl)['model_state']
                 model_dict = models[model].state_dict()
 
-                # print(model,start_layer,end_layer)
-
-
                 # 1. filter out unnecessary keys
                 pretrained_dict = {k: v.resize_(model_dict[k].shape) for k, v in pretrained_dict.items() if (k in model_dict)} # and ((model!="fuse") or (model=="fuse" and not start_layer in k))}
-
-
-                # print(pretrained_dict.keys())
 
                 # 2. overwrite entries in the existing state dict
                 model_dict.update(pretrained_dict) 
 
-                print(model_dict.keys())
-
                 # 3. load the new state dict
                 models[model].load_state_dict(pretrained_dict)
-                ###
-
-                # print(pretrained_dict)
-
 
                 if attr['resume']=='same_yaml':
                     # models[model].load_state_dict(checkpoint["model_state"])
@@ -379,12 +573,15 @@ def train(cfg, writer, logger, logdir):
                     start_iter = checkpoint["epoch"]
                 else:
                     start_iter = 0
+
                 # start_iter = 0
                 logger.info("Loaded checkpoint '{}' (iter {})".format(model_pkl, checkpoint["epoch"]))
             else:
                 logger.info("No checkpoint found at '{}'".format(model_pkl))        
 
         # val_loss_meter[model] = averageMeter()
+
+
     # val_loss_meter = averageMeter()
     time_meter = averageMeter()
 
@@ -399,151 +596,27 @@ def train(cfg, writer, logger, logdir):
 
             inputs, labels = parseEightCameras( images, labels, aux, device )
 
-            reg = torch.zeros(1,device=device )
-
             if labels.shape[0]<=1:
                 continue
 
-            [schedulers[m].step() for m in models.keys()]
+            [schedulers[m].step() for m in schedulers.keys()]
             [models[m].train() for m in models.keys()]
-            [optimizers[m].zero_grad() for m in models.keys()]
+            [optimizers[m].zero_grad() for m in optimizers.keys()]
 
-
-            if any("input_fusion" == m for m in models.keys()):
-                outputs, _ = models['input_fusion'](inputs['fused'])
-            elif any("rgb_only" == m for m in models.keys()):
-                outputs, _ = models['rgb_only'](inputs['rgb'])
-            elif any("d_only" == m for m in models.keys()):
-                outputs, _ = models['d_only'](inputs['d'])
-
-            else:
-
-                outputs = {}
-                outputs_aux = {}
-                if any("_static" in m for m in models.keys()):                
-                    outputs = {m:list(models[m+"_static"](inputs[m]))[0] for m in ['rgb','d']}
-                    inputs = outputs
-
-                # Start MCDO Style Training
-                outputs = {}
-                outputs_aux = {}   
-                regs = {}             
-                for m in ['rgb','d']:
-
-                    if i>cfg['models'][m]['mcdo_start_iter']:
-                        models[m].mcdo_passes = cfg['models'][m]['mcdo_passes']
-
-                        regs[m] = torch.zeros( models[m].mcdo_passes, device=device )
-
-                        if not cfg['models'][m]['mcdo_backprop']:
-                            x, regs[m][0] = models[m](inputs[m])
-                            x_aux = None
-                            if isinstance(x,tuple):
-                                x, x_aux = x
-                            outputs[m] = x.unsqueeze(-1)
-                            if not x_aux is None:
-                                outputs_aux[m] = x_aux.unsqueeze(-1)
-
-
-                            with torch.no_grad():
-                                for mi in range(models[m].mcdo_passes-1):
-                                    x, regs[m][mi+1] = models[m](inputs[m])
-                                    x_aux = None
-                                    if isinstance(x,tuple):
-                                        x, x_aux = x
-                                    if not m in outputs:
-                                        outputs[m] = x.unsqueeze(-1)
-                                        if not x_aux is None:
-                                            outputs_aux[m] = x_aux.unsqueeze(-1)
-                                    else:
-                                        outputs[m] = torch.cat((outputs[m], x.unsqueeze(-1)),-1)
-                                        if not x_aux is None:
-                                            outputs_aux[m] = torch.cat((outputs_aux[m], x_aux.unsqueeze(-1)),-1)
-                        else:
-                            for mi in range(models[m].mcdo_passes):
-                                x, regs[m][mi] = models[m](inputs[m])
-                                x_aux = None
-                                if isinstance(x,tuple):
-                                    x, x_aux = x
-                                if not m in outputs:
-                                    outputs[m] = x.unsqueeze(-1)
-                                    if not x_aux is None:
-                                        outputs_aux[m] = x_aux.unsqueeze(-1)
-                                else:
-                                    outputs[m] = torch.cat((outputs[m], x.unsqueeze(-1)),-1)
-                                    if not x_aux is None:
-                                        outputs_aux[m] = torch.cat((outputs_aux[m], x_aux.unsqueeze(-1)),-1)
-
-
-                    else:
-                        models[m].mcdo_passes = 1
-
-                        regs[m] = torch.zeros( models[m].mcdo_passes, device=device )
-
-                        for mi in range(models[m].mcdo_passes):
-                            x, regs[m][mi] = models[m](inputs[m])
-                            x_aux = None
-                            if isinstance(x,tuple):
-                                x, x_aux = x
-                            if not m in outputs:
-                                outputs[m] = x.unsqueeze(-1)
-                                if not x_aux is None:
-                                    outputs_aux[m] = x_aux.unsqueeze(-1)
-                            else:
-                                outputs[m] = torch.cat((outputs[m], x.unsqueeze(-1)),-1)
-                                if not x_aux is None:
-                                    outputs_aux[m] = torch.cat((outputs_aux[m], x_aux.unsqueeze(-1)),-1)
-                    reg = torch.stack([regs[m].sum() for m in regs.keys()]).sum()
-
-                mean_outputs = {}
-                var_outputs = {}
-                for m in outputs.keys():
-                    mean_outputs[m] = outputs[m].mean(-1)
-                    if models[m].mcdo_passes>1:
-                        var_outputs[m] = outputs[m].pow(2).mean(-1)-mean_outputs[m].pow(2)
-                    else:
-                        var_outputs[m] = torch.ones(mean_outputs[m].shape,device=device) #mean_outputs[m]  
-
-                if len(outputs_aux)>0:
-                    mean_outputs_aux = {m:outputs_aux[m].mean(-1) for m in outputs_aux.keys()}
-                    with torch.no_grad():
-                        if models[m].mcdo_passes>1:
-                            var_outputs_aux = {m:outputs[m].pow(2).mean(-1)-mean_outputs[m].pow(2) for m in outputs_aux.keys()}
-                        else:
-                            var_outputs_aux = {m:torch.ones(mean_outputs[m].shape,device=device) for m in outputs_aux.keys()}
-
-                # # UNCERTAINTY
-                # # convert log variance to normal variance
-                # for m in mean_outputs.keys():
-                #     var_split = int(mean_outputs[m].shape[1]/2)
-                #     mean_outputs[m][:,:var_split,:,:] = torch.exp(mean_outputs[m][:,:var_split,:,:])
-
-
-                if cfg['models']['fuse']['in_channels'] == 0:
-                    # stack outputs from parallel legs
-                    intermediate = torch.cat(tuple([mean_outputs[m] for m in outputs.keys()]+[var_outputs[m] for m in outputs.keys()]),1)
-                if cfg['models']['fuse']['in_channels'] == -1:
-                    normalizer = var_outputs["rgb"] + var_outputs["d"]
-                    normalizer[normalizer==0] = 1
-                    intermediate = ((mean_outputs["rgb"]*var_outputs["d"]) + (mean_outputs["d"]*var_outputs["rgb"]))/normalizer
-
-
-                outputs, _ = models['fuse'](intermediate)
-
-                # auxiliaring training loss
-                if len(outputs_aux)>0:
-                    outputs = (outputs,*[mean_outputs_aux[m] for m in mean_outputs_aux.keys()])
+            outputs, reg, mean_var_outputs = runModel(models,inputs,device)
+            mean_outputs, var_outputs = mean_var_outputs
 
 
             # with torch.no_grad():
-                # print(mean_outputs['rgb'].cpu().numpy())
-                # print(var_outputs['rgb'].cpu().numpy())
-                # print(intermediate.cpu().numpy().shape)
-                # print(outputs.cpu().numpy())
+            #     print(mean_outputs['rgb_only'].cpu().numpy())
+            #     print(var_outputs['rgb_only'].cpu().numpy())
+            #     # print(intermediate.cpu().numpy().shape)
+            #     print(outputs.cpu().numpy())
      
             CE_loss = loss_fn(input=outputs,target=labels)
             REG_loss = reg
             loss = CE_loss + 1e6*REG_loss
+
 
             # register hooks for modifying gradients for learned uncertainty
             if len(cfg['models'])>1 and cfg['models']['rgb']['learned_uncertainty'] == 'yes':            
@@ -555,7 +628,7 @@ def train(cfg, writer, logger, logdir):
             if len(cfg['models'])>1 and cfg['models']['rgb']['learned_uncertainty'] == 'yes':            
                 [hooks[h].remove() for h in hooks.keys()]            
 
-            [optimizers[m].step() for m in models.keys()]
+            [optimizers[m].step() for m in optimizers.keys()]
 
 
 
@@ -593,67 +666,12 @@ def train(cfg, writer, logger, logdir):
                             
                             inputs, labels = parseEightCameras( images, labels, aux, device )
 
-                            reg = torch.zeros(1,device=device )
-
                             orig = inputs.copy()
 
                             if labels.shape[0]<=1:
                                 continue
 
-
-                            if any("input_fusion" == m for m in models.keys()):
-                                outputs, _ = models['input_fusion'](inputs['fused'])
-
-                            elif any("rgb_only" == m for m in models.keys()):
-                                outputs, _ = models['rgb_only'](inputs['rgb'])
-
-                            elif any("d_only" == m for m in models.keys()):
-                                outputs, _ = models['d_only'](inputs['d'])
-
-
-                            else:
-
-                                outputs = {}
-                                outputs_aux = {}
-                                if any("_static" in m for m in models.keys()):                
-                                    outputs = {m:list(models[m+"_static"](inputs[m]))[0] for m in ['rgb','d']}
-                                    inputs = outputs
-
-                                outputs = {}
-                                outputs_aux = {}
-                                regs = {}
-                                for m in ['rgb','d']:
-                                    regs[m] = torch.zeros( models[m].mcdo_passes, device=device )
-                                    for mi in range(cfg['models'][m]['mcdo_passes']):
-                                        x, regs[m][mi] = models[m](inputs[m])
-                                        if not m in outputs:
-                                            outputs[m] = x.unsqueeze(-1)
-                                        else:
-                                            outputs[m] = torch.cat((outputs[m], x.unsqueeze(-1)),-1)
-                                reg = torch.stack([regs[m].sum() for m in regs.keys()]).sum()
-
-                                mean_outputs = {}
-                                var_outputs = {}
-                                for m in outputs.keys():
-                                    mean_outputs[m] = outputs[m].mean(-1)
-                                    if models[m].mcdo_passes>1:
-                                        var_outputs[m] = outputs[m].pow(2).mean(-1)-mean_outputs[m].pow(2)
-                                    else:
-                                        var_outputs[m] = torch.ones(mean_outputs[m].shape,device=device) #mean_outputs[m]  
-
-                                if cfg['models']['fuse']['in_channels'] == 0:
-                                    # stack outputs from parallel legs
-                                    intermediate = torch.cat(tuple([mean_outputs[m] for m in outputs.keys()]+[var_outputs[m] for m in outputs.keys()]),1)
-                                if cfg['models']['fuse']['in_channels'] == -1:
-                                    normalizer = var_outputs["rgb"] + var_outputs["d"]
-                                    normalizer[normalizer==0] = 1
-                                    intermediate = ((mean_outputs["rgb"]*var_outputs["d"]) + (mean_outputs["d"]*var_outputs["rgb"]))/normalizer
-
-
-                                outputs, _ = models['fuse'](intermediate)
-
-
-
+                            outputs, reg, _ = runModel(models,inputs,device)
      
                             CE_loss = loss_fn(input=outputs,target=labels)
                             REG_loss = reg
@@ -671,70 +689,86 @@ def train(cfg, writer, logger, logdir):
 
                             #     inputs_recal, labels_recal = parseEightCameras( images_recal, labels_recal, aux_recal, device )
 
-                            #     reg = torch.zeros(1,device=device )
-
-                            #     orig = inputs.copy()
-
-                            #     if labels.shape[0]<=1:
+                            #     if labels_recal.shape[0]<=1:
                             #         continue
 
+                            #     outputs_recal, reg_recal, meanvar_recal = runModel(models,inputs,device)
+                            #     mean_outputs, var_outputs = meanvar_recal
 
-                            #     if any("input_fusion" == m for m in models.keys()):
-                            #         outputs, _ = models['input_fusion'](inputs['fused'])
+                            #     pred = outputs_recal.data.max(1)[1].cpu().numpy()
+                            #     conf = outputs_recal.data.max(1)[0].cpu().numpy()
+                            #     gt = labels_recal.data.cpu().numpy()
 
-                            #     elif any("rgb_only" == m for m in models.keys()):
-                            #         outputs, _ = models['rgb_only'](inputs['rgb'])
-
-                            #     elif any("d_only" == m for m in models.keys()):
-                            #         outputs, _ = models['d_only'](inputs['d'])
+                            #     modes = [mode for mode in ['rgb','d'] if any([mode==m or mode+"_only"==m for m in models.keys()])]
 
 
-                            #     else:
+                            #     # Visualization
+                            #     if True: #i_recal % cfg['training']['png_frames'] == 0:
+                            #         fig, axes = plt.subplots(3,4)
+                            #         [axi.set_axis_off() for axi in axes.ravel()]
 
-                            #         outputs = {}
-                            #         outputs_aux = {}
-                            #         if any("_static" in m for m in models.keys()):                
-                            #             outputs = {m:list(models[m+"_static"](inputs[m]))[0] for m in ['rgb','d']}
-                            #             inputs = outputs
+                            #         gt_norm = gt[0,:,:].copy()
+                            #         pred_norm = pred[0,:,:].copy()
 
-                            #         outputs = {}
-                            #         outputs_aux = {}
-                            #         regs = {}
-                            #         for m in ['rgb','d']:
-                            #             regs[m] = torch.zeros( models[m].mcdo_passes, device=device )
-                            #             for mi in range(cfg['models'][m]['mcdo_passes']):
-                            #                 x, regs[m][mi] = models[m](inputs[m])
-                            #                 if not m in outputs:
-                            #                     outputs[m] = x.unsqueeze(-1)
-                            #                 else:
-                            #                     outputs[m] = torch.cat((outputs[m], x.unsqueeze(-1)),-1)
-                            #         reg = torch.stack([regs[m].sum() for m in regs.keys()]).sum()
+                            #         gt_norm[0,0] = 0
+                            #         gt_norm[0,1] = n_classes
+                            #         pred_norm[0,0] = 0
+                            #         pred_norm[0,1] = n_classes
 
-                            #         mean_outputs = {}
-                            #         var_outputs = {}
-                            #         for m in outputs.keys():
-                            #             mean_outputs[m] = outputs[m].mean(-1)
-                            #             if models[m].mcdo_passes>1:
-                            #                 var_outputs[m] = outputs[m].pow(2).mean(-1)-mean_outputs[m].pow(2)
+                            #         axes[0,0].imshow(gt_norm)
+                            #         axes[0,0].set_title("GT")
+    
+                            #         if 'rgb' in modes:
+                            #             axes[0,1].imshow(orig['rgb'][0,:,:,:].permute(1,2,0).cpu().numpy()[:,:,0])
+                            #             axes[0,1].set_title("RGB")
+                                            
+                            #         if 'd' in modes:
+                            #             axes[0,2].imshow(orig['d'][0,:,:,:].permute(1,2,0).cpu().numpy())
+                            #             axes[0,2].set_title("D")
+
+                            #         axes[1,0].imshow(pred_norm)
+                            #         axes[1,0].set_title("Pred")
+
+                            #         axes[2,0].imshow(conf[0,:,:])
+                            #         axes[2,0].set_title("Conf")
+
+
+                            #         if len(cfg['models'])>1:
+                            #             if cfg['models']['rgb']['learned_uncertainty'] == 'yes':            
+                            #                 channels = int(mean_outputs['rgb'].shape[1]/2)
+
+                            #                 if 'rgb' in modes:
+                            #                     axes[1,1].imshow(mean_outputs['rgb'][:,channels:,:,:].mean(1)[0,:,:].cpu().numpy())
+                            #                     axes[1,1].set_title("Aleatoric (RGB)")
+
+                            #                 if 'd' in modes:
+                            #                     axes[1,2].imshow(mean_outputs['d'][:,channels:,:,:].mean(1)[0,:,:].cpu().numpy())
+                            #                     # axes[1,2].imshow(mean_outputs['rgb'][:,:channels,:,:].mean(1)[0,:,:].cpu().numpy())
+                            #                     axes[1,2].set_title("Aleatoric (D)")
+
                             #             else:
-                            #                 var_outputs[m] = mean_outputs[m]  
+                            #                 channels = int(mean_outputs['rgb'].shape[1])
 
-                            #         if cfg['models']['fuse']['in_channels'] == 0:
-                            #             # stack outputs from parallel legs
-                            #             intermediate = torch.cat(tuple([mean_outputs[m] for m in outputs.keys()]+[var_outputs[m] for m in outputs.keys()]),1)
-                            #         if cfg['models']['fuse']['in_channels'] == -1:
-                            #             normalizer = var_outputs["rgb"] + var_outputs["d"]
-                            #             normalizer[normalizer==0] = 1
-                            #             intermediate = ((mean_outputs["rgb"]*var_outputs["d"]) + (mean_outputs["d"]*var_outputs["rgb"]))/normalizer
+                            #             if cfg['models']['rgb']['mcdo_passes']>1:
+                            #                 if 'rgb' in modes:
+                            #                     axes[2,1].imshow(var_outputs['rgb'][:,:channels,:,:].mean(1)[0,:,:].cpu().numpy())
+                            #                     axes[2,1].set_title("Epistemic (RGB)")
 
-
-                            #         outputs, _ = models['fuse'](intermediate)
-
-
-                            # exit()
+                            #                 if 'd' in modes:
+                            #                     axes[2,2].imshow(var_outputs['d'][:,:channels,:,:].mean(1)[0,:,:].cpu().numpy())
+                            #                     # axes[2,2].imshow(var_outputs['rgb'][:,channels:,:,:].mean(1)[0,:,:].cpu().numpy())
+                            #                     axes[2,2].set_title("Epistemic (D)")
 
 
+                                        
 
+                            #         path = "{}/{}".format(logdir,k)
+                            #         if not os.path.exists(path):
+                            #             os.makedirs(path)
+                            #         plt.savefig("{}/{}_{}.png".format(path,i_val,i))
+                            #         plt.close(fig)
+
+                            #         input()
 
 
                             # Visualization
@@ -824,7 +858,7 @@ def train(cfg, writer, logger, logdir):
                     val_loss_meter[env].reset()
                     running_metrics_val[env].reset()
 
-                for m in models.keys():
+                for m in optimizers.keys():
                     model = models[m]
                     optimizer = optimizers[m]
                     scheduler = schedulers[m]
@@ -869,6 +903,7 @@ if __name__ == "__main__":
 
     name = [cfg['id']]
     name.append("{}x{}".format(cfg['data']['img_rows'],cfg['data']['img_cols']))
+    name.append("{}Mode".format("-".join([mode for mode in ['rgb','d'] if any([mode==m for m in cfg['models'].keys()])])))
     name.append("_{}_".format("-".join(cfg['start_layers']) if len(cfg['models'])>1 else mcdo_model_name))
     # name.append("_{}_".format("-".join(cfg['start_layers'])))
     name.append("{}bs".format(cfg['training']['batch_size']))

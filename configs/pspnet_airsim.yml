@@ -20,58 +20,58 @@ model:
 ###################
 # Single Leg MCDO #
 ###################
-# start_layers: None
-# models:
-#     rgb_only:
-#         in_channels: 3 #if receiving mean and variance from input legs
-#         # start_layer: res_block5 #res_block3 #res_block2
-#         # end_layer: classification        
-#         reduction: 0.5
-#         mcdo_passes: 5
-#         dropoutP: 0.1        
-#         mcdo_start_iter: 0
-#         mcdo_backprop: None
-#         learned_uncertainty: "no"        
-#         resume: models/rgb_only_pspnet_airsim_best_model.pkl   
-######################
-# Middle Fusion MCDO #
-######################
-# learned_uncertainty: mode block needs to be "yes" followed by "double_input" fusion block
-start_layers: [convbnrelu1_1,classification] #,res_block4]
+start_layers: None
 models:
-    rgb:
-        in_channels: 3
-        # start_layer: res_block2
-        # end_layer: res_block4
-        reduction: 0.5
-        mcdo_passes: 5
-        dropoutP: 0.1
-        mcdo_start_iter: 0
-        mcdo_backprop: False
-        learned_uncertainty: "no"
-        resume: None #models/rgb_only_pspnet_airsim_best_model.pkl
-    d:
-        in_channels: 3
-        # start_layer: res_block2
-        # end_layer: res_block4
-        reduction: 0.5
-        mcdo_passes: 5
-        dropoutP: 0.1
-        mcdo_start_iter: 0
-        mcdo_backprop: False
-        learned_uncertainty: "no"        
-        resume: None #models/d_only_pspnet_airsim_best_model.pkl
-    fuse:
-        in_channels: 0
+    rgb_only:
+        in_channels: 3 #if receiving mean and variance from input legs
         # start_layer: res_block5 #res_block3 #res_block2
         # end_layer: classification        
         reduction: 0.5
-        mcdo_passes: 1
-        dropoutP: 0.1
-        mcdo_start_iter: None
+        mcdo_passes: 5
+        dropoutP: 0.1        
+        mcdo_start_iter: 0
         mcdo_backprop: None
         learned_uncertainty: "no"        
-        resume: None #models/rgb_only_pspnet_airsim_best_model.pkl
+        resume: models/rgb_only_pspnet_airsim_best_model.pkl   
+######################
+# Middle Fusion MCDO #
+######################
+# # learned_uncertainty: mode block needs to be "yes" followed by "double_input" fusion block
+# start_layers: [convbnrelu1_1,classification] #,res_block4]
+# models:
+#     rgb:
+#         in_channels: 3
+#         # start_layer: res_block2
+#         # end_layer: res_block4
+#         reduction: 0.5
+#         mcdo_passes: 5
+#         dropoutP: 0.1
+#         mcdo_start_iter: 0
+#         mcdo_backprop: False
+#         learned_uncertainty: "no"
+#         resume: None #models/rgb_only_pspnet_airsim_best_model.pkl
+#     d:
+#         in_channels: 3
+#         # start_layer: res_block2
+#         # end_layer: res_block4
+#         reduction: 0.5
+#         mcdo_passes: 5
+#         dropoutP: 0.1
+#         mcdo_start_iter: 0
+#         mcdo_backprop: False
+#         learned_uncertainty: "no"        
+#         resume: None #models/d_only_pspnet_airsim_best_model.pkl
+#     fuse:
+#         in_channels: 0
+#         # start_layer: res_block5 #res_block3 #res_block2
+#         # end_layer: classification        
+#         reduction: 0.5
+#         mcdo_passes: 1
+#         dropoutP: 0.1
+#         mcdo_start_iter: None
+#         mcdo_backprop: None
+#         learned_uncertainty: "no"        
+#         resume: None #models/rgb_only_pspnet_airsim_best_model.pkl
 ########################
 # Isolated MCDO Fusion #
 ########################

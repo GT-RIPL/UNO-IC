@@ -30,6 +30,7 @@ from ptsemseg.optimizers import get_optimizer
 from tensorboardX import SummaryWriter
 from functools import partial
 
+from sklearn.isotonic import IsotonicRegression
 
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
@@ -414,7 +415,7 @@ def train(cfg, writer, logger, logdir):
         is_transform=True,
         split="recal",
         subsplits=cfg['data']['train_subsplit'],
-        scale_quantity=0.5,
+        scale_quantity=0.25,
         img_size=(cfg['data']['img_rows'],cfg['data']['img_cols']),
         augmentations=data_aug)
 
@@ -440,7 +441,7 @@ def train(cfg, writer, logger, logdir):
                                   shuffle=True)
 
     recalloader = data.DataLoader(r_loader,
-                                  batch_size=cfg['training']['batch_size'], 
+                                  batch_size=1, #cfg['training']['batch_size'], 
                                   num_workers=cfg['training']['n_workers'], 
                                   shuffle=True)
 
@@ -476,6 +477,14 @@ def train(cfg, writer, logger, logdir):
                     "cbr_final",
                "classification"]
 
+
+    calibration = {}
+    calibration['model'] = IsotonicRegression()
+    calibration['fit'] = False
+    # calibration['model'] = nn.Linear(1,1)
+    # calibration['criterion'] = nn.MSELoss()
+    # l_rate = 0.01
+    # calibration['optim'] = torch.optim.SGD(calibration['model'].parameters(),lr=l_rate)
 
     for model,attr in cfg["models"].items():
         if len(cfg['models'])==1:
@@ -606,6 +615,10 @@ def train(cfg, writer, logger, logdir):
             outputs, reg, mean_var_outputs = runModel(models,inputs,device)
             mean_outputs, var_outputs = mean_var_outputs
 
+            if calibration['fit']:
+                var_soft_outputs = {m:torch.nn.Softmax(1)(var_outputs[m]) for m in var_outputs.keys()}
+                var_recal = calibration['model'](var_soft_outputs)
+
 
             # with torch.no_grad():
             #     print(mean_outputs['rgb_only'].cpu().numpy())
@@ -663,18 +676,23 @@ def train(cfg, writer, logger, logdir):
 
                 with torch.no_grad():
 
-
-
                     # Calibration Visualization
-                    steps = 10
+                    steps = 20
                     ranges = list(zip([1.*a/steps for a in range(steps+2)][:-2],
                                       [1.*a/steps for a in range(steps+2)][1:]))
 
-                    val = ['sum_pred_in_range','sum_obs_in_range','sum_in_range']
+                    val = ['sum_pred_in_range',
+                           'sum_obs_in_range',
+                           'sum_in_range',
+                           'sum_pred_below_range',
+                           'sum_obs_below_range',
+                           'sum_below_range']
+
                     per_class_match_var = {r:{c:{v:0 for v in val} for c in range(n_classes)} for r in ranges}
                     overall_match_var = {r:{v:0 for v in val} for r in ranges}
 
                     # Evaluate Calibration
+                    print("Evaluating Calibration")
                     for i_recal, (images_recal, labels_recal, aux_recal) in tqdm(enumerate(recalloader)):                            
 
                         inputs_recal, labels_recal = parseEightCameras( images_recal, labels_recal, aux_recal, device )
@@ -691,15 +709,26 @@ def train(cfg, writer, logger, logdir):
 
                         gt = labels_recal.data.cpu().numpy()
 
-                        # try softmax confidences first
-                        pred = outputs_recal.data.max(1)[1].cpu().numpy()
-                        conf = outputs_recal.data.max(1)[0].cpu().numpy()
-                        pred_var = conf.copy()
+                        # # try softmax confidences first
+                        # pred = outputs_recal.data.max(1)[1].cpu().numpy()
+                        # conf = outputs_recal.data.max(1)[0].cpu().numpy()
+                        # pred_var = conf.copy()
 
                         # MCDO softmax
                         full = var_soft_outputs[list(var_soft_outputs.keys())[0]].cpu().numpy()
-                        pred = var_soft_outputs[list(var_soft_outputs.keys())[0]].data.max(1)[1].cpu().numpy()
-                        pred_var = var_soft_outputs[list(var_soft_outputs.keys())[0]].data.max(1)[0].cpu().numpy()                        
+                        pred = mean_outputs[list(mean_outputs.keys())[0]].data.max(1)[1]
+                        pred_var = var_soft_outputs[list(var_soft_outputs.keys())[0]][pred]
+
+                        # pred_one_hot = torch.cuda.LongTensor(pred.size(0),n_classes,pred.size(1),pred.size(2)).zero_()
+                        # pred_one_hot = pred_one_hot.scatter_(1,pred.unsqueeze(1).data,1)
+                        # pred_one_hot = pred_one_hot.cpu().numpy()
+                        # pred_var = full[pred_one_hot]
+                        pred = pred.cpu().numpy()
+                        pred_var = pred_var.cpu().numpy()
+                        print(pred.shape)
+                        print(pred_var.shape)
+
+
                         
 
 
@@ -710,14 +739,25 @@ def train(cfg, writer, logger, logdir):
                             low,high = r
                             idx_pred_gt_match = (pred==gt) # index of all correct labels
                             idx_pred_var_in_range = (low<=pred_var)&(pred_var<high) # index with specific variance
+                            idx_pred_var_below_range = (pred_var<high) # index with specific variance
 
                             sum_pred_var_in_range = np.sum(pred_var[idx_pred_var_in_range][:])
+                            # sum_pred_var_below_range = np.sum(pred_var[idx_pred_var_below_range][:])
+
                             sum_obs_var_in_range = np.sum((idx_pred_gt_match&idx_pred_var_in_range)[:])
+                            sum_obs_var_below_range = np.sum((idx_pred_gt_match&idx_pred_var_below_range)[:])
+
                             sum_in_range = np.sum(idx_pred_var_in_range[:])
+                            sum_below_range = np.sum(idx_pred_var_below_range[:])
 
                             overall_match_var[r]['sum_pred_in_range'] += sum_pred_var_in_range
                             overall_match_var[r]['sum_obs_in_range'] += sum_obs_var_in_range
                             overall_match_var[r]['sum_in_range'] += sum_in_range
+
+                            # overall_match_var[r]['sum_pred_below_range'] += sum_pred_var_below_range
+                            overall_match_var[r]['sum_obs_below_range'] += sum_obs_var_below_range
+                            overall_match_var[r]['sum_below_range'] += sum_below_range
+
 
                             for c in range(n_classes):
                                 # for each class, record number of correct labels for each confidence bin
@@ -741,6 +781,12 @@ def train(cfg, writer, logger, logdir):
                         den = den if den>0 else 1
                         overall_match_var[r]['pred'] = 1.*overall_match_var[r]['sum_pred_in_range']/den #overall_match_var[r]['sum_in_range']
                         overall_match_var[r]['obs'] = 1.*overall_match_var[r]['sum_obs_in_range']/den #overall_match_var[r]['sum_in_range']
+
+                        den = overall_match_var[r]['sum_below_range']
+                        den = den if den>0 else 1
+                        # overall_match_var[r]['pred_below'] = 1.*overall_match_var[r]['sum_pred_below_range']/den #overall_match_var[r]['sum_in_range']
+                        overall_match_var[r]['obs_below'] = 1.*overall_match_var[r]['sum_obs_below_range']/den #overall_match_var[r]['sum_in_range']
+
                         for c in range(n_classes):
                             den = per_class_match_var[r][c]['sum_in_range']
                             den = den if den>0 else 1
@@ -748,15 +794,51 @@ def train(cfg, writer, logger, logdir):
                             per_class_match_var[r][c]['obs'] = 1.*per_class_match_var[r][c]['sum_obs_in_range']/den #per_class_match_var[r][c]['sum_in_range']
 
 
+
+                x = np.array([overall_match_var[r]['pred'] for r in overall_match_var.keys()])
+                y = np.array([overall_match_var[r]['obs_below'] for r in overall_match_var.keys()])
+
+                calibration['model'].fit_transform(x,y)
+                calibration['fit'] = True
+
+                # # Training Recalibration
+                # print("Training Recalibration")
+                # for i_recal in tqdm(range(100)):
+                #     calibration['optim'].zero_grad()
+
+                #     y_recal = calibration['model'](x)
+                #     loss_recal = calibration['criterion'](y_recal,y)
+                #     loss_recal.backward()
+
+                #     calibration['optim'].step()
+
+                with torch.no_grad():
+
+
                     ###########
                     # Overall #
                     ###########
-                    fig, axes = plt.subplots(2,2)
+                    fig, axes = plt.subplots(1,2)
                     # [axi.set_axis_off() for axi in axes.ravel()]
 
                     x = [overall_match_var[r]['pred'] for r in overall_match_var.keys()]
                     y = [overall_match_var[r]['obs'] for r in overall_match_var.keys()]
-                    axes[0,0].plot(x,y)
+                    axes[0].plot(x,y)
+                    axes[0].set_title("Uncalibrated")
+
+                    # calibration['model'].eval()
+                    # y_recal = calibration['model'](torch.tensor(x).view(-1,1)).cpu().numpy()
+                    # axes[1].plot(x,y_recal)
+
+
+                    x = np.array([overall_match_var[r]['pred'] for r in overall_match_var.keys()])
+                    y = np.array([overall_match_var[r]['obs_below'] for r in overall_match_var.keys()])
+
+                    y_pred = calibration['model'].predict(x)
+
+                    # y_pred = [y[int(xx*steps)] for xx in x]
+                    axes[1].plot(y,y_pred)                    
+                    axes[1].set_title("Recalibrated")
 
                     path = "{}/{}".format(logdir,'calibration')
                     if not os.path.exists(path):
@@ -862,6 +944,7 @@ def train(cfg, writer, logger, logdir):
 
                         #     input()
 
+                with torch.no_grad():
 
                     for k,valloader in valloaders.items():
                         for i_val, (images, labels, aux) in tqdm(enumerate(valloader)):

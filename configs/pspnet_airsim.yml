@@ -139,25 +139,25 @@ data:
     dataset: airsim
     path: ../../ros/data/airsim_03-05-2019/airsim_data #/mnt/HDD/datasets/airsim/bags/airsim_data
     train_split: train
-    train_subsplit: ['8camera_fog_000_dense','8camera_fog_050_dense']
+    train_subsplit: ['8camera_fog_000_dense'] #,'8camera_fog_050_dense']
     train_reduction: 1.0
     val_split: val
     val_subsplit: [
                    '8camera_fog_000_dense',
-                   '8camera_fog_050_dense',
-                   '8camera_fog_100_dense',
-                   '8camera_rain_dense',
-                   "8camera_fog_100_dense__{'channel':'rgb','type':'blackoutNoise','value':'20'}",
-                   "8camera_fog_100_dense__{'channel':'d','type':'blackoutNoise','value':'20'}",
-                   "8camera_fog_100_dense__{'channel':'rgbd','type':'blackoutNoise','value':'20'}",                   
+                   # '8camera_fog_050_dense',
+                   # '8camera_fog_100_dense',
+                   # '8camera_rain_dense',
+                   # "8camera_fog_100_dense__{'channel':'rgb','type':'blackoutNoise','value':'20'}",
+                   # "8camera_fog_100_dense__{'channel':'d','type':'blackoutNoise','value':'20'}",
+                   # "8camera_fog_100_dense__{'channel':'rgbd','type':'blackoutNoise','value':'20'}",                   
                   ]    
     val_reduction: 1.0
     img_rows: 128 #512
     img_cols: 128 #512
 training:
     train_iters: 300000
-    batch_size: 8
-    val_interval: 1000
+    batch_size: 4
+    val_interval: 1
     png_frames: 50
     n_workers: 16
     print_interval: 50

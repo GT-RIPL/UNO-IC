@@ -17,6 +17,7 @@ include = [
            'run5',
            'run6',
            'run7',
+           'run8',
            ]
 
 run_comments = {
@@ -95,7 +96,7 @@ run_comments = {
     },  
     "run8": {
         "names": [
-            "MAGNUS_correctingComputationGraph_128x128_Mode__rgb_only__8bs_0.5reduction_5passes_0.1dropoutP_nolearnedUncertainty_0mcdostart_Nonemcdobackprop_pretrain_01-16-2019",
+            "MAGNUS_correctingComputationGraph_128x128_rgb-dMode__convbnrelu1_1-classification__8bs_0.5reduction_5passes_0.1dropoutP_nolearnedUncertainty_0mcdostart_Falsemcdobackprop_fromscratch_StackedFuse_01-16-2019",
             "MAGNUS_correctingComputationGraph_128x128_rgb-dMode__convbnrelu1_1-classification__8bs_0.5reduction_5passes_0.1dropoutP_nolearnedUncertainty_0mcdostart_Falsemcdobackprop_pretrain_MultipliedFuse_01-16-2019",
             "MAGNUS_correctingComputationGraph_128x128_rgb-dMode__convbnrelu1_1-classification__8bs_0.5reduction_5passes_0.1dropoutP_nolearnedUncertainty_0mcdostart_Falsemcdobackprop_pretrain_StackedFuse_01-16-2019",
         ],

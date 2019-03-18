@@ -414,7 +414,7 @@ def train(cfg, writer, logger, logdir):
         is_transform=True,
         split="recal",
         subsplits=cfg['data']['train_subsplit'],
-        scale_quantity=cfg['data']['train_reduction'],
+        scale_quantity=0.5,
         img_size=(cfg['data']['img_rows'],cfg['data']['img_cols']),
         augmentations=data_aug)
 
@@ -654,13 +654,215 @@ def train(cfg, writer, logger, logdir):
 
 
 
+
+
             if (i + 1) % cfg['training']['val_interval'] == 0 or \
                (i + 1) == cfg['training']['train_iters']:
                 
                 [models[m].eval() for m in models.keys()]
 
                 with torch.no_grad():
-                    # for k,valloader in valloaders.items():
+
+
+
+                    # Calibration Visualization
+                    steps = 10
+                    ranges = list(zip([1.*a/steps for a in range(steps+2)][:-2],
+                                      [1.*a/steps for a in range(steps+2)][1:]))
+
+                    val = ['sum_pred_in_range','sum_obs_in_range','sum_in_range']
+                    per_class_match_var = {r:{c:{v:0 for v in val} for c in range(n_classes)} for r in ranges}
+                    overall_match_var = {r:{v:0 for v in val} for r in ranges}
+
+                    # Evaluate Calibration
+                    for i_recal, (images_recal, labels_recal, aux_recal) in tqdm(enumerate(recalloader)):                            
+
+                        inputs_recal, labels_recal = parseEightCameras( images_recal, labels_recal, aux_recal, device )
+
+                        if labels_recal.shape[0]<=1:
+                            continue
+
+                        outputs_recal, reg_recal, meanvar_recal = runModel(models,inputs,device)
+                        mean_outputs, var_outputs = meanvar_recal
+
+                        # convert variances to softmax probabilities
+                        var_soft_outputs = {m:torch.nn.Softmax(1)(var_outputs[m]) for m in var_outputs.keys()}
+                        
+
+                        gt = labels_recal.data.cpu().numpy()
+
+                        # try softmax confidences first
+                        pred = outputs_recal.data.max(1)[1].cpu().numpy()
+                        conf = outputs_recal.data.max(1)[0].cpu().numpy()
+                        pred_var = conf.copy()
+
+                        # MCDO softmax
+                        full = var_soft_outputs[list(var_soft_outputs.keys())[0]].cpu().numpy()
+                        pred = var_soft_outputs[list(var_soft_outputs.keys())[0]].data.max(1)[1].cpu().numpy()
+                        pred_var = var_soft_outputs[list(var_soft_outputs.keys())[0]].data.max(1)[0].cpu().numpy()                        
+                        
+
+
+                        for r in ranges:
+                            # for each probability range
+                            # (1) tally correct labels (classes) for empirical confidence 
+                            # (2) average predicted confidences
+                            low,high = r
+                            idx_pred_gt_match = (pred==gt) # index of all correct labels
+                            idx_pred_var_in_range = (low<=pred_var)&(pred_var<high) # index with specific variance
+
+                            sum_pred_var_in_range = np.sum(pred_var[idx_pred_var_in_range][:])
+                            sum_obs_var_in_range = np.sum((idx_pred_gt_match&idx_pred_var_in_range)[:])
+                            sum_in_range = np.sum(idx_pred_var_in_range[:])
+
+                            overall_match_var[r]['sum_pred_in_range'] += sum_pred_var_in_range
+                            overall_match_var[r]['sum_obs_in_range'] += sum_obs_var_in_range
+                            overall_match_var[r]['sum_in_range'] += sum_in_range
+
+                            for c in range(n_classes):
+                                # for each class, record number of correct labels for each confidence bin
+                                # for each class, record average confidence for each confidence bin 
+
+                                low,high = r
+                                # idx_pred_gt_match = (pred==gt) # everywhere correctly labeled to correct class                                
+                                idx_pred_gt_match = (pred==gt)&(pred==c) # everywhere correctly labeled to correct class
+                                idx_pred_var_in_range = (low<=full[:,c,:,:])&(full[:,c,:,:]<high) # everywhere with specified confidence level
+
+                                sum_pred_var_in_range = np.sum(pred_var[idx_pred_var_in_range][:])
+                                sum_obs_var_in_range = np.sum((idx_pred_gt_match&idx_pred_var_in_range)[:])
+                                sum_in_range = np.sum(idx_pred_var_in_range[:])
+
+                                per_class_match_var[r][c]['sum_pred_in_range'] += sum_pred_var_in_range
+                                per_class_match_var[r][c]['sum_obs_in_range'] += sum_obs_var_in_range
+                                per_class_match_var[r][c]['sum_in_range'] += sum_in_range
+
+                    for r in ranges:
+                        den = overall_match_var[r]['sum_in_range']
+                        den = den if den>0 else 1
+                        overall_match_var[r]['pred'] = 1.*overall_match_var[r]['sum_pred_in_range']/den #overall_match_var[r]['sum_in_range']
+                        overall_match_var[r]['obs'] = 1.*overall_match_var[r]['sum_obs_in_range']/den #overall_match_var[r]['sum_in_range']
+                        for c in range(n_classes):
+                            den = per_class_match_var[r][c]['sum_in_range']
+                            den = den if den>0 else 1
+                            per_class_match_var[r][c]['pred'] = 1.*per_class_match_var[r][c]['sum_pred_in_range']/den #per_class_match_var[r][c]['sum_in_range']
+                            per_class_match_var[r][c]['obs'] = 1.*per_class_match_var[r][c]['sum_obs_in_range']/den #per_class_match_var[r][c]['sum_in_range']
+
+
+                    ###########
+                    # Overall #
+                    ###########
+                    fig, axes = plt.subplots(2,2)
+                    # [axi.set_axis_off() for axi in axes.ravel()]
+
+                    x = [overall_match_var[r]['pred'] for r in overall_match_var.keys()]
+                    y = [overall_match_var[r]['obs'] for r in overall_match_var.keys()]
+                    axes[0,0].plot(x,y)
+
+                    path = "{}/{}".format(logdir,'calibration')
+                    if not os.path.exists(path):
+                        os.makedirs(path)
+                    plt.savefig("{}/calibOverall{}.png".format(path,i))
+                    plt.close(fig)
+
+
+                    ###############
+                    # All Classes #
+                    ###############
+                    fig, axes = plt.subplots(3,n_classes//3+1)
+                    # [axi.set_axis_off() for axi in axes.ravel()]
+
+                    x = [overall_match_var[r]['pred'] for r in overall_match_var.keys()]
+                    y = [overall_match_var[r]['obs'] for r in overall_match_var.keys()]
+                    axes[0,0].plot(x,y)
+
+                    for c in range(n_classes):
+                        x = [per_class_match_var[r][c]['pred'] for r in per_class_match_var.keys()]
+                        y = [per_class_match_var[r][c]['obs'] for r in per_class_match_var.keys()]                        
+                        axes[(c+1)//(n_classes//3+1),(c+1)%(n_classes//3+1)].plot(x,y)
+                        axes[(c+1)//(n_classes//3+1),(c+1)%(n_classes//3+1)].set_title("Class: {}".format(c))
+
+                    path = "{}/{}".format(logdir,'calibration')
+                    if not os.path.exists(path):
+                        os.makedirs(path)
+                    plt.savefig("{}/calib{}.png".format(path,i))
+                    plt.close(fig)
+
+                    print(overall_match_var)
+
+                    exit()
+
+
+
+
+                        # # Visualization
+                        # if i_recal % cfg['training']['png_frames'] == 0:
+                        #     fig, axes = plt.subplots(3,4)
+                        #     [axi.set_axis_off() for axi in axes.ravel()]
+
+                        #     gt_norm = gt[0,:,:].copy()
+                        #     pred_norm = pred[0,:,:].copy()
+
+                        #     gt_norm[0,0] = 0
+                        #     gt_norm[0,1] = n_classes
+                        #     pred_norm[0,0] = 0
+                        #     pred_norm[0,1] = n_classes
+
+                        #     axes[0,0].imshow(gt_norm)
+                        #     axes[0,0].set_title("GT")
+
+                        #     if 'rgb' in modes:
+                        #         axes[0,1].imshow(orig['rgb'][0,:,:,:].permute(1,2,0).cpu().numpy()[:,:,0])
+                        #         axes[0,1].set_title("RGB")
+                                    
+                        #     if 'd' in modes:
+                        #         axes[0,2].imshow(orig['d'][0,:,:,:].permute(1,2,0).cpu().numpy())
+                        #         axes[0,2].set_title("D")
+
+                        #     axes[1,0].imshow(pred_norm)
+                        #     axes[1,0].set_title("Pred")
+
+                        #     axes[2,0].imshow(conf[0,:,:])
+                        #     axes[2,0].set_title("Conf")
+
+
+                        #     if len(cfg['models'])>1:
+                        #         if cfg['models']['rgb']['learned_uncertainty'] == 'yes':            
+                        #             channels = int(mean_outputs['rgb'].shape[1]/2)
+
+                        #             if 'rgb' in modes:
+                        #                 axes[1,1].imshow(mean_outputs['rgb'][:,channels:,:,:].mean(1)[0,:,:].cpu().numpy())
+                        #                 axes[1,1].set_title("Aleatoric (RGB)")
+
+                        #             if 'd' in modes:
+                        #                 axes[1,2].imshow(mean_outputs['d'][:,channels:,:,:].mean(1)[0,:,:].cpu().numpy())
+                        #                 # axes[1,2].imshow(mean_outputs['rgb'][:,:channels,:,:].mean(1)[0,:,:].cpu().numpy())
+                        #                 axes[1,2].set_title("Aleatoric (D)")
+
+                        #         else:
+                        #             channels = int(mean_outputs['rgb'].shape[1])
+
+                        #         if cfg['models']['rgb']['mcdo_passes']>1:
+                        #             if 'rgb' in modes:
+                        #                 axes[2,1].imshow(var_outputs['rgb'][:,:channels,:,:].mean(1)[0,:,:].cpu().numpy())
+                        #                 axes[2,1].set_title("Epistemic (RGB)")
+
+                        #             if 'd' in modes:
+                        #                 axes[2,2].imshow(var_outputs['d'][:,:channels,:,:].mean(1)[0,:,:].cpu().numpy())
+                        #                 # axes[2,2].imshow(var_outputs['rgb'][:,channels:,:,:].mean(1)[0,:,:].cpu().numpy())
+                        #                 axes[2,2].set_title("Epistemic (D)")
+
+
+                                
+
+                        #     path = "{}/{}".format(logdir,k)
+                        #     if not os.path.exists(path):
+                        #         os.makedirs(path)
+                        #     plt.savefig("{}/{}_{}.png".format(path,i_val,i))
+                        #     plt.close(fig)
+
+                        #     input()
+
+
                     for k,valloader in valloaders.items():
                         for i_val, (images, labels, aux) in tqdm(enumerate(valloader)):
                             
@@ -683,153 +885,65 @@ def train(cfg, writer, logger, logdir):
 
 
 
-                            # print("EVALUATING CALIBRATION")
-                            # # Evaluate Calibration
-                            # for i_recal, (images_recal, labels_recal, aux_recal) in tqdm(enumerate(recalloader)):                            
+                            # # Visualization
+                            # if i_val % cfg['training']['png_frames'] == 0:
+                            #     fig, axes = plt.subplots(3,4)
+                            #     [axi.set_axis_off() for axi in axes.ravel()]
 
-                            #     inputs_recal, labels_recal = parseEightCameras( images_recal, labels_recal, aux_recal, device )
+                            #     gt_norm = gt[0,:,:].copy()
+                            #     pred_norm = pred[0,:,:].copy()
 
-                            #     if labels_recal.shape[0]<=1:
-                            #         continue
+                            #     gt_norm[0,0] = 0
+                            #     gt_norm[0,1] = n_classes
+                            #     pred_norm[0,0] = 0
+                            #     pred_norm[0,1] = n_classes
 
-                            #     outputs_recal, reg_recal, meanvar_recal = runModel(models,inputs,device)
-                            #     mean_outputs, var_outputs = meanvar_recal
+                            #     axes[0,0].imshow(gt_norm)
+                            #     axes[0,0].set_title("GT")
 
-                            #     pred = outputs_recal.data.max(1)[1].cpu().numpy()
-                            #     conf = outputs_recal.data.max(1)[0].cpu().numpy()
-                            #     gt = labels_recal.data.cpu().numpy()
+                            #     axes[0,1].imshow(orig['rgb'][0,:,:,:].permute(1,2,0).cpu().numpy()[:,:,0])
+                            #     axes[0,1].set_title("RGB")
 
-                            #     modes = [mode for mode in ['rgb','d'] if any([mode==m or mode+"_only"==m for m in models.keys()])]
+                            #     axes[0,2].imshow(orig['d'][0,:,:,:].permute(1,2,0).cpu().numpy())
+                            #     axes[0,2].set_title("D")
 
+                            #     axes[1,0].imshow(pred_norm)
+                            #     axes[1,0].set_title("Pred")
 
-                            #     # Visualization
-                            #     if True: #i_recal % cfg['training']['png_frames'] == 0:
-                            #         fig, axes = plt.subplots(3,4)
-                            #         [axi.set_axis_off() for axi in axes.ravel()]
-
-                            #         gt_norm = gt[0,:,:].copy()
-                            #         pred_norm = pred[0,:,:].copy()
-
-                            #         gt_norm[0,0] = 0
-                            #         gt_norm[0,1] = n_classes
-                            #         pred_norm[0,0] = 0
-                            #         pred_norm[0,1] = n_classes
-
-                            #         axes[0,0].imshow(gt_norm)
-                            #         axes[0,0].set_title("GT")
-    
-                            #         if 'rgb' in modes:
-                            #             axes[0,1].imshow(orig['rgb'][0,:,:,:].permute(1,2,0).cpu().numpy()[:,:,0])
-                            #             axes[0,1].set_title("RGB")
-                                            
-                            #         if 'd' in modes:
-                            #             axes[0,2].imshow(orig['d'][0,:,:,:].permute(1,2,0).cpu().numpy())
-                            #             axes[0,2].set_title("D")
-
-                            #         axes[1,0].imshow(pred_norm)
-                            #         axes[1,0].set_title("Pred")
-
-                            #         axes[2,0].imshow(conf[0,:,:])
-                            #         axes[2,0].set_title("Conf")
+                            #     axes[2,0].imshow(conf[0,:,:])
+                            #     axes[2,0].set_title("Conf")
 
 
-                            #         if len(cfg['models'])>1:
-                            #             if cfg['models']['rgb']['learned_uncertainty'] == 'yes':            
-                            #                 channels = int(mean_outputs['rgb'].shape[1]/2)
+                            #     if len(cfg['models'])>1:
+                            #         if cfg['models']['rgb']['learned_uncertainty'] == 'yes':            
+                            #             channels = int(mean_outputs['rgb'].shape[1]/2)
 
-                            #                 if 'rgb' in modes:
-                            #                     axes[1,1].imshow(mean_outputs['rgb'][:,channels:,:,:].mean(1)[0,:,:].cpu().numpy())
-                            #                     axes[1,1].set_title("Aleatoric (RGB)")
+                            #             axes[1,1].imshow(mean_outputs['rgb'][:,channels:,:,:].mean(1)[0,:,:].cpu().numpy())
+                            #             axes[1,1].set_title("Aleatoric (RGB)")
 
-                            #                 if 'd' in modes:
-                            #                     axes[1,2].imshow(mean_outputs['d'][:,channels:,:,:].mean(1)[0,:,:].cpu().numpy())
-                            #                     # axes[1,2].imshow(mean_outputs['rgb'][:,:channels,:,:].mean(1)[0,:,:].cpu().numpy())
-                            #                     axes[1,2].set_title("Aleatoric (D)")
+                            #             axes[1,2].imshow(mean_outputs['d'][:,channels:,:,:].mean(1)[0,:,:].cpu().numpy())
+                            #             # axes[1,2].imshow(mean_outputs['rgb'][:,:channels,:,:].mean(1)[0,:,:].cpu().numpy())
+                            #             axes[1,2].set_title("Aleatoric (D)")
 
-                            #             else:
-                            #                 channels = int(mean_outputs['rgb'].shape[1])
+                            #         else:
+                            #             channels = int(mean_outputs['rgb'].shape[1])
 
-                            #             if cfg['models']['rgb']['mcdo_passes']>1:
-                            #                 if 'rgb' in modes:
-                            #                     axes[2,1].imshow(var_outputs['rgb'][:,:channels,:,:].mean(1)[0,:,:].cpu().numpy())
-                            #                     axes[2,1].set_title("Epistemic (RGB)")
+                            #         if cfg['models']['rgb']['mcdo_passes']>1:
+                            #             axes[2,1].imshow(var_outputs['rgb'][:,:channels,:,:].mean(1)[0,:,:].cpu().numpy())
+                            #             axes[2,1].set_title("Epistemic (RGB)")
 
-                            #                 if 'd' in modes:
-                            #                     axes[2,2].imshow(var_outputs['d'][:,:channels,:,:].mean(1)[0,:,:].cpu().numpy())
-                            #                     # axes[2,2].imshow(var_outputs['rgb'][:,channels:,:,:].mean(1)[0,:,:].cpu().numpy())
-                            #                     axes[2,2].set_title("Epistemic (D)")
-
-
-                                        
-
-                            #         path = "{}/{}".format(logdir,k)
-                            #         if not os.path.exists(path):
-                            #             os.makedirs(path)
-                            #         plt.savefig("{}/{}_{}.png".format(path,i_val,i))
-                            #         plt.close(fig)
-
-                            #         input()
-
-
-                            # Visualization
-                            if i_val % cfg['training']['png_frames'] == 0:
-                                fig, axes = plt.subplots(3,4)
-                                [axi.set_axis_off() for axi in axes.ravel()]
-
-                                gt_norm = gt[0,:,:].copy()
-                                pred_norm = pred[0,:,:].copy()
-
-                                gt_norm[0,0] = 0
-                                gt_norm[0,1] = n_classes
-                                pred_norm[0,0] = 0
-                                pred_norm[0,1] = n_classes
-
-                                axes[0,0].imshow(gt_norm)
-                                axes[0,0].set_title("GT")
-
-                                axes[0,1].imshow(orig['rgb'][0,:,:,:].permute(1,2,0).cpu().numpy()[:,:,0])
-                                axes[0,1].set_title("RGB")
-
-                                axes[0,2].imshow(orig['d'][0,:,:,:].permute(1,2,0).cpu().numpy())
-                                axes[0,2].set_title("D")
-
-                                axes[1,0].imshow(pred_norm)
-                                axes[1,0].set_title("Pred")
-
-                                axes[2,0].imshow(conf[0,:,:])
-                                axes[2,0].set_title("Conf")
-
-
-                                if len(cfg['models'])>1:
-                                    if cfg['models']['rgb']['learned_uncertainty'] == 'yes':            
-                                        channels = int(mean_outputs['rgb'].shape[1]/2)
-
-                                        axes[1,1].imshow(mean_outputs['rgb'][:,channels:,:,:].mean(1)[0,:,:].cpu().numpy())
-                                        axes[1,1].set_title("Aleatoric (RGB)")
-
-                                        axes[1,2].imshow(mean_outputs['d'][:,channels:,:,:].mean(1)[0,:,:].cpu().numpy())
-                                        # axes[1,2].imshow(mean_outputs['rgb'][:,:channels,:,:].mean(1)[0,:,:].cpu().numpy())
-                                        axes[1,2].set_title("Aleatoric (D)")
-
-                                    else:
-                                        channels = int(mean_outputs['rgb'].shape[1])
-
-                                    if cfg['models']['rgb']['mcdo_passes']>1:
-                                        axes[2,1].imshow(var_outputs['rgb'][:,:channels,:,:].mean(1)[0,:,:].cpu().numpy())
-                                        axes[2,1].set_title("Epistemic (RGB)")
-
-                                        axes[2,2].imshow(var_outputs['d'][:,:channels,:,:].mean(1)[0,:,:].cpu().numpy())
-                                        # axes[2,2].imshow(var_outputs['rgb'][:,channels:,:,:].mean(1)[0,:,:].cpu().numpy())
-                                        axes[2,2].set_title("Epistemic (D)")
+                            #             axes[2,2].imshow(var_outputs['d'][:,:channels,:,:].mean(1)[0,:,:].cpu().numpy())
+                            #             # axes[2,2].imshow(var_outputs['rgb'][:,channels:,:,:].mean(1)[0,:,:].cpu().numpy())
+                            #             axes[2,2].set_title("Epistemic (D)")
 
 
                                     
 
-                                path = "{}/{}".format(logdir,k)
-                                if not os.path.exists(path):
-                                    os.makedirs(path)
-                                plt.savefig("{}/{}_{}.png".format(path,i_val,i))
-                                plt.close(fig)
+                            #     path = "{}/{}".format(logdir,k)
+                            #     if not os.path.exists(path):
+                            #         os.makedirs(path)
+                            #     plt.savefig("{}/{}_{}.png".format(path,i_val,i))
+                            #     plt.close(fig)
 
                             running_metrics_val[k].update(gt, pred)
 

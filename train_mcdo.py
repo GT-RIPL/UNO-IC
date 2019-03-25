@@ -717,16 +717,21 @@ def train(cfg, writer, logger, logdir):
                         # MCDO softmax
                         full = var_soft_outputs[list(var_soft_outputs.keys())[0]].cpu().numpy()
                         pred = mean_outputs[list(mean_outputs.keys())[0]].data.max(1)[1]
-                        pred_var = var_soft_outputs[list(var_soft_outputs.keys())[0]][pred]
-
                         # pred_one_hot = torch.cuda.LongTensor(pred.size(0),n_classes,pred.size(1),pred.size(2)).zero_()
                         # pred_one_hot = pred_one_hot.scatter_(1,pred.unsqueeze(1).data,1)
-                        # pred_one_hot = pred_one_hot.cpu().numpy()
-                        # pred_var = full[pred_one_hot]
+                        
+                        pred_var = var_soft_outputs[list(var_soft_outputs.keys())[0]].gather(1,pred.clone().unsqueeze(1)).squeeze(1)
+                        # pred_var = var_soft_outputs[list(var_soft_outputs.keys())[0]].index_select(1,pred)
+                        
+
+                        # # pred_one_hot = torch.cuda.LongTensor(pred.size(0),n_classes,pred.size(1),pred.size(2)).zero_()
+                        # # pred_one_hot = pred_one_hot.scatter_(1,pred.unsqueeze(1).data,1)
+                        # # pred_one_hot = pred_one_hot.cpu().numpy()
+                        # # pred_var = full[pred_one_hot]
                         pred = pred.cpu().numpy()
                         pred_var = pred_var.cpu().numpy()
-                        print(pred.shape)
-                        print(pred_var.shape)
+                        # print(pred.shape)
+                        # print(pred_var.shape)
 
 
                         

@@ -439,7 +439,8 @@ class airsimLoader(data.Dataset):
             path_list = distance_and_path_list[1] 
             tem_list = copy.deepcopy(path_list)
 
-            # shuffle(tem_list)
+            random.seed(0)
+            shuffle(tem_list)
 
             sum_distance = 0 
 

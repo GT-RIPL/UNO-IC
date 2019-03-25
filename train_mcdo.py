@@ -313,73 +313,207 @@ def runModel(models,inputs,device):
     return outputs, reg, (mean_outputs,var_outputs)
 
 
-# def runModel(models,inputs,cfg,model,input,passes):
+def fitCalibration(recalloader, models, calibration, n_classes, device):
 
-#     models[m].mcdo_passes = cfg['models'][m]['mcdo_passes']
+    # Calibration Visualization
+    steps = 20
+    ranges = list(zip([1.*a/steps for a in range(steps+2)][:-2],
+                      [1.*a/steps for a in range(steps+2)][1:]))
 
-#     regs[m] = torch.zeros( models[m].mcdo_passes, device=device )
+    val = ['sum_pred_in_range',
+           'sum_obs_in_range',
+           'sum_in_range',
+           'sum_pred_below_range',
+           'sum_obs_below_range',
+           'sum_below_range']
 
-#         if not cfg['models'][m]['mcdo_backprop']:
-#             x, regs[m][0] = models[m](inputs[m])
-#             x_aux = None
-#             if isinstance(x,tuple):
-#                 x, x_aux = x
-#             outputs[m] = x.unsqueeze(-1)
-#             if not x_aux is None:
-#                 outputs_aux[m] = x_aux.unsqueeze(-1)
+    per_class_match_var = {r:{c:{v:0 for v in val} for c in range(n_classes)} for r in ranges}
+    overall_match_var = {r:{v:0 for v in val} for r in ranges}
 
+    # Evaluate Calibration
+    print("Evaluating Calibration")
+    for i_recal, (images_recal, labels_recal, aux_recal) in tqdm(enumerate(recalloader)):                            
 
-#             with torch.no_grad():
-#                 for mi in range(models[m].mcdo_passes-1):
-#                     x, regs[m][mi+1] = models[m](inputs[m])
-#                     x_aux = None
-#                     if isinstance(x,tuple):
-#                         x, x_aux = x
-#                     if not m in outputs:
-#                         outputs[m] = x.unsqueeze(-1)
-#                         if not x_aux is None:
-#                             outputs_aux[m] = x_aux.unsqueeze(-1)
-#                     else:
-#                         outputs[m] = torch.cat((outputs[m], x.unsqueeze(-1)),-1)
-#                         if not x_aux is None:
-#                             outputs_aux[m] = torch.cat((outputs_aux[m], x_aux.unsqueeze(-1)),-1)
-#         else:
-#             for mi in range(models[m].mcdo_passes):
-#                 x, regs[m][mi] = models[m](inputs[m])
-#                 x_aux = None
-#                 if isinstance(x,tuple):
-#                     x, x_aux = x
-#                 if not m in outputs:
-#                     outputs[m] = x.unsqueeze(-1)
-#                     if not x_aux is None:
-#                         outputs_aux[m] = x_aux.unsqueeze(-1)
-#                 else:
-#                     outputs[m] = torch.cat((outputs[m], x.unsqueeze(-1)),-1)
-#                     if not x_aux is None:
-#                         outputs_aux[m] = torch.cat((outputs_aux[m], x_aux.unsqueeze(-1)),-1)
+        inputs_recal, labels_recal = parseEightCameras( images_recal, labels_recal, aux_recal, device )
 
+        if labels_recal.shape[0]<=1:
+            continue
 
-#     else:
-#         models[m].mcdo_passes = 1
+        outputs_recal, reg_recal, meanvar_recal = runModel(models,inputs_recal,device)
+        mean_outputs, var_outputs = meanvar_recal
 
-#         regs[m] = torch.zeros( models[m].mcdo_passes, device=device )
+        # convert variances to softmax probabilities
+        var_soft_outputs = {m:torch.nn.Softmax(1)(var_outputs[m]) for m in var_outputs.keys()}
+        
 
-#         for mi in range(models[m].mcdo_passes):
-#             x, regs[m][mi] = models[m](inputs[m])
-#             x_aux = None
-#             if isinstance(x,tuple):
-#                 x, x_aux = x
-#             if not m in outputs:
-#                 outputs[m] = x.unsqueeze(-1)
-#                 if not x_aux is None:
-#                     outputs_aux[m] = x_aux.unsqueeze(-1)
-#             else:
-#                 outputs[m] = torch.cat((outputs[m], x.unsqueeze(-1)),-1)
-#                 if not x_aux is None:
-#                     outputs_aux[m] = torch.cat((outputs_aux[m], x_aux.unsqueeze(-1)),-1)
+        gt = labels_recal.data.cpu().numpy()
+
+        # # try softmax confidences first
+        # pred = outputs_recal.data.max(1)[1].cpu().numpy()
+        # conf = outputs_recal.data.max(1)[0].cpu().numpy()
+        # pred_var = conf.copy()
+
+        # MCDO softmax
+        full = var_soft_outputs[list(var_soft_outputs.keys())[0]].cpu().numpy()
+        pred = mean_outputs[list(mean_outputs.keys())[0]].data.max(1)[1]
+        # pred_one_hot = torch.cuda.LongTensor(pred.size(0),n_classes,pred.size(1),pred.size(2)).zero_()
+        # pred_one_hot = pred_one_hot.scatter_(1,pred.unsqueeze(1).data,1)
+        
+        pred_var = var_soft_outputs[list(var_soft_outputs.keys())[0]].gather(1,pred.clone().unsqueeze(1)).squeeze(1)
+        # pred_var = var_soft_outputs[list(var_soft_outputs.keys())[0]].index_select(1,pred)
+        
+
+        # # pred_one_hot = torch.cuda.LongTensor(pred.size(0),n_classes,pred.size(1),pred.size(2)).zero_()
+        # # pred_one_hot = pred_one_hot.scatter_(1,pred.unsqueeze(1).data,1)
+        # # pred_one_hot = pred_one_hot.cpu().numpy()
+        # # pred_var = full[pred_one_hot]
+        pred = pred.cpu().numpy()
+        pred_var = pred_var.cpu().numpy()
 
 
-#     return mean_output, var_output, regs
+        fig = plt.figure()
+        plt.subplot(2,1,1)
+        plt.imshow(pred[0,:,:])
+        plt.subplot(2,1,2)
+        plt.imshow(pred_var[0,:,:])
+        plt.show()
+
+        # print(pred.shape)
+        # print(pred_var.shape)
+
+
+        
+
+
+        for r in ranges:
+            # for each probability range
+            # (1) tally correct labels (classes) for empirical confidence 
+            # (2) average predicted confidences
+            low,high = r
+            idx_pred_gt_match = (pred==gt) # index of all correct labels
+            idx_pred_var_in_range = (low<=pred_var)&(pred_var<high) # index with specific variance
+            idx_pred_var_below_range = (pred_var<high) # index with specific variance
+
+            sum_pred_var_in_range = np.sum(pred_var[idx_pred_var_in_range][:])
+            # sum_pred_var_below_range = np.sum(pred_var[idx_pred_var_below_range][:])
+
+            sum_obs_var_in_range = np.sum((idx_pred_gt_match&idx_pred_var_in_range)[:])
+            sum_obs_var_below_range = np.sum((idx_pred_gt_match&idx_pred_var_below_range)[:])
+
+            sum_in_range = np.sum(idx_pred_var_in_range[:])
+            sum_below_range = np.sum(idx_pred_var_below_range[:])
+
+            overall_match_var[r]['sum_pred_in_range'] += sum_pred_var_in_range
+            overall_match_var[r]['sum_obs_in_range'] += sum_obs_var_in_range
+            overall_match_var[r]['sum_in_range'] += sum_in_range
+
+            # overall_match_var[r]['sum_pred_below_range'] += sum_pred_var_below_range
+            overall_match_var[r]['sum_obs_below_range'] += sum_obs_var_below_range
+            overall_match_var[r]['sum_below_range'] += sum_below_range
+
+
+            for c in range(n_classes):
+                # for each class, record number of correct labels for each confidence bin
+                # for each class, record average confidence for each confidence bin 
+
+                low,high = r
+                # idx_pred_gt_match = (pred==gt) # everywhere correctly labeled to correct class                                
+                idx_pred_gt_match = (pred==gt)&(pred==c) # everywhere correctly labeled to correct class
+                idx_pred_var_in_range = (low<=full[:,c,:,:])&(full[:,c,:,:]<high) # everywhere with specified confidence level
+
+                sum_pred_var_in_range = np.sum(pred_var[idx_pred_var_in_range][:])
+                sum_obs_var_in_range = np.sum((idx_pred_gt_match&idx_pred_var_in_range)[:])
+                sum_in_range = np.sum(idx_pred_var_in_range[:])
+
+                per_class_match_var[r][c]['sum_pred_in_range'] += sum_pred_var_in_range
+                per_class_match_var[r][c]['sum_obs_in_range'] += sum_obs_var_in_range
+                per_class_match_var[r][c]['sum_in_range'] += sum_in_range
+
+    for r in ranges:
+        den = overall_match_var[r]['sum_in_range']
+        den = den if den>0 else 1
+        overall_match_var[r]['pred'] = 1.*overall_match_var[r]['sum_pred_in_range']/den #overall_match_var[r]['sum_in_range']
+        overall_match_var[r]['obs'] = 1.*overall_match_var[r]['sum_obs_in_range']/den #overall_match_var[r]['sum_in_range']
+
+        den = overall_match_var[r]['sum_below_range']
+        den = den if den>0 else 1
+        # overall_match_var[r]['pred_below'] = 1.*overall_match_var[r]['sum_pred_below_range']/den #overall_match_var[r]['sum_in_range']
+        overall_match_var[r]['obs_below'] = 1.*overall_match_var[r]['sum_obs_below_range']/den #overall_match_var[r]['sum_in_range']
+
+        for c in range(n_classes):
+            den = per_class_match_var[r][c]['sum_in_range']
+            den = den if den>0 else 1
+            per_class_match_var[r][c]['pred'] = 1.*per_class_match_var[r][c]['sum_pred_in_range']/den #per_class_match_var[r][c]['sum_in_range']
+            per_class_match_var[r][c]['obs'] = 1.*per_class_match_var[r][c]['sum_obs_in_range']/den #per_class_match_var[r][c]['sum_in_range']
+
+
+    x = np.array([overall_match_var[r]['pred'] for r in ranges])
+    y = np.array([overall_match_var[r]['obs'] for r in ranges])
+
+    calibration['model'].fit_transform(x,y)
+    calibration['fit'] = True
+
+    return ranges, overall_match_var, per_class_match_var, calibration
+
+
+def showCalibration(ranges, overall_match_var, per_class_match_var, calibration, logdir, i, n_classes):
+
+
+    ###########
+    # Overall #
+    ###########
+    fig, axes = plt.subplots(1,2)
+    # [axi.set_axis_off() for axi in axes.ravel()]
+
+    x = [overall_match_var[r]['pred'] for r in ranges]
+    y = [overall_match_var[r]['obs'] for r in ranges]
+    axes[0].plot(x,y)
+    axes[0].set_title("Uncalibrated")
+
+    # calibration['model'].eval()
+    # y_recal = calibration['model'](torch.tensor(x).view(-1,1)).cpu().numpy()
+    # axes[1].plot(x,y_recal)
+
+
+    x = np.array([overall_match_var[r]['pred'] for r in ranges])
+    y = np.array([overall_match_var[r]['obs'] for r in ranges])
+
+    y_pred = calibration['model'].predict(x)
+
+    # y_pred = [y[int(xx*steps)] for xx in x]
+    axes[1].plot(y,y_pred)                    
+    axes[1].set_title("Recalibrated")
+
+    path = "{}/{}".format(logdir,'calibration')
+    if not os.path.exists(path):
+        os.makedirs(path)
+    plt.savefig("{}/calibOverall{}.png".format(path,i))
+    plt.close(fig)
+
+
+    ###############
+    # All Classes #
+    ###############
+    fig, axes = plt.subplots(3,n_classes//3+1)
+    # [axi.set_axis_off() for axi in axes.ravel()]
+
+    x = [overall_match_var[r]['pred'] for r in ranges]
+    y = [overall_match_var[r]['obs'] for r in ranges]
+    axes[0,0].plot(x,y)
+
+    for c in range(n_classes):
+        x = [per_class_match_var[r][c]['pred'] for r in ranges]
+        y = [per_class_match_var[r][c]['obs'] for r in ranges]                        
+        axes[(c+1)//(n_classes//3+1),(c+1)%(n_classes//3+1)].plot(x,y)
+        axes[(c+1)//(n_classes//3+1),(c+1)%(n_classes//3+1)].set_title("Class: {}".format(c))
+
+    path = "{}/{}".format(logdir,'calibration')
+    if not os.path.exists(path):
+        os.makedirs(path)
+    plt.savefig("{}/calib{}.png".format(path,i))
+    plt.close(fig)
+
+    print(overall_match_var)    
 
 
 def train(cfg, writer, logger, logdir):
@@ -674,281 +808,31 @@ def train(cfg, writer, logger, logdir):
                 
                 [models[m].eval() for m in models.keys()]
 
-                with torch.no_grad():
+                # Recalibration Set
+                mcdo_model_name = "rgb" if len(cfg['models'])>1 else list(cfg['models'].keys())[0] #next((s for s in list(cfg['models'].keys()) if "mcdo" in s), None)
+                if cfg['models'][mcdo_model_name]['mcdo_passes']>1:
+                    with torch.no_grad():
 
-                    # Calibration Visualization
-                    steps = 20
-                    ranges = list(zip([1.*a/steps for a in range(steps+2)][:-2],
-                                      [1.*a/steps for a in range(steps+2)][1:]))
+                        ranges, overall_match_var, per_class_match_var, calibration = fitCalibration(recalloader, 
+                                                                                                     models, 
+                                                                                                     calibration, 
+                                                                                                     n_classes, 
+                                                                                                     device)
 
-                    val = ['sum_pred_in_range',
-                           'sum_obs_in_range',
-                           'sum_in_range',
-                           'sum_pred_below_range',
-                           'sum_obs_below_range',
-                           'sum_below_range']
-
-                    per_class_match_var = {r:{c:{v:0 for v in val} for c in range(n_classes)} for r in ranges}
-                    overall_match_var = {r:{v:0 for v in val} for r in ranges}
-
-                    # Evaluate Calibration
-                    print("Evaluating Calibration")
-                    for i_recal, (images_recal, labels_recal, aux_recal) in tqdm(enumerate(recalloader)):                            
-
-                        inputs_recal, labels_recal = parseEightCameras( images_recal, labels_recal, aux_recal, device )
-
-                        if labels_recal.shape[0]<=1:
-                            continue
-
-                        outputs_recal, reg_recal, meanvar_recal = runModel(models,inputs,device)
-                        mean_outputs, var_outputs = meanvar_recal
-
-                        # convert variances to softmax probabilities
-                        var_soft_outputs = {m:torch.nn.Softmax(1)(var_outputs[m]) for m in var_outputs.keys()}
-                        
-
-                        gt = labels_recal.data.cpu().numpy()
-
-                        # # try softmax confidences first
-                        # pred = outputs_recal.data.max(1)[1].cpu().numpy()
-                        # conf = outputs_recal.data.max(1)[0].cpu().numpy()
-                        # pred_var = conf.copy()
-
-                        # MCDO softmax
-                        full = var_soft_outputs[list(var_soft_outputs.keys())[0]].cpu().numpy()
-                        pred = mean_outputs[list(mean_outputs.keys())[0]].data.max(1)[1]
-                        # pred_one_hot = torch.cuda.LongTensor(pred.size(0),n_classes,pred.size(1),pred.size(2)).zero_()
-                        # pred_one_hot = pred_one_hot.scatter_(1,pred.unsqueeze(1).data,1)
-                        
-                        pred_var = var_soft_outputs[list(var_soft_outputs.keys())[0]].gather(1,pred.clone().unsqueeze(1)).squeeze(1)
-                        # pred_var = var_soft_outputs[list(var_soft_outputs.keys())[0]].index_select(1,pred)
-                        
-
-                        # # pred_one_hot = torch.cuda.LongTensor(pred.size(0),n_classes,pred.size(1),pred.size(2)).zero_()
-                        # # pred_one_hot = pred_one_hot.scatter_(1,pred.unsqueeze(1).data,1)
-                        # # pred_one_hot = pred_one_hot.cpu().numpy()
-                        # # pred_var = full[pred_one_hot]
-                        pred = pred.cpu().numpy()
-                        pred_var = pred_var.cpu().numpy()
-                        # print(pred.shape)
-                        # print(pred_var.shape)
-
-
-                        
-
-
-                        for r in ranges:
-                            # for each probability range
-                            # (1) tally correct labels (classes) for empirical confidence 
-                            # (2) average predicted confidences
-                            low,high = r
-                            idx_pred_gt_match = (pred==gt) # index of all correct labels
-                            idx_pred_var_in_range = (low<=pred_var)&(pred_var<high) # index with specific variance
-                            idx_pred_var_below_range = (pred_var<high) # index with specific variance
-
-                            sum_pred_var_in_range = np.sum(pred_var[idx_pred_var_in_range][:])
-                            # sum_pred_var_below_range = np.sum(pred_var[idx_pred_var_below_range][:])
-
-                            sum_obs_var_in_range = np.sum((idx_pred_gt_match&idx_pred_var_in_range)[:])
-                            sum_obs_var_below_range = np.sum((idx_pred_gt_match&idx_pred_var_below_range)[:])
-
-                            sum_in_range = np.sum(idx_pred_var_in_range[:])
-                            sum_below_range = np.sum(idx_pred_var_below_range[:])
-
-                            overall_match_var[r]['sum_pred_in_range'] += sum_pred_var_in_range
-                            overall_match_var[r]['sum_obs_in_range'] += sum_obs_var_in_range
-                            overall_match_var[r]['sum_in_range'] += sum_in_range
-
-                            # overall_match_var[r]['sum_pred_below_range'] += sum_pred_var_below_range
-                            overall_match_var[r]['sum_obs_below_range'] += sum_obs_var_below_range
-                            overall_match_var[r]['sum_below_range'] += sum_below_range
-
-
-                            for c in range(n_classes):
-                                # for each class, record number of correct labels for each confidence bin
-                                # for each class, record average confidence for each confidence bin 
-
-                                low,high = r
-                                # idx_pred_gt_match = (pred==gt) # everywhere correctly labeled to correct class                                
-                                idx_pred_gt_match = (pred==gt)&(pred==c) # everywhere correctly labeled to correct class
-                                idx_pred_var_in_range = (low<=full[:,c,:,:])&(full[:,c,:,:]<high) # everywhere with specified confidence level
-
-                                sum_pred_var_in_range = np.sum(pred_var[idx_pred_var_in_range][:])
-                                sum_obs_var_in_range = np.sum((idx_pred_gt_match&idx_pred_var_in_range)[:])
-                                sum_in_range = np.sum(idx_pred_var_in_range[:])
-
-                                per_class_match_var[r][c]['sum_pred_in_range'] += sum_pred_var_in_range
-                                per_class_match_var[r][c]['sum_obs_in_range'] += sum_obs_var_in_range
-                                per_class_match_var[r][c]['sum_in_range'] += sum_in_range
-
-                    for r in ranges:
-                        den = overall_match_var[r]['sum_in_range']
-                        den = den if den>0 else 1
-                        overall_match_var[r]['pred'] = 1.*overall_match_var[r]['sum_pred_in_range']/den #overall_match_var[r]['sum_in_range']
-                        overall_match_var[r]['obs'] = 1.*overall_match_var[r]['sum_obs_in_range']/den #overall_match_var[r]['sum_in_range']
-
-                        den = overall_match_var[r]['sum_below_range']
-                        den = den if den>0 else 1
-                        # overall_match_var[r]['pred_below'] = 1.*overall_match_var[r]['sum_pred_below_range']/den #overall_match_var[r]['sum_in_range']
-                        overall_match_var[r]['obs_below'] = 1.*overall_match_var[r]['sum_obs_below_range']/den #overall_match_var[r]['sum_in_range']
-
-                        for c in range(n_classes):
-                            den = per_class_match_var[r][c]['sum_in_range']
-                            den = den if den>0 else 1
-                            per_class_match_var[r][c]['pred'] = 1.*per_class_match_var[r][c]['sum_pred_in_range']/den #per_class_match_var[r][c]['sum_in_range']
-                            per_class_match_var[r][c]['obs'] = 1.*per_class_match_var[r][c]['sum_obs_in_range']/den #per_class_match_var[r][c]['sum_in_range']
+                        showCalibration(ranges,
+                                        overall_match_var, 
+                                        per_class_match_var, 
+                                        calibration, 
+                                        logdir, 
+                                        i, 
+                                        n_classes)
 
 
 
-                x = np.array([overall_match_var[r]['pred'] for r in overall_match_var.keys()])
-                y = np.array([overall_match_var[r]['obs_below'] for r in overall_match_var.keys()])
-
-                calibration['model'].fit_transform(x,y)
-                calibration['fit'] = True
-
-                # # Training Recalibration
-                # print("Training Recalibration")
-                # for i_recal in tqdm(range(100)):
-                #     calibration['optim'].zero_grad()
-
-                #     y_recal = calibration['model'](x)
-                #     loss_recal = calibration['criterion'](y_recal,y)
-                #     loss_recal.backward()
-
-                #     calibration['optim'].step()
-
-                with torch.no_grad():
-
-
-                    ###########
-                    # Overall #
-                    ###########
-                    fig, axes = plt.subplots(1,2)
-                    # [axi.set_axis_off() for axi in axes.ravel()]
-
-                    x = [overall_match_var[r]['pred'] for r in overall_match_var.keys()]
-                    y = [overall_match_var[r]['obs'] for r in overall_match_var.keys()]
-                    axes[0].plot(x,y)
-                    axes[0].set_title("Uncalibrated")
-
-                    # calibration['model'].eval()
-                    # y_recal = calibration['model'](torch.tensor(x).view(-1,1)).cpu().numpy()
-                    # axes[1].plot(x,y_recal)
-
-
-                    x = np.array([overall_match_var[r]['pred'] for r in overall_match_var.keys()])
-                    y = np.array([overall_match_var[r]['obs_below'] for r in overall_match_var.keys()])
-
-                    y_pred = calibration['model'].predict(x)
-
-                    # y_pred = [y[int(xx*steps)] for xx in x]
-                    axes[1].plot(y,y_pred)                    
-                    axes[1].set_title("Recalibrated")
-
-                    path = "{}/{}".format(logdir,'calibration')
-                    if not os.path.exists(path):
-                        os.makedirs(path)
-                    plt.savefig("{}/calibOverall{}.png".format(path,i))
-                    plt.close(fig)
-
-
-                    ###############
-                    # All Classes #
-                    ###############
-                    fig, axes = plt.subplots(3,n_classes//3+1)
-                    # [axi.set_axis_off() for axi in axes.ravel()]
-
-                    x = [overall_match_var[r]['pred'] for r in overall_match_var.keys()]
-                    y = [overall_match_var[r]['obs'] for r in overall_match_var.keys()]
-                    axes[0,0].plot(x,y)
-
-                    for c in range(n_classes):
-                        x = [per_class_match_var[r][c]['pred'] for r in per_class_match_var.keys()]
-                        y = [per_class_match_var[r][c]['obs'] for r in per_class_match_var.keys()]                        
-                        axes[(c+1)//(n_classes//3+1),(c+1)%(n_classes//3+1)].plot(x,y)
-                        axes[(c+1)//(n_classes//3+1),(c+1)%(n_classes//3+1)].set_title("Class: {}".format(c))
-
-                    path = "{}/{}".format(logdir,'calibration')
-                    if not os.path.exists(path):
-                        os.makedirs(path)
-                    plt.savefig("{}/calib{}.png".format(path,i))
-                    plt.close(fig)
-
-                    print(overall_match_var)
 
                     exit()
 
-
-
-
-                        # # Visualization
-                        # if i_recal % cfg['training']['png_frames'] == 0:
-                        #     fig, axes = plt.subplots(3,4)
-                        #     [axi.set_axis_off() for axi in axes.ravel()]
-
-                        #     gt_norm = gt[0,:,:].copy()
-                        #     pred_norm = pred[0,:,:].copy()
-
-                        #     gt_norm[0,0] = 0
-                        #     gt_norm[0,1] = n_classes
-                        #     pred_norm[0,0] = 0
-                        #     pred_norm[0,1] = n_classes
-
-                        #     axes[0,0].imshow(gt_norm)
-                        #     axes[0,0].set_title("GT")
-
-                        #     if 'rgb' in modes:
-                        #         axes[0,1].imshow(orig['rgb'][0,:,:,:].permute(1,2,0).cpu().numpy()[:,:,0])
-                        #         axes[0,1].set_title("RGB")
-                                    
-                        #     if 'd' in modes:
-                        #         axes[0,2].imshow(orig['d'][0,:,:,:].permute(1,2,0).cpu().numpy())
-                        #         axes[0,2].set_title("D")
-
-                        #     axes[1,0].imshow(pred_norm)
-                        #     axes[1,0].set_title("Pred")
-
-                        #     axes[2,0].imshow(conf[0,:,:])
-                        #     axes[2,0].set_title("Conf")
-
-
-                        #     if len(cfg['models'])>1:
-                        #         if cfg['models']['rgb']['learned_uncertainty'] == 'yes':            
-                        #             channels = int(mean_outputs['rgb'].shape[1]/2)
-
-                        #             if 'rgb' in modes:
-                        #                 axes[1,1].imshow(mean_outputs['rgb'][:,channels:,:,:].mean(1)[0,:,:].cpu().numpy())
-                        #                 axes[1,1].set_title("Aleatoric (RGB)")
-
-                        #             if 'd' in modes:
-                        #                 axes[1,2].imshow(mean_outputs['d'][:,channels:,:,:].mean(1)[0,:,:].cpu().numpy())
-                        #                 # axes[1,2].imshow(mean_outputs['rgb'][:,:channels,:,:].mean(1)[0,:,:].cpu().numpy())
-                        #                 axes[1,2].set_title("Aleatoric (D)")
-
-                        #         else:
-                        #             channels = int(mean_outputs['rgb'].shape[1])
-
-                        #         if cfg['models']['rgb']['mcdo_passes']>1:
-                        #             if 'rgb' in modes:
-                        #                 axes[2,1].imshow(var_outputs['rgb'][:,:channels,:,:].mean(1)[0,:,:].cpu().numpy())
-                        #                 axes[2,1].set_title("Epistemic (RGB)")
-
-                        #             if 'd' in modes:
-                        #                 axes[2,2].imshow(var_outputs['d'][:,:channels,:,:].mean(1)[0,:,:].cpu().numpy())
-                        #                 # axes[2,2].imshow(var_outputs['rgb'][:,channels:,:,:].mean(1)[0,:,:].cpu().numpy())
-                        #                 axes[2,2].set_title("Epistemic (D)")
-
-
-                                
-
-                        #     path = "{}/{}".format(logdir,k)
-                        #     if not os.path.exists(path):
-                        #         os.makedirs(path)
-                        #     plt.savefig("{}/{}_{}.png".format(path,i_val,i))
-                        #     plt.close(fig)
-
-                        #     input()
-
+                # Validation Set
                 with torch.no_grad():
 
                     for k,valloader in valloaders.items():

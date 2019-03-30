@@ -146,99 +146,108 @@ class pspnet(nn.Module):
         self.mcdo_passes = mcdo_passes
         self.learned_uncertainty = learned_uncertainty
 
-        self.default_layers = [[  "convbnrelu1_1",                   4,   int(64*reduction), 3, 1, 2, False],
-                               [  "convbnrelu1_2",   int(64*reduction),   int(64*reduction), 3, 1, 1, False],
-                               [  "convbnrelu1_3",   int(64*reduction),  int(128*reduction), 3, 1, 1, False],
-                               [     "res_block2",  int(128*reduction),  int(256*reduction), int(64*reduction), self.block_config[0], 1, 1],
-                               [     "res_block3",  int(256*reduction),  int(512*reduction), int(128*reduction), self.block_config[1], 2, 1],
-                               [     "res_block4",  int(512*reduction), int(1024*reduction), int(256*reduction), self.block_config[2], 1, 2],
-                               ["convbnrelu4_aux", int(1024*reduction),  int(256*reduction), 3, 1, 1, False],
-                               [        "aux_cls",  int(256*reduction),                None, self.n_classes, 1, 1, 0],
-                               [     "res_block5", int(1024*reduction), int(2048*reduction), int(512*reduction), self.block_config[3], 1, 4],
-                               ["pyramid_pooling", int(2048*reduction),                None, [6,3,2,1]],
-                               [      "cbr_final", int(4096*reduction),  int(512*reduction), 3, 1, 1, False],
-                               [ "classification",  int(512*reduction),                None, self.n_classes, 1, 1, 0]]
-        # print(start_layer,end_layer)
+        
+        if start_layer == "fuse" or end_layer == "fuse":
+            
+            self.layers = {}
+            v = [int(512*reduction), None, self.n_classes, 1, 1, 0]    
+            self.layers["fuse"] = nn.Conv2d(v[0],v[2],v[3],v[4],v[5]) # placeholder
 
-        # specify in_channels programmatically
-        if in_channels == 0:
-            if start_layer == "res_block5":
-                match = [row[0] for row in (self.default_layers)].index("convbnrelu4_aux")
-                in_channels = int(self.default_layers[match-1][2]*4) # two stacked mean and variance = x4
-            elif start_layer == "cbr_final":
-                match = [row[0] for row in (self.default_layers)].index("cbr_final")
-                in_channels = int(self.default_layers[match][1]*0.5) # two stacked mean and variance = x4
-            else:
+        else:
+            
+            self.default_layers = [[  "convbnrelu1_1",                   4,   int(64*reduction), 3, 1, 2, False],
+                                   [  "convbnrelu1_2",   int(64*reduction),   int(64*reduction), 3, 1, 1, False],
+                                   [  "convbnrelu1_3",   int(64*reduction),  int(128*reduction), 3, 1, 1, False],
+                                   [     "res_block2",  int(128*reduction),  int(256*reduction), int(64*reduction), self.block_config[0], 1, 1],
+                                   [     "res_block3",  int(256*reduction),  int(512*reduction), int(128*reduction), self.block_config[1], 2, 1],
+                                   [     "res_block4",  int(512*reduction), int(1024*reduction), int(256*reduction), self.block_config[2], 1, 2],
+                                   ["convbnrelu4_aux", int(1024*reduction),  int(256*reduction), 3, 1, 1, False],
+                                   [        "aux_cls",  int(256*reduction),                None, self.n_classes, 1, 1, 0],
+                                   [     "res_block5", int(1024*reduction), int(2048*reduction), int(512*reduction), self.block_config[3], 1, 4],
+                                   ["pyramid_pooling", int(2048*reduction),                None, [6,3,2,1]],
+                                   [      "cbr_final", int(4096*reduction),  int(512*reduction), 3, 1, 1, False],
+                                   [ "classification",  int(512*reduction),                None, self.n_classes, 1, 1, 0]]
+            # print(start_layer,end_layer)
+
+            # specify in_channels programmatically
+            if in_channels == 0:
+                if start_layer == "res_block5":
+                    match = [row[0] for row in (self.default_layers)].index("convbnrelu4_aux")
+                    in_channels = int(self.default_layers[match-1][2]*4) # two stacked mean and variance = x4
+                elif start_layer == "cbr_final":
+                    match = [row[0] for row in (self.default_layers)].index("cbr_final")
+                    in_channels = int(self.default_layers[match][1]*0.5) # two stacked mean and variance = x4
+                else:
+                    match = [row[0] for row in (self.default_layers)].index(start_layer)
+                    in_channels = int(self.default_layers[match-1][2]*4) # two stacked mean and variance = x4
+            if in_channels == -1:
                 match = [row[0] for row in (self.default_layers)].index(start_layer)
-                in_channels = int(self.default_layers[match-1][2]*4) # two stacked mean and variance = x4
-        if in_channels == -1:
-            match = [row[0] for row in (self.default_layers)].index(start_layer)
-            in_channels = int(self.default_layers[match-1][2]*1) # forwarded output from previous layer
+                in_channels = int(self.default_layers[match-1][2]*1) # forwarded output from previous layer
 
-        # double size of input after learned uncertainty layer (mu,sigma)
-        if learned_uncertainty=="double_input":
-            # match = [row[0] for row in (self.default_layers)].index(start_layer)
-            # in_channels = self.default_layers[match][1]*2
-            in_channels *= 2
+            # double size of input after learned uncertainty layer (mu,sigma)
+            if learned_uncertainty=="double_input":
+                # match = [row[0] for row in (self.default_layers)].index(start_layer)
+                # in_channels = self.default_layers[match][1]*2
+                in_channels *= 2
 
 
-        # Extract Sub Layers for Fusion
-        start_i = 0
-        end_i = len(self.default_layers)
-        for i,row in enumerate(self.default_layers):
-            if start_layer == row[0]:
-                start_i = i
-            if end_layer == row[0]:
-                end_i = i
+            # Extract Sub Layers for Fusion
+            start_i = 0
+            end_i = len(self.default_layers)
+            for i,row in enumerate(self.default_layers):
+                if start_layer == row[0]:
+                    start_i = i
+                if end_layer == row[0]:
+                    end_i = i
 
-        self.sub_layers = []
-        for i,row in enumerate(self.default_layers):
-            if i < start_i:
-                self.sub_layers.append([row[0],None])
-            elif i == start_i:
-                self.sub_layers.append([row[0]]+[in_channels]+row[2:])
-            elif i > start_i and i <= end_i:
-                self.sub_layers.append(row)
-            else:
-                self.sub_layers.append([row[0],None])
-
-
-        # print(in_channels,self.sub_layers)
-
-        for i,row in enumerate(self.default_layers):
-            if row[0]=="cbr_final":
-                if not row[1] is None and not self.sub_layers[i-1][1] is None:
-                    self.sub_layers[i] = [row[0]]+[2*self.sub_layers[i-1][1]]+row[2:]
+            self.sub_layers = []
+            for i,row in enumerate(self.default_layers):
+                if i < start_i:
+                    self.sub_layers.append([row[0],None])
+                elif i == start_i:
+                    self.sub_layers.append([row[0]]+[in_channels]+row[2:])
+                elif i > start_i and i <= end_i:
+                    self.sub_layers.append(row)
+                else:
+                    self.sub_layers.append([row[0],None])
 
 
-        self.layer_dict = {row[0]:row[1:] for row in self.sub_layers}
+            # print(in_channels,self.sub_layers)
 
-        # print(self.layer_dict)
+            for i,row in enumerate(self.default_layers):
+                if row[0]=="cbr_final":
+                    if not row[1] is None and not self.sub_layers[i-1][1] is None:
+                        self.sub_layers[i] = [row[0]]+[2*self.sub_layers[i-1][1]]+row[2:]
 
-        self.layers = {}
-        self.layers['dropoutMCDO'] = nn.Dropout2d(p=dropoutP, inplace=False)
-        self.layers['dropout'] = nn.Dropout2d(p=0.1, inplace=False)
-        for k,v in self.layer_dict.items():
-            if ("convbnrelu" in k or "cbr_final" in k) and not v[0] is None:
-                self.layers[k] = conv2DBatchNormRelu(in_channels=v[0],
-                                                     k_size=v[2],
-                                                     n_filters=v[1],
-                                                     padding=v[3],
-                                                     stride=v[4],
-                                                     bias=v[5])
-                # self.layers[k+"_concrete"] = ConcreteDropout()
 
-            if "res_block" in k and not v[0] is None:
-                self.layers[k] = residualBlockPSP(v[3],v[0],v[2],v[1],v[4],v[5])
-                # self.layers[k+"_concrete"] = ConcreteDropout()
+            self.layer_dict = {row[0]:row[1:] for row in self.sub_layers}
 
-            if "pyramid_pooling" in k and not v[0] is None:
-                self.layers[k] = pyramidPooling(v[0],v[2])
-                # self.layers[k+"_concrete"] = ConcreteDropout()
+            # print(self.layer_dict)
 
-            if ("classification" in k or "aux_cls" in k) and not v[0] is None:
-                self.layers[k] = nn.Conv2d(v[0],v[2],v[3],v[4],v[5])
-                # self.layers[k+"_concrete"] = ConcreteDropout()
+            self.layers = {}
+            self.layers['dropoutMCDO'] = nn.Dropout2d(p=dropoutP, inplace=False)
+            self.layers['dropout'] = nn.Dropout2d(p=0.1, inplace=False)
+            for k,v in self.layer_dict.items():
+                if ("convbnrelu" in k or "cbr_final" in k) and not v[0] is None:
+                    self.layers[k] = conv2DBatchNormRelu(in_channels=v[0],
+                                                         k_size=v[2],
+                                                         n_filters=v[1],
+                                                         padding=v[3],
+                                                         stride=v[4],
+                                                         bias=v[5])
+                    # self.layers[k+"_concrete"] = ConcreteDropout()
+
+                if "res_block" in k and not v[0] is None:
+                    self.layers[k] = residualBlockPSP(v[3],v[0],v[2],v[1],v[4],v[5])
+                    # self.layers[k+"_concrete"] = ConcreteDropout()
+
+                if "pyramid_pooling" in k and not v[0] is None:
+                    self.layers[k] = pyramidPooling(v[0],v[2])
+                    # self.layers[k+"_concrete"] = ConcreteDropout()
+
+                if ("classification" in k or "aux_cls" in k) and not v[0] is None:
+                    self.layers[k] = nn.Conv2d(v[0],v[2],v[3],v[4],v[5])
+                    # self.layers[k+"_concrete"] = ConcreteDropout()
 
 
         # set attributes from dictionary
@@ -298,189 +307,206 @@ class pspnet(nn.Module):
 
     def forward(self, x, dropout=False):
 
-        # Turn on training to get weight dropout
-        if self.mcdo_passes>1:
-            dropout = self.dropoutMCDO
-        else:
-            dropout = self.dropout
+        if "fuse" in self.layers.keys():
 
-        if self.training:
-            dropout.train(mode=True)            
-            dropout_scalar = 1
-        else:
-            if self.mcdo_passes>1:
-                dropout.train(mode=True)                
-                dropout_scalar = 1-dropout.p
+
+            o, var_outputs = x
+
+            o = {m:torch.nn.Softmax(1)(o[m]) for m in o.keys()}
+
+            if len(o.keys())==1:
+                intermediate = o[list(o.keys())[0]]
             else:
-                dropout.eval()
-                dropout_scalar = 1
+                normalizer = var_outputs["rgb"] + var_outputs["d"]
+                normalizer[normalizer==0] = 1
+                intermediate = ((o["rgb"]*var_outputs["d"]) + (o["d"]*var_outputs["rgb"]))/normalizer
 
-        inp_shape = x.shape[2:]
+            return intermediate, 0
 
-        num_concretes = len([x for x in self.layers.keys() if 'concrete' in x])
-        regularization = torch.zeros( num_concretes, device=x.device )
-
-
-
-        ri = 0
-
-        # H, W -> H/2, W/2
-        if 'convbnrelu1_1' in self.layers.keys():
-            xprev = x                       
-            x = getattr(self,'convbnrelu1_1')(x) 
-            x = dropout(x)
-            # if self.mcdo_passes == 1:
-            #     x = getattr(self,'convbnrelu1_1')(x) 
-            #     x = self.dropout(x)
-            # else:
-            #     x, regularization[ri] = getattr(self,'convbnrelu1_1_concrete')(x,getattr(self,'convbnrelu1_1')) 
-            #     ri += 1
-
-            # x *= dropout_scalar
-        if 'convbnrelu1_2' in self.layers.keys():
-            xprev = x            
-            x = getattr(self,'convbnrelu1_2')(x) 
-            x = dropout(x)
-            # if self.mcdo_passes == 1:
-            #     x = getattr(self,'convbnrelu1_2')(x) 
-            #     x = self.dropout(x)
-            # else:
-            #     x, regularization[ri] = getattr(self,'convbnrelu1_2_concrete')(x,getattr(self,'convbnrelu1_2')) 
-            #     ri += 1
-
-            # x *= dropout_scalar
-        if 'convbnrelu1_3' in self.layers.keys():
-            xprev = x
-            x = getattr(self,'convbnrelu1_3')(x) 
-            x = dropout(x)
-            # if self.mcdo_passes == 1:
-            #     x = getattr(self,'convbnrelu1_3')(x) 
-            #     x = self.dropout(x)
-            # else:
-            #     x, regularization[ri] = getattr(self,'convbnrelu1_3_concrete')(x,getattr(self,'convbnrelu1_3')) 
-            #     ri += 1
-            
-            # x *= dropout_scalar
-            
-            x = F.max_pool2d(x, 3, 2, 1)
-
-        # # H/4, W/4 -> H/8, W/8
-        if 'res_block2' in self.layers.keys():
-            xprev = x                        
-            x = getattr(self,'res_block2')(x)                
-            x = dropout(x)
-            # if self.mcdo_passes == 1:
-            #     x = getattr(self,'res_block2')(x)                
-            #     x = self.dropout(x)
-            # else:
-            #     x, regularization[ri] = getattr(self,'res_block2_concrete')(x,getattr(self,'res_block2')) 
-            #     ri += 1            
-
-            # x *= dropout_scalar
-        if 'res_block3' in self.layers.keys():
-            xprev = x                   
-            x = getattr(self,'res_block3')(x)                
-            x = dropout(x)
-            # if self.mcdo_passes == 1:
-            #     x = getattr(self,'res_block3')(x)                
-            #     x = self.dropout(x)
-            # else:
-            #     x, regularization[ri] = getattr(self,'res_block3_concrete')(x,getattr(self,'res_block3')) 
-            #     ri += 1            
-
-            # x *= dropout_scalar
-        if 'res_block4' in self.layers.keys():
-            xprev = x
-            x = getattr(self,'res_block4')(x)
-            x = dropout(x)
-            # if self.mcdo_passes == 1:
-            #     x = getattr(self,'res_block4')(x)
-            #     x = self.dropout(x)
-            # else:
-            #     x, regularization[ri] = getattr(self,'res_block4_concrete')(x,getattr(self,'res_block4')) 
-            #     ri += 1            
-
-            # x *= dropout_scalar
-
-        if self.training and 'convbnrelu4_aux' in self.layers.keys():  # Auxiliary layers for training
-            xprev = x            
-            x_aux = getattr(self,'convbnrelu4_aux')(x)
-            x_aux = dropout(x_aux)
-            # if self.mcdo_passes == 1:
-            #     x_aux = getattr(self,'convbnrelu4_aux')(x)
-            #     x_aux = self.dropout(x_aux)
-            # else:
-            #     x_aux, regularization[ri] = getattr(self,'convbnrelu4_aux_concrete')(x,getattr(self,'convbnrelu4_aux')) 
-            #     ri += 1       
-
-            # x_aux *= dropout_scalar
-            x_aux = getattr(self,'aux_cls')(x_aux)
-
-        if 'res_block5' in self.layers.keys():
-            xprev = x           
-            x = getattr(self,'res_block5')(x)
-            x = dropout(x)
-            # if self.mcdo_passes == 1:
-            #     x = getattr(self,'res_block5')(x)
-            #     x = self.dropout(x)
-            # else:
-            #     x, regularization[ri] = getattr(self,'res_block5_concrete')(x,getattr(self,'res_block5')) 
-            #     ri += 1            
-
-            # x *= dropout_scalar
-
-        if 'pyramid_pooling' in self.layers.keys():
-            xprev = x                       
-            x = getattr(self,'pyramid_pooling')(x)                   
-            x = dropout(x)
-            # if self.mcdo_passes == 1:
-            #     x = getattr(self,'pyramid_pooling')(x)                   
-            #     x = self.dropout(x)
-            # else:
-            #     x, regularization[ri] = getattr(self,'pyramid_pooling_concrete')(x,getattr(self,'pyramid_pooling')) 
-            #     ri += 1            
-
-            # x *= dropout_scalar
-
-        if 'cbr_final' in self.layers.keys():
-            xprev = x            
-            x = getattr(self,'cbr_final')(x)                   
-            x = dropout(x)
-            # if self.mcdo_passes == 1:
-            #     x = getattr(self,'cbr_final')(x)                   
-            #     x = self.dropout(x)
-            # else:
-            #     x, regularization[ri] = getattr(self,'cbr_final_concrete')(x,getattr(self,'cbr_final')) 
-            #     ri += 1            
-
-            # x *= dropout_scalar
-
-        if 'classification' in self.layers.keys():
-            xprev = x
-            x = getattr(self,'classification')(x)   
-            x = F.interpolate(x, size=self.input_size, mode='bilinear', align_corners=True)
-
-        if self.learned_uncertainty == "yes":
-            last_module = [s[0] for s in self.sub_layers if not s[1] is None][-1]
-            sigma = getattr(self,last_module)(xprev)
-            if last_module=="convbnrelu1_3":
-                sigma = F.max_pool2d(sigma, 3, 2, 1)
-            if last_module=="classification":
-                sigma = F.interpolate(sigma, size=self.input_size, mode='bilinear', align_corners=True)
-
-            x = torch.cat((x,sigma),1)
-
-
-        if self.mcdo_passes > 1:
-            if self.training and 'convbnrelu4_aux' in self.layers.keys():
-                return (x, x_aux), regularization.sum()
-            else:  # eval mode
-                return x, regularization.sum()
         else:
-            if self.training and 'convbnrelu4_aux' in self.layers.keys():
-                return (x, x_aux), torch.zeros( 1, device=x.device )
-            else:  # eval mode
-                return x, torch.zeros( 1, device=x.device )
+            # Turn on training to get weight dropout
+            if self.mcdo_passes>1:
+                dropout = self.dropoutMCDO
+            else:
+                dropout = self.dropout
+
+            if self.training:
+                dropout.train(mode=True)            
+                dropout_scalar = 1
+            else:
+                if self.mcdo_passes>1:
+                    dropout.train(mode=True)                
+                    dropout_scalar = 1-dropout.p
+                else:
+                    dropout.eval()
+                    dropout_scalar = 1
+
+            inp_shape = x.shape[2:]
+
+            num_concretes = len([x for x in self.layers.keys() if 'concrete' in x])
+            regularization = torch.zeros( num_concretes, device=x.device )
+
+
+
+            ri = 0
+
+            # H, W -> H/2, W/2
+            if 'convbnrelu1_1' in self.layers.keys():
+                xprev = x                       
+                x = getattr(self,'convbnrelu1_1')(x) 
+                x = dropout(x)
+                # if self.mcdo_passes == 1:
+                #     x = getattr(self,'convbnrelu1_1')(x) 
+                #     x = self.dropout(x)
+                # else:
+                #     x, regularization[ri] = getattr(self,'convbnrelu1_1_concrete')(x,getattr(self,'convbnrelu1_1')) 
+                #     ri += 1
+
+                # x *= dropout_scalar
+            if 'convbnrelu1_2' in self.layers.keys():
+                xprev = x            
+                x = getattr(self,'convbnrelu1_2')(x) 
+                x = dropout(x)
+                # if self.mcdo_passes == 1:
+                #     x = getattr(self,'convbnrelu1_2')(x) 
+                #     x = self.dropout(x)
+                # else:
+                #     x, regularization[ri] = getattr(self,'convbnrelu1_2_concrete')(x,getattr(self,'convbnrelu1_2')) 
+                #     ri += 1
+
+                # x *= dropout_scalar
+            if 'convbnrelu1_3' in self.layers.keys():
+                xprev = x
+                x = getattr(self,'convbnrelu1_3')(x) 
+                x = dropout(x)
+                # if self.mcdo_passes == 1:
+                #     x = getattr(self,'convbnrelu1_3')(x) 
+                #     x = self.dropout(x)
+                # else:
+                #     x, regularization[ri] = getattr(self,'convbnrelu1_3_concrete')(x,getattr(self,'convbnrelu1_3')) 
+                #     ri += 1
+                
+                # x *= dropout_scalar
+                
+                x = F.max_pool2d(x, 3, 2, 1)
+
+            # # H/4, W/4 -> H/8, W/8
+            if 'res_block2' in self.layers.keys():
+                xprev = x                        
+                x = getattr(self,'res_block2')(x)                
+                x = dropout(x)
+                # if self.mcdo_passes == 1:
+                #     x = getattr(self,'res_block2')(x)                
+                #     x = self.dropout(x)
+                # else:
+                #     x, regularization[ri] = getattr(self,'res_block2_concrete')(x,getattr(self,'res_block2')) 
+                #     ri += 1            
+
+                # x *= dropout_scalar
+            if 'res_block3' in self.layers.keys():
+                xprev = x                   
+                x = getattr(self,'res_block3')(x)                
+                x = dropout(x)
+                # if self.mcdo_passes == 1:
+                #     x = getattr(self,'res_block3')(x)                
+                #     x = self.dropout(x)
+                # else:
+                #     x, regularization[ri] = getattr(self,'res_block3_concrete')(x,getattr(self,'res_block3')) 
+                #     ri += 1            
+
+                # x *= dropout_scalar
+            if 'res_block4' in self.layers.keys():
+                xprev = x
+                x = getattr(self,'res_block4')(x)
+                x = dropout(x)
+                # if self.mcdo_passes == 1:
+                #     x = getattr(self,'res_block4')(x)
+                #     x = self.dropout(x)
+                # else:
+                #     x, regularization[ri] = getattr(self,'res_block4_concrete')(x,getattr(self,'res_block4')) 
+                #     ri += 1            
+
+                # x *= dropout_scalar
+
+            if self.training and 'convbnrelu4_aux' in self.layers.keys():  # Auxiliary layers for training
+                xprev = x            
+                x_aux = getattr(self,'convbnrelu4_aux')(x)
+                x_aux = dropout(x_aux)
+                # if self.mcdo_passes == 1:
+                #     x_aux = getattr(self,'convbnrelu4_aux')(x)
+                #     x_aux = self.dropout(x_aux)
+                # else:
+                #     x_aux, regularization[ri] = getattr(self,'convbnrelu4_aux_concrete')(x,getattr(self,'convbnrelu4_aux')) 
+                #     ri += 1       
+
+                # x_aux *= dropout_scalar
+                x_aux = getattr(self,'aux_cls')(x_aux)
+
+            if 'res_block5' in self.layers.keys():
+                xprev = x           
+                x = getattr(self,'res_block5')(x)
+                x = dropout(x)
+                # if self.mcdo_passes == 1:
+                #     x = getattr(self,'res_block5')(x)
+                #     x = self.dropout(x)
+                # else:
+                #     x, regularization[ri] = getattr(self,'res_block5_concrete')(x,getattr(self,'res_block5')) 
+                #     ri += 1            
+
+                # x *= dropout_scalar
+
+            if 'pyramid_pooling' in self.layers.keys():
+                xprev = x                       
+                x = getattr(self,'pyramid_pooling')(x)                   
+                x = dropout(x)
+                # if self.mcdo_passes == 1:
+                #     x = getattr(self,'pyramid_pooling')(x)                   
+                #     x = self.dropout(x)
+                # else:
+                #     x, regularization[ri] = getattr(self,'pyramid_pooling_concrete')(x,getattr(self,'pyramid_pooling')) 
+                #     ri += 1            
+
+                # x *= dropout_scalar
+
+            if 'cbr_final' in self.layers.keys():
+                xprev = x            
+                x = getattr(self,'cbr_final')(x)                   
+                x = dropout(x)
+                # if self.mcdo_passes == 1:
+                #     x = getattr(self,'cbr_final')(x)                   
+                #     x = self.dropout(x)
+                # else:
+                #     x, regularization[ri] = getattr(self,'cbr_final_concrete')(x,getattr(self,'cbr_final')) 
+                #     ri += 1            
+
+                # x *= dropout_scalar
+
+            if 'classification' in self.layers.keys():
+                xprev = x
+                x = getattr(self,'classification')(x) 
+                x = F.interpolate(x, size=self.input_size, mode='bilinear', align_corners=True)
+
+            if self.learned_uncertainty == "yes":
+                last_module = [s[0] for s in self.sub_layers if not s[1] is None][-1]
+                sigma = getattr(self,last_module)(xprev)
+                if last_module=="convbnrelu1_3":
+                    sigma = F.max_pool2d(sigma, 3, 2, 1)
+                if last_module=="classification":
+                    sigma = F.interpolate(sigma, size=self.input_size, mode='bilinear', align_corners=True)
+
+                x = torch.cat((x,sigma),1)
+
+
+            if self.mcdo_passes > 1:
+                if self.training and 'convbnrelu4_aux' in self.layers.keys():
+                    return (x, x_aux), regularization.sum()
+                else:  # eval mode
+                    return x, regularization.sum()
+            else:
+                if self.training and 'convbnrelu4_aux' in self.layers.keys():
+                    return (x, x_aux), torch.zeros( 1, device=x.device )
+                else:  # eval mode
+                    return x, torch.zeros( 1, device=x.device )
 
 
 

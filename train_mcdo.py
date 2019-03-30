@@ -301,10 +301,11 @@ def runModel(models,inputs,device):
                 normalizer[normalizer==0] = 1
                 intermediate = ((o["rgb"]*var_outputs["d"]) + (o["d"]*var_outputs["rgb"]))/normalizer
 
+
         ################
         # Fusion Trunk #
         ################
-        outputs, _ = models['fuse'](intermediate)
+        outputs, _ = models['fuse']((o,var_outputs))
 
         # auxiliaring training loss
         if len(outputs_aux)>0:
@@ -624,8 +625,8 @@ def train(cfg, writer, logger, logdir):
         if len(cfg['models'])==1:
             start_layer = "convbnrelu1_1"
             end_layer = "classification"
-        else:    
-            if not cfg['start_layers'] is None:
+        else:  
+            if not str(cfg['start_layers']) == "None":
                 if "_static" in model:
                     start_layer = "convbnrelu1_1"
                     end_layer = layers[layers.index(cfg['start_layers'][1])-1]

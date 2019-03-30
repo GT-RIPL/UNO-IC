@@ -808,16 +808,20 @@ def train(cfg, writer, logger, logdir):
                 
                 [models[m].eval() for m in models.keys()]
 
+                """
                 # Recalibration Set
                 mcdo_model_name = "rgb" if len(cfg['models'])>1 else list(cfg['models'].keys())[0] #next((s for s in list(cfg['models'].keys()) if "mcdo" in s), None)
                 if cfg['models'][mcdo_model_name]['mcdo_passes']>1:
                     with torch.no_grad():
 
-                        ranges, overall_match_var, per_class_match_var, calibration = fitCalibration(recalloader, 
-                                                                                                     models, 
-                                                                                                     calibration, 
-                                                                                                     n_classes, 
-                                                                                                     device)
+                        ranges, \
+                        overall_match_var, \
+                        per_class_match_var, \
+                        calibration = fitCalibration(recalloader, 
+                                                     models, 
+                                                     calibration, 
+                                                     n_classes, 
+                                                     device)
 
                         showCalibration(ranges,
                                         overall_match_var, 
@@ -827,10 +831,8 @@ def train(cfg, writer, logger, logdir):
                                         i, 
                                         n_classes)
 
-
-
-
                     exit()
+                """
 
                 # Validation Set
                 with torch.no_grad():

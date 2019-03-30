@@ -1,34 +1,34 @@
-id: "MAGNUS_correctingComputationGraph"
+id: "final_baseline"
 model:
     arch: pspnet
 ############
 # BASELINE #
 ############
-# start_layers: None
-# models:
-#     input_fusion:
-#         in_channels: 6 #if receiving mean and variance from input legs
-#         reduction: 0.5
-#         mcdo_passes: 1
-#         dropoutP: 0.1        
-#         mcdo_start_iter: 0
-#         mcdo_backprop: None
-#         learned_uncertainty: "no"        
-#         resume: None   
-###################
-# Single Leg MCDO #
-###################
 start_layers: None
 models:
-    rgb_only:
-        in_channels: 3 #if receiving mean and variance from input legs   
+    input_fusion:
+        in_channels: 6 #if receiving mean and variance from input legs
         reduction: 0.5
-        mcdo_passes: 5
+        mcdo_passes: 1
         dropoutP: 0.1        
         mcdo_start_iter: 0
         mcdo_backprop: None
         learned_uncertainty: "no"        
-        resume: models/rgb_only_pspnet_airsim_best_model.pkl   
+        resume: None   
+###################
+# Single Leg MCDO #
+###################
+# start_layers: None
+# models:
+#     rgb_only:
+#         in_channels: 3 #if receiving mean and variance from input legs   
+#         reduction: 0.5
+#         mcdo_passes: 5
+#         dropoutP: 0.1        
+#         mcdo_start_iter: 0
+#         mcdo_backprop: None
+#         learned_uncertainty: "no"        
+#         resume: models/rgb_only_pspnet_airsim_best_model.pkl   
 ######################
 # Middle Fusion MCDO #
 ######################
@@ -135,17 +135,16 @@ data:
     dataset: airsim
     path: ../../ros/data/airsim_03-30-2019/airsim_data_async #../../ros/data/airsim_03-05-2019/airsim_data
     train_split: train
-    train_subsplit: ['async_fog_000_clear'] #,'8camera_fog_050_dense']
+    train_subsplit: ['async_fog_000_clear']
     train_reduction: 1.0
     val_split: val
     val_subsplit: [
                    'async_fog_000_clear',
-                   # '8camera_fog_050_dense',
-                   # '8camera_fog_100_dense',
-                   # '8camera_rain_dense',
-                   # "8camera_fog_100_dense__{'channel':'rgb','type':'blackoutNoise','value':'20'}",
-                   # "8camera_fog_100_dense__{'channel':'d','type':'blackoutNoise','value':'20'}",
-                   # "8camera_fog_100_dense__{'channel':'rgbd','type':'blackoutNoise','value':'20'}",                   
+                   'async_fog_050_clear',
+                   'async_fog_100_clear',
+                   "async_fog_100_clear__{'channel':'rgb','type':'blackoutNoise','value':'20'}",
+                   "async_fog_100_clear__{'channel':'d','type':'blackoutNoise','value':'20'}",
+                   "async_fog_100_clear__{'channel':'rgbd','type':'blackoutNoise','value':'20'}",                   
                   ]    
     val_reduction: 1.0
     img_rows: 128 #512
@@ -153,7 +152,7 @@ data:
 training:
     train_iters: 300000
     batch_size: 4
-    val_interval: 1
+    val_interval: 1000
     png_frames: 50
     n_workers: 16
     print_interval: 50

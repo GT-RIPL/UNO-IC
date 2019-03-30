@@ -23,7 +23,7 @@ def main():
     """Extract a folder of images from a rosbag.
     """
 
-    output_root = "airsim_data_async"
+    output_root = "/home/n8k9/ripl/ros/data/bag/airsim_data_async"
 
     topic_folders = [
                      # DroneHigh Left
@@ -106,12 +106,18 @@ def main():
                 
                 print(folder.split("/"))
 
+
                 if not "pose" in folder.split('/'): # segmentation, depth, scene
 
                     camera_id = folder.split('/')[4]
                     output_dir = "{}/{}/{}/{}/{}".format(output_root,topic,condition,trajectory,camera_id)
                     if not os.path.exists(output_dir):
                         os.makedirs(output_dir)
+                    else:
+                        continue
+
+
+
 
                     bag = rosbag.Bag(file_path, "r")
                     bridge = CvBridge()
@@ -151,6 +157,8 @@ def main():
                     output_dir = "{}/{}/{}/{}/{}".format(output_root,topic,condition,trajectory,camera_id)
                     if not os.path.exists(output_dir):
                         os.makedirs(output_dir)
+                    else:
+                        continue
 
                     bag = rosbag.Bag(file_path, "r")
                     bridge = CvBridge()

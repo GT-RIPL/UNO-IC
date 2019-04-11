@@ -32,6 +32,7 @@ for r in ranges:
     low,high = r
     idx_pred_gt_match = (pred==gt) # everywhere correctly labeled
     idx_pred_var_in_range = (low<=pred_var)&(pred_var<high) # everywhere with specified confidence level
+    # idx_pred_var_in_range = (pred_var<high) # everywhere with specified confidence level
 
     in_range += np.sum(idx_pred_var_in_range[:])
 

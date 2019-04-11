@@ -1,4 +1,4 @@
-id: "final_baseline"
+id: "final_baseline_withoutRecalibration"
 model:
     arch: pspnet
 ############
@@ -45,7 +45,7 @@ models:
         mcdo_start_iter: 0
         mcdo_backprop: False
         learned_uncertainty: "no"
-        resume: None #models/rgb_only_pspnet_airsim_best_model.pkl
+        resume: models/rgb_only_pspnet_airsim_best_model.pkl
     d:
         in_channels: 3
         start_layer: convbnrelu1_1
@@ -56,7 +56,7 @@ models:
         mcdo_start_iter: 0
         mcdo_backprop: False
         learned_uncertainty: "no"        
-        resume: None #models/d_only_pspnet_airsim_best_model.pkl
+        resume: models/d_only_pspnet_airsim_best_model.pkl
     fuse:
         in_channels: 0
         start_layer: fuse #res_block3 #res_block2

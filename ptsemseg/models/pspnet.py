@@ -307,23 +307,22 @@ class pspnet(nn.Module):
 
     def forward(self, x, dropout=False):
 
-        if "fuse" in self.layers.keys():
-
+        if "fuse" in self.layers.keys() or isinstance(x,tuple):
 
             o, var_outputs = x
 
             o = {m:torch.nn.Softmax(1)(o[m]) for m in o.keys()}
 
             if len(o.keys())==1:
-                intermediate = o[list(o.keys())[0]]
+                x = o[list(o.keys())[0]]
             else:
                 normalizer = var_outputs["rgb"] + var_outputs["d"]
                 normalizer[normalizer==0] = 1
-                intermediate = ((o["rgb"]*var_outputs["d"]) + (o["d"]*var_outputs["rgb"]))/normalizer
+                x = ((o["rgb"]*var_outputs["d"]) + (o["d"]*var_outputs["rgb"]))/normalizer
 
-            return intermediate, 0
+            # return x, 0
 
-        else:
+        if True: #else:
             # Turn on training to get weight dropout
             if self.mcdo_passes>1:
                 dropout = self.dropoutMCDO
@@ -343,7 +342,7 @@ class pspnet(nn.Module):
 
             inp_shape = x.shape[2:]
 
-            num_concretes = len([x for x in self.layers.keys() if 'concrete' in x])
+            num_concretes = len([xx for xx in self.layers.keys() if 'concrete' in xx])
             regularization = torch.zeros( num_concretes, device=x.device )
 
 

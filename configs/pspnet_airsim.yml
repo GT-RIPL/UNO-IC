@@ -1,4 +1,4 @@
-id: "test"
+id: "final_baseline_pretrained_withRecalibrationSoftmax"
 model:
     arch: pspnet
 ############
@@ -38,7 +38,7 @@ models:
     rgb:
         in_channels: 3
         start_layer: convbnrelu1_1
-        end_layer: convbnrelu1_3
+        end_layer: classification
         reduction: 0.5
         mcdo_passes: 5
         dropoutP: 0.1
@@ -49,7 +49,7 @@ models:
     d:
         in_channels: 3
         start_layer: convbnrelu1_1
-        end_layer: convbnrelu1_3 #classification
+        end_layer: classification #classification
         reduction: 0.5
         mcdo_passes: 5
         dropoutP: 0.1
@@ -59,15 +59,15 @@ models:
         resume: models/d_only_pspnet_airsim_best_model.pkl
     fuse:
         in_channels: -1
-        start_layer: res_block2 #fuse #res_block3 #res_block2
-        end_layer: classification #fuse        
+        start_layer: fuse #res_block3 #res_block2
+        end_layer: fuse        
         reduction: 0.5
         mcdo_passes: 1
         dropoutP: 0.1
         mcdo_start_iter: None
         mcdo_backprop: None
         learned_uncertainty: "no"        
-        resume: models/rgb_only_pspnet_airsim_best_model.pkl #None
+        resume: None #models/rgb_only_pspnet_airsim_best_model.pkl #None
 ########################
 # Isolated MCDO Fusion #
 ########################
@@ -140,11 +140,11 @@ data:
     val_split: val
     val_subsplit: [
                    'async_fog_000_clear',
-                   #'async_fog_050_clear',
-                   #'async_fog_100_clear',
-                   #"async_fog_100_clear__{'channel':'rgb','type':'blackoutNoise','value':'20'}",
-                   #"async_fog_100_clear__{'channel':'d','type':'blackoutNoise','value':'20'}",
-                   #"async_fog_100_clear__{'channel':'rgbd','type':'blackoutNoise','value':'20'}",                   
+                   'async_fog_050_clear',
+                   'async_fog_100_clear',
+                   "async_fog_100_clear__{'channel':'rgb','type':'blackoutNoise','value':'20'}",
+                   "async_fog_100_clear__{'channel':'d','type':'blackoutNoise','value':'20'}",
+                   "async_fog_100_clear__{'channel':'rgbd','type':'blackoutNoise','value':'20'}",                   
                   ]    
     val_reduction: 1.0
     img_rows: 128 #512

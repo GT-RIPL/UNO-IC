@@ -294,7 +294,10 @@ def runModel(models,calibration,inputs,device):
                         var_outputs_aux = {m:torch.ones(mean_outputs[m].shape,device=device) for m in outputs_aux.keys()}
 
             # Convert Variances to Softmax Probabilities and Recalibrate
-            var_soft_outputs = {m:torch.nn.Softmax(1)(var_outputs[m]) for m in var_outputs.keys()}
+            # var_soft_outputs = {m:torch.nn.Softmax(1)(var_outputs[m]) for m in var_outputs.keys()}
+
+            # Use Softmax Class Probability for Recalibration
+            var_soft_outputs = {m:torch.nn.Softmax(1)(outputs[m]) for m in outputs.keys()}
 
             # print(var_soft_outputs[m].shape)
             # print(var_soft_outputs[m].cpu().numpy().reshape(-1).shape)
@@ -392,7 +395,11 @@ def runModel(models,calibration,inputs,device):
                     var_outputs_aux = {m:torch.ones(mean_outputs[m].shape,device=device) for m in outputs_aux.keys()}
 
         # Convert Variances to Softmax Probabilities and Recalibrate
-        var_soft_outputs = {m:torch.nn.Softmax(1)(var_outputs[m]) for m in var_outputs.keys()}
+        # var_soft_outputs = {m:torch.nn.Softmax(1)(var_outputs[m]) for m in var_outputs.keys()}
+
+        # Use Softmax Class Probability for Recalibration
+        var_soft_outputs = {m:torch.nn.Softmax(1)(outputs[m]) for m in outputs.keys()}
+
 
         if reg.requires_grad == True or not calibration[m]['fit']:
             var_recal = {m:var_soft_outputs[m] for m in var_outputs.keys()}
@@ -625,7 +632,7 @@ def fitCalibration(recalloader, models, calibration, n_classes, device):
         y = torch.from_numpy(y).float()
 
         calibration[m]['model'].fit(x,y,device)
-        calibration[m]['fit'] = False #True
+        calibration[m]['fit'] = True # True
 
 
 
@@ -1055,28 +1062,28 @@ def train(cfg, writer, logger, logdir):
                 
                 [models[m].eval() for m in models.keys()]
 
-                # # Recalibration Set
-                # mcdo_model_name = "rgb" if len(cfg['models'])>1 else list(cfg['models'].keys())[0] #next((s for s in list(cfg['models'].keys()) if "mcdo" in s), None)
-                # if cfg['models'][mcdo_model_name]['mcdo_passes']>1:
-                #     # with torch.no_grad():
+                # Recalibration Set
+                mcdo_model_name = "rgb" if len(cfg['models'])>1 else list(cfg['models'].keys())[0] #next((s for s in list(cfg['models'].keys()) if "mcdo" in s), None)
+                if cfg['models'][mcdo_model_name]['mcdo_passes']>1:
+                    # with torch.no_grad():
 
-                #         ranges, \
-                #         overall_match_var, \
-                #         per_class_match_var, \
-                #         calibration = fitCalibration(recalloader, 
-                #                                      models, 
-                #                                      calibration, 
-                #                                      n_classes, 
-                #                                      device)
+                        ranges, \
+                        overall_match_var, \
+                        per_class_match_var, \
+                        calibration = fitCalibration(recalloader, 
+                                                     models, 
+                                                     calibration, 
+                                                     n_classes, 
+                                                     device)
 
-                #         showCalibration(ranges,
-                #                         overall_match_var, 
-                #                         per_class_match_var, 
-                #                         calibration, 
-                #                         logdir, 
-                #                         i, 
-                #                         n_classes,
-                #                         device)
+                        showCalibration(ranges,
+                                        overall_match_var, 
+                                        per_class_match_var, 
+                                        calibration, 
+                                        logdir, 
+                                        i, 
+                                        n_classes,
+                                        device)
 
 
                 # Validation Set

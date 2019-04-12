@@ -15,6 +15,7 @@ import random
 from torch.utils import data
 import yaml
 from tqdm import tqdm
+import pickle
 
 random.seed(42) 
 
@@ -374,6 +375,56 @@ class airsimLoader(data.Dataset):
                 for image_mode in self.image_modes:
                     self.imgs[self.split][cam_pos][image_mode] = self.imgs[self.split][cam_pos][image_mode][::int(1/scale_quantity)]
             print("{} {}: Reduced by {} to {} Images".format(self.split,self.subsplits,scale_quantity,len(self.imgs[self.split][self.cam_pos[0]][self.image_modes[0]])))
+
+
+        self.dataset_statistics()
+
+        exit()
+
+    def dataset_statistics(self):
+
+        print("="*20)
+        print("Running Dataset Statistics")
+        print("="*20)
+
+        print("Splits:    {}".format(self.split))
+        print("Positions: {}".format(", ".join(list(self.imgs[self.split].keys()))))
+        print("Modes:     {}".format(", ".join(list(self.imgs[self.split][self.cam_pos[0]].keys()))))
+
+        savefile = "{}_dataset_statistics.p".format(self.split)
+
+        if os.path.isfile(savefile):
+            pixel_stats = pickle.load( open(savefile,"rb"))
+
+        else:        
+            pixel_stats = {p:{n:[] for n in self.name2id} for p in self.cam_pos}
+
+            for index in tqdm(range(int(1.0*len(self.imgs[self.split][self.cam_pos[0]][self.image_modes[0]])))):
+                img_list, lbl_list, aux_list = self.__getitem__(index)
+
+                for i,p in enumerate(self.cam_pos):
+                    for n in self.name2id:
+                        pixel_stats[p][n].append( (1.*torch.sum(lbl_list[i]==self.name2id[n]).tolist()/(list(lbl_list[i].size())[0]*list(lbl_list[i].size())[1])) ) 
+
+
+            pickle.dump( pixel_stats, open(savefile,"wb"))
+
+
+        pixel_stats_summary = {p:{n:{"mean":0} for n in self.name2id} for p in self.cam_pos}
+        for i,p in enumerate(self.cam_pos):
+            for n in self.name2id:
+                pixel_stats_summary[p][n]["mean"] = np.mean(pixel_stats[p][n])
+                # pixel_stats_summary[m][n]["var"] = np.var(pixel_stats[m][n])
+
+        print(pixel_stats_summary)
+
+
+
+        # for cam_pos in self.cam_pos:
+        #     for image_mode in self.image_modes:
+        #         for index in range(len(self.imgs[self.split][cam_pos][image_mode])):
+        #             print(index)
+
 
 
     def tuple_to_folder_name(self, path_tuple):

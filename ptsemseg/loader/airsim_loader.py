@@ -377,9 +377,8 @@ class airsimLoader(data.Dataset):
             print("{} {}: Reduced by {} to {} Images".format(self.split,self.subsplits,scale_quantity,len(self.imgs[self.split][self.cam_pos[0]][self.image_modes[0]])))
 
 
-        self.dataset_statistics()
-
-        exit()
+        # self.dataset_statistics()
+        # exit()
 
     def dataset_statistics(self):
 

@@ -297,7 +297,7 @@ def runModel(models,calibration,inputs,device):
             # var_soft_outputs = {m:torch.nn.Softmax(1)(var_outputs[m]) for m in var_outputs.keys()}
 
             # Use Softmax Class Probability for Recalibration
-            var_soft_outputs = {m:torch.nn.Softmax(1)(outputs[m]) for m in outputs.keys()}
+            var_soft_outputs = {m:torch.nn.Softmax(1)(mean_outputs[m]) for m in outputs.keys()}
 
             # print(var_soft_outputs[m].shape)
             # print(var_soft_outputs[m].cpu().numpy().reshape(-1).shape)
@@ -398,8 +398,7 @@ def runModel(models,calibration,inputs,device):
         # var_soft_outputs = {m:torch.nn.Softmax(1)(var_outputs[m]) for m in var_outputs.keys()}
 
         # Use Softmax Class Probability for Recalibration
-        var_soft_outputs = {m:torch.nn.Softmax(1)(outputs[m]) for m in outputs.keys()}
-
+        var_soft_outputs = {m:torch.nn.Softmax(1)(mean_outputs[m]) for m in outputs.keys()}
 
         if reg.requires_grad == True or not calibration[m]['fit']:
             var_recal = {m:var_soft_outputs[m] for m in var_outputs.keys()}
@@ -850,7 +849,7 @@ def train(cfg, writer, logger, logdir):
     # Initially Fit to Identity Transfer Function
     calibration = {}
     for m in cfg["models"].keys():
-        if cfg["models"][m]["mcdo_passes"]>1:
+        if cfg["models"][m]["mcdo_passes"]>=1:
             x = np.arange(0,1,0.01)
 
             # calibration[m] = IsotonicRegression()

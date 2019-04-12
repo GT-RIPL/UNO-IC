@@ -320,9 +320,12 @@ class pspnet(nn.Module):
                 normalizer[normalizer==0] = 1
                 x = ((o["rgb"]*var_outputs["d"]) + (o["d"]*var_outputs["rgb"]))/normalizer
 
+            if "fuse" in self.layers.keys():
+                return x, 0
+
             # return x, 0
 
-        if True: #else:
+        if "dropout" in self.layers.keys(): #else:
             # Turn on training to get weight dropout
             if self.mcdo_passes>1:
                 dropout = self.dropoutMCDO

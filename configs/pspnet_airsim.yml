@@ -40,7 +40,7 @@ models:
         start_layer: convbnrelu1_1
         end_layer: classification
         reduction: 0.5
-        mcdo_passes: 1
+        mcdo_passes: 5
         dropoutP: 0.1
         mcdo_start_iter: 0
         mcdo_backprop: False
@@ -51,7 +51,7 @@ models:
         start_layer: convbnrelu1_1
         end_layer: classification #classification
         reduction: 0.5
-        mcdo_passes: 1
+        mcdo_passes: 5
         dropoutP: 0.1
         mcdo_start_iter: 0
         mcdo_backprop: False

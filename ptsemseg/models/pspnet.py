@@ -311,14 +311,34 @@ class pspnet(nn.Module):
 
             o, var_outputs = x
 
-            o = {m:torch.nn.Softmax(1)(o[m]) for m in o.keys()}
+            # o = {m:torch.nn.Softmax(1)(o[m]) for m in o.keys()}
+            # o = {m:torch.max(o[m],dim=1)[0] for m in o.keys()}
 
             if len(o.keys())==1:
                 x = o[list(o.keys())[0]]
             else:
-                normalizer = var_outputs["rgb"] + var_outputs["d"]
-                normalizer[normalizer==0] = 1
-                x = ((o["rgb"]*var_outputs["d"]) + (o["d"]*var_outputs["rgb"]))/normalizer
+                # normalizer = var_outputs["rgb"] + var_outputs["d"]
+                # normalizer[normalizer==0] = 1
+                # x = ((o["rgb"]*var_outputs["d"]) + (o["d"]*var_outputs["rgb"]))/normalizer
+
+                x = torch.cat((o["rgb"].unsqueeze(0),o["d"].unsqueeze(0)),0)
+
+                x = x.gather(0,(var_outputs["rgb"]<var_outputs["d"]).long().unsqueeze(1).unsqueeze(0).repeat(1,1,x.shape[2],1,1)).squeeze(0)
+
+                
+
+                # print(var_outputs["rgb"][0,0,0],var_outputs["d"][0,0,0],o["rgb"][0,0,0,0],o["d"][0,0,0,0],x[0,0,0,0])
+
+                # print(x.shape)
+                # # print(x[0,:,:])
+
+                # print(x.shape)
+
+                # exit()
+
+                # x = o["rgb"]*(var_outputs["rgb"]>=var_outputs["d"]) + \
+                #     o["d"]*(var_outputs["rgb"]<var_outputs["d"])
+
 
             if "fuse" in self.layers.keys():
                 return x, 0

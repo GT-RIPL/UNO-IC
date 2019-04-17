@@ -3,6 +3,7 @@ import torchvision.models as models
 
 from ptsemseg.models.fcn import *
 from ptsemseg.models.segnet import *
+from ptsemseg.models.segnet_mcdo import *
 from ptsemseg.models.unet import *
 from ptsemseg.models.pspnet import *
 from ptsemseg.models.icnet import *
@@ -35,6 +36,21 @@ def get_model(model_dict,
 
     elif name == "segnet":
         model = model(n_classes=n_classes, **param_dict)
+        vgg16 = models.vgg16(pretrained=True)
+        model.init_vgg16_params(vgg16)
+
+    elif name == "segnet_mcdo":
+        model = model(n_classes=n_classes, 
+                      input_size=input_size,
+                      version=version, 
+                      reduction=reduction, 
+                      mcdo_passes=mcdo_passes,
+                      dropoutP=dropoutP,
+                      learned_uncertainty=learned_uncertainty,
+                      in_channels=in_channels,
+                      start_layer=start_layer,
+                      end_layer=end_layer,
+                      **param_dict)
         vgg16 = models.vgg16(pretrained=True)
         model.init_vgg16_params(vgg16)
 
@@ -74,6 +90,7 @@ def _get_model_instance(name):
             "fcn16s": fcn16s,
             "unet": unet,
             "segnet": segnet,
+            "segnet_mcdo": segnet_mcdo,
             "pspnet": pspnet,
             "icnet": icnet,
             "icnetBN": icnet,

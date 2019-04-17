@@ -9,8 +9,9 @@ import numpy as np
 
 from torch.utils import data
 from tqdm import tqdm
+import cv2
 
-from ptsemseg.process_img import generate_noise
+# from ptsemseg.process_img import generate_noise
 from ptsemseg.models import get_model
 from ptsemseg.loss import get_loss_function
 from ptsemseg.loader import get_loader
@@ -21,9 +22,11 @@ from ptsemseg.schedulers import get_scheduler
 from ptsemseg.optimizers import get_optimizer
 
 from tensorboardX import SummaryWriter
+from scipy.misc import imsave
 
+import matplotlib.pyplot as plt
 
-def train(cfg, writer, logger):
+def train(cfg, writer, logger, logdir):
 
     # Setup seeds
     torch.manual_seed(cfg.get("seed", 1337))
@@ -42,81 +45,155 @@ def train(cfg, writer, logger):
     data_loader = get_loader(cfg["data"]["dataset"])
     data_path = cfg["data"]["path"]
 
-    #sbd_path = cfg["data"]["sbd_path"]
-
     t_loader = data_loader(
         data_path,
         is_transform=True,
-        split=cfg["data"]["train_split"],
-        subsplits=cfg["data"]["train_subsplit"],
-        scale_quantity=1.0,
-        img_size=(cfg["data"]["img_rows"], cfg["data"]["img_cols"]),
-        augmentations=data_aug,
-    )
+        split=cfg['data']['train_split'],
+        subsplits=cfg['data']['train_subsplit'],
+        scale_quantity=cfg['data']['train_reduction'],
+        img_size=(cfg['data']['img_rows'],cfg['data']['img_cols']),
+        augmentations=data_aug)
 
-    v_loader = data_loader(
+    r_loader = data_loader(
         data_path,
         is_transform=True,
-        split=cfg["data"]["val_split"],
-        subsplits=cfg["data"]["train_subsplit"],
-        scale_quantity=1.0,
-        img_size=(cfg["data"]["img_rows"], cfg["data"]["img_cols"]),
-    )
+        split="recal",
+        subsplits=cfg['data']['train_subsplit'],
+        scale_quantity=0.25,
+        img_size=(cfg['data']['img_rows'],cfg['data']['img_cols']),
+        augmentations=data_aug)
+
+    tv_loader = data_loader(
+        data_path,
+        is_transform=True,
+        split=cfg['data']['train_split'],
+        subsplits=cfg['data']['train_subsplit'],
+        scale_quantity=0.05,
+        img_size=(cfg['data']['img_rows'],cfg['data']['img_cols']),
+        augmentations=data_aug)
+
+    v_loader = {env:data_loader(
+        data_path,
+        is_transform=True,
+        split="val", subsplits=[env], scale_quantity=cfg['data']['val_reduction'],
+        img_size=(cfg['data']['img_rows'],cfg['data']['img_cols']),) for env in cfg['data']['val_subsplit']}
 
     n_classes = t_loader.n_classes
-    trainloader = data.DataLoader(
-        t_loader,
-        batch_size=cfg["training"]["batch_size"],
-        num_workers=cfg["training"]["n_workers"],
-        shuffle=True,
-    )
+    trainloader = data.DataLoader(t_loader,
+                                  batch_size=cfg['training']['batch_size'], 
+                                  num_workers=cfg['training']['n_workers'], 
+                                  shuffle=True)
 
-    valloader = data.DataLoader(
-        v_loader, batch_size=cfg["training"]["batch_size"], num_workers=cfg["training"]["n_workers"]
-    )
+    recalloader = data.DataLoader(r_loader,
+                                  batch_size=1, #cfg['training']['batch_size'], 
+                                  num_workers=cfg['training']['n_workers'], 
+                                  shuffle=True)
 
+    valloaders = {key:data.DataLoader(v_loader[key], 
+                                      batch_size=cfg['training']['batch_size'], 
+                                      num_workers=cfg['training']['n_workers']) for key in v_loader.keys()}
+
+    # add training samples to validation sweep
+    valloaders = {**valloaders,'train':data.DataLoader(tv_loader,
+                                                       batch_size=cfg['training']['batch_size'], 
+                                                       num_workers=cfg['training']['n_workers'])}
 
     # Setup Metrics
-    running_metrics_val = runningScore(n_classes)
+    running_metrics_val = {env:runningScore(n_classes) for env in valloaders.keys()}
 
-    # Setup Model
-    model = get_model(cfg["model"], n_classes).to(device)
+    # Setup Meters
+    val_loss_meter = {env:averageMeter() for env in valloaders.keys()}
+    val_CE_loss_meter = {env:averageMeter() for env in valloaders.keys()}
+    val_REG_loss_meter = {env:averageMeter() for env in valloaders.keys()}
+    time_meter = averageMeter()
+    
 
-    model = torch.nn.DataParallel(model, device_ids=range(torch.cuda.device_count()))
 
-    # Setup optimizer, lr_scheduler and loss function
-    optimizer_cls = get_optimizer(cfg)
-    optimizer_params = {k: v for k, v in cfg["training"]["optimizer"].items() if k != "name"}
 
-    optimizer = optimizer_cls(model.parameters(), **optimizer_params)
-    logger.info("Using optimizer {}".format(optimizer))
 
-    scheduler = get_scheduler(optimizer, cfg["training"]["lr_schedule"])
-
-    loss_fn = get_loss_function(cfg)
-    logger.info("Using loss {}".format(loss_fn))
 
     start_iter = 0
-    if cfg["training"]["resume"] is not None:
-        if os.path.isfile(cfg["training"]["resume"]):
-            logger.info(
-                "Loading model and optimizer from checkpoint '{}'".format(cfg["training"]["resume"])
-            )
-            checkpoint = torch.load(cfg["training"]["resume"])
-            model.load_state_dict(checkpoint["model_state"])
-            optimizer.load_state_dict(checkpoint["optimizer_state"])
-            scheduler.load_state_dict(checkpoint["scheduler_state"])
-            start_iter = checkpoint["epoch"]
-            logger.info(
-                "Loaded checkpoint '{}' (iter {})".format(
-                    cfg["training"]["resume"], checkpoint["epoch"]
-                )
-            )
-        else:
-            logger.info("No checkpoint found at '{}'".format(cfg["training"]["resume"]))
+    models = {}
+    optimizers = {}
+    schedulers = {}
 
-    val_loss_meter = averageMeter()
-    time_meter = averageMeter()
+    # Setup Model
+    for model,attr in cfg["models"].items():
+
+        models[model] = get_model(cfg["model"], 
+                                  n_classes,
+                                  input_size=(cfg['data']['img_rows'],cfg['data']['img_cols']),
+                                  in_channels=attr['in_channels'],
+                                  start_layer=attr['start_layer'],
+                                  end_layer=attr['end_layer'],
+                                  mcdo_passes=attr['mcdo_passes'], 
+                                  dropoutP=attr['dropoutP'],
+                                  learned_uncertainty=attr['learned_uncertainty'],
+                                  reduction=attr['reduction']).to(device)
+
+
+
+        if "caffemodel" in attr['resume']:
+            models[model].load_pretrained_model(model_path=attr['resume'])
+
+        models[model] = torch.nn.DataParallel(models[model], device_ids=range(torch.cuda.device_count()))
+
+        # Setup optimizer, lr_scheduler and loss function
+        optimizer_cls = get_optimizer(cfg)
+        optimizer_params = {k:v for k, v in cfg['training']['optimizer'].items() 
+                            if k != 'name'}
+
+        optimizers[model] = optimizer_cls(models[model].parameters(), **optimizer_params)
+        logger.info("Using optimizer {}".format(optimizers[model]))
+
+        schedulers[model] = get_scheduler(optimizers[model], cfg['training']['lr_schedule'])
+
+        loss_fn = get_loss_function(cfg)
+        # loss_sig = # Loss Function for Aleatoric Uncertainty
+        logger.info("Using loss {}".format(loss_fn))
+
+        # Load pretrained weights
+        if str(attr['resume']) is not "None" and not "caffemodel" in attr['resume']:
+
+            model_pkl = attr['resume']
+            if attr['resume']=='same_yaml':
+                model_pkl = "{}/{}_pspnet_airsim_best_model.pkl".format(logdir,model)
+
+            if os.path.isfile(model_pkl):
+                logger.info(
+                    "Loading model and optimizer from checkpoint '{}'".format(model_pkl)
+                )
+                checkpoint = torch.load(model_pkl)
+
+                ###
+                pretrained_dict = torch.load(model_pkl)['model_state']
+                model_dict = models[model].state_dict()
+
+                # 1. filter out unnecessary keys
+                pretrained_dict = {k: v.resize_(model_dict[k].shape) for k, v in pretrained_dict.items() if (k in model_dict)} # and ((model!="fuse") or (model=="fuse" and not start_layer in k))}
+
+                # 2. overwrite entries in the existing state dict
+                model_dict.update(pretrained_dict) 
+
+                # 3. load the new state dict
+                models[model].load_state_dict(pretrained_dict)
+
+                if attr['resume']=='same_yaml':
+                    # models[model].load_state_dict(checkpoint["model_state"])
+                    optimizers[model].load_state_dict(checkpoint["optimizer_state"])
+                    schedulers[model].load_state_dict(checkpoint["scheduler_state"])
+                    start_iter = checkpoint["epoch"]
+                else:
+                    start_iter = checkpoint["epoch"] #0
+
+                # start_iter = 0
+                logger.info("Loaded checkpoint '{}' (iter {})".format(model_pkl, checkpoint["epoch"]))
+            else:
+                logger.info("No checkpoint found at '{}'".format(model_pkl))        
+
+
+
+
 
     best_iou = -100.0
     i = start_iter
@@ -124,108 +201,257 @@ def train(cfg, writer, logger):
 
     while i <= cfg["training"]["train_iters"] and flag:
         for (images_list, labels_list, aux_list) in trainloader:
-            images = images_list[0]
-            labels = labels_list[0]
-            images = generate_noise(images,cfg["data"]["noisy_type"])
 
-            if cfg["model"]["communication"] == 'all':
-                images_list[0] = images
-                images = torch.cat(tuple(images_list), dim=1)
+            inputs, labels = parseEightCameras( images_list, labels_list, aux_list, device )
 
+            # Read batch from only one camera
+            bs = cfg['training']['batch_size']
+            images = inputs["rgb"][:bs,:,:,:]
+            labels = labels[:bs,:,:]
+
+
+            # images = images_list[0]
+            # labels = labels_list[0]
+            # images = generate_noise(images,cfg["data"]["noisy_type"])
+            #labels = generate_noise(labels,cfg["data"]["noisy_type"])
 
             i += 1
             start_ts = time.time()
-            scheduler.step()
-            model.train()
-            images = images.to(device)
-            labels = labels.to(device)
 
-            optimizer.zero_grad()
-            outputs = model(images)
+            m = "rgb"
+            [schedulers[m].step() for m in schedulers.keys()]
+            [models[m].train() for m in models.keys()]
+            [optimizers[m].zero_grad() for m in optimizers.keys()]
+
+            # images = images.to(device)
+            # labels = labels.to(device)
+
+            outputs = models[m](images)
 
             loss = loss_fn(input=outputs, target=labels)
 
             loss.backward()
-            optimizer.step()
+
+            [optimizers[m].step() for m in optimizers.keys()]
+
 
             time_meter.update(time.time() - start_ts)
-
-            # Process display on screen
-            if (i + 1) % cfg["training"]["print_interval"] == 0:
+            if (i + 1) % cfg['training']['print_interval'] == 0:
                 fmt_str = "Iter [{:d}/{:d}]  Loss: {:.4f}  Time/Image: {:.4f}"
-                print_str = fmt_str.format(
-                    i + 1,
-                    cfg["training"]["train_iters"],
-                    loss.item(),
-                    time_meter.avg / cfg["training"]["batch_size"],
-                )
+                print_str = fmt_str.format(i + 1,
+                                           cfg['training']['train_iters'], 
+                                           loss.item(),
+                                           time_meter.avg / cfg['training']['batch_size'])
 
                 print(print_str)
                 logger.info(print_str)
-                writer.add_scalar("loss/train_loss", loss.item(), i + 1)
+                writer.add_scalar('loss/train_loss', loss.item(), i+1)
+                # writer.add_scalar('loss/train_CE_loss', CE_loss.item(), i+1)
+                # writer.add_scalar('loss/train_REG_loss', REG_loss, i+1)
                 time_meter.reset()
 
-            # Validation 
+
+
+
+
+            ###  Validation 
             if (i + 1) % cfg["training"]["val_interval"] == 0 or (i + 1) == cfg["training"][
                 "train_iters"
             ]:
-                model.eval()
+
+
+                [models[m].eval() for m in models.keys()]
+
                 with torch.no_grad():
-                    for i_val, (images_val_list, labels_val_list, aux_val_list) in tqdm(enumerate(valloader)):
+                    for k,valloader in valloaders.items():
+                        for i_val, (images_list, labels_list, aux_list) in tqdm(enumerate(valloader)):
 
-                        images_val = images_val_list[0]
-                        labels_val = labels_val_list[0]
+                            inputs, labels = parseEightCameras( images_list, labels_list, aux_list, device )
 
-                        if cfg["model"]["communication"] == 'all':
-                            images_val = torch.cat(tuple(images_val_list), dim=1)
+                            # Read batch from only one camera
+                            bs = cfg['training']['batch_size']
+                            images_val = inputs["rgb"][:bs,:,:,:]
+                            labels_val = labels[:bs,:,:]
 
 
-                        images_val = images_val.to(device)
-                        labels_val = labels_val.to(device)
+                            # images_val = generate_noise(images_val,cfg["data"]["noisy_type"])
+                            # No need to predict 
 
-                        outputs = model(images_val)
-                        val_loss = loss_fn(input=outputs, target=labels_val)
 
-                        pred = outputs.data.max(1)[1].cpu().numpy()
-                        gt = labels_val.data.cpu().numpy()
+                            #tmp_img = np.transpose(images_val.numpy()[0],(1,2,0))
+                            # print((tmp_img).shape)
+                            #imsave('val'+cfg["data"]["noisy_type"]+cfg["model"]["communication"]+'1.png',tmp_img[:,:,0:3])
 
-                        running_metrics_val.update(gt, pred)
-                        val_loss_meter.update(val_loss.item())
 
-                writer.add_scalar("loss/val_loss", val_loss_meter.avg, i + 1)
-                logger.info("Iter %d Loss: %.4f" % (i + 1, val_loss_meter.avg))
+                            # images_val = images_val.to(device)
+                            # labels_val = labels_val.to(device)
 
-                score, class_iou = running_metrics_val.get_scores()
-                for k, v in score.items():
-                    print(k, v)
-                    logger.info("{}: {}".format(k, v))
-                    writer.add_scalar("val_metrics/{}".format(k), v, i + 1)
+                            m = "rgb"
+                            outputs = models[m](images_val)
+                            val_loss = loss_fn(input=outputs, target=labels_val)
 
-                for k, v in class_iou.items():
-                    logger.info("{}: {}".format(k, v))
-                    writer.add_scalar("val_metrics/cls_{}".format(k), v, i + 1)
 
-                val_loss_meter.reset()
-                running_metrics_val.reset()
 
-                if score["Mean IoU : \t"] >= best_iou:
-                    best_iou = score["Mean IoU : \t"]
-                    state = {
-                        "epoch": i + 1,
-                        "model_state": model.state_dict(),
-                        "optimizer_state": optimizer.state_dict(),
-                        "scheduler_state": scheduler.state_dict(),
-                        "best_iou": best_iou,
-                    }
-                    save_path = os.path.join(
-                        writer.file_writer.get_logdir(),
-                        "{}_{}_best_model.pkl".format(cfg["model"]["arch"], cfg["data"]["dataset"]),
-                    )
-                    torch.save(state, save_path)
+                            pred = outputs.data.max(1)[1].cpu().numpy()
+                            gt = labels_val.data.cpu().numpy()
+
+
+                            #imsave('pred'+cfg["data"]["noisy_type"]+cfg["model"]["communication"]+'.png',pred[0])
+                            #imsave('gt'+cfg["data"]["noisy_type"]+cfg["model"]["communication"]+'.png',gt[0])
+
+                            if i_val % cfg["training"]["png_frames"] == 0:
+                                plotPrediction(logdir,cfg,n_classes,i,i_val,k,inputs,pred,gt)
+
+                            running_metrics_val[k].update(gt, pred)
+
+                            val_loss_meter[k].update(val_loss.item())
+                            # val_CE_loss_meter[k].update(CE_loss.item())
+                            # val_REG_loss_meter[k].update(REG_loss)
+
+
+
+                    for k in valloaders.keys():
+                        writer.add_scalar('loss/val_loss/{}'.format(k), val_loss_meter[k].avg, i+1)
+                        # writer.add_scalar('loss/val_CE_loss/{}'.format(k), val_CE_loss_meter[k].avg, i+1)
+                        # writer.add_scalar('loss/val_REG_loss/{}'.format(k), val_REG_loss_meter[k].avg, i+1)
+                        logger.info("%s Iter %d Loss: %.4f" % (k, i + 1, val_loss_meter[k].avg))
+                
+                for env,valloader in valloaders.items():
+                    score, class_iou = running_metrics_val[env].get_scores()
+                    for k, v in score.items():
+                        print(k, v)
+                        logger.info('{}: {}'.format(k, v))
+                        writer.add_scalar('val_metrics/{}/{}'.format(env,k), v, i+1)
+
+                    for k, v in class_iou.items():
+                        logger.info('{}: {}'.format(k, v))
+                        writer.add_scalar('val_metrics/{}/cls_{}'.format(env,k), v, i+1)
+
+                    val_loss_meter[env].reset()
+                    running_metrics_val[env].reset()
+
+
+                for m in optimizers.keys():
+                    model = models[m]
+                    optimizer = optimizers[m]
+                    scheduler = schedulers[m]
+
+                    if score["Mean IoU : \t"] >= best_iou:
+                        best_iou = score["Mean IoU : \t"]
+                        state = {
+                            "epoch": i + 1,
+                            "model_state": model.state_dict(),
+                            "optimizer_state": optimizer.state_dict(),
+                            "scheduler_state": scheduler.state_dict(),
+                            "best_iou": best_iou,
+                        }
+                        save_path = os.path.join(writer.file_writer.get_logdir(),
+                                                 "{}_{}_{}_best_model.pkl".format(
+                                                     m,
+                                                     cfg['model']['arch'],
+                                                     cfg['data']['dataset']))
+                        torch.save(state, save_path)
+
+
 
             if (i + 1) == cfg["training"]["train_iters"]:
                 flag = False
                 break
+
+def parseEightCameras(images,labels,aux,device):
+
+    # Stack 8 Cameras into 1 for MCDO Dataset Testing
+    images = torch.cat(images,0)
+    labels = torch.cat(labels,0)
+    aux = torch.cat(aux,0)
+
+    images = images.to(device)
+    labels = labels.to(device)
+
+    if len(aux.shape)<len(images.shape):
+        aux = aux.unsqueeze(1).to(device)
+        depth = torch.cat((aux,aux,aux),1)
+    else:
+        aux = aux.to(device)
+        depth = torch.cat((aux[:,0,:,:].unsqueeze(1),
+                           aux[:,1,:,:].unsqueeze(1),
+                           aux[:,2,:,:].unsqueeze(1)),1)
+
+    fused = torch.cat((images,aux),1)
+
+    rgb = torch.cat((images[:,0,:,:].unsqueeze(1),
+                     images[:,1,:,:].unsqueeze(1),
+                     images[:,2,:,:].unsqueeze(1)),1)
+
+    inputs = {"rgb": rgb,
+              "d": depth,
+              "fused": fused}
+
+    return inputs, labels
+
+def plotPrediction(logdir,cfg,n_classes,i,i_val,k,inputs,pred,gt):
+
+    fig, axes = plt.subplots(3,4)
+    [axi.set_axis_off() for axi in axes.ravel()]
+
+    gt_norm = gt[0,:,:].copy()
+    pred_norm = pred[0,:,:].copy()
+
+    # Ensure each mask has same min and max value for matplotlib normalization
+    gt_norm[0,0] = 0
+    gt_norm[0,1] = n_classes
+    pred_norm[0,0] = 0
+    pred_norm[0,1] = n_classes
+
+    axes[0,0].imshow(inputs['rgb'][0,:,:,:].permute(1,2,0).cpu().numpy()[:,:,0])
+    axes[0,0].set_title("RGB")
+
+    axes[0,1].imshow(inputs['d'][0,:,:,:].permute(1,2,0).cpu().numpy())
+    axes[0,1].set_title("D")
+
+    axes[0,2].imshow(gt_norm)
+    axes[0,2].set_title("GT")
+
+    axes[0,3].imshow(pred_norm)
+    axes[0,3].set_title("Pred")
+
+    # axes[2,0].imshow(conf[0,:,:])
+    # axes[2,0].set_title("Conf")
+
+
+    # if len(cfg['models'])>1:
+    #     if cfg['models']['rgb']['learned_uncertainty'] == 'yes':            
+    #         channels = int(mean_outputs['rgb'].shape[1]/2)
+
+    #         axes[1,1].imshow(mean_outputs['rgb'][:,channels:,:,:].mean(1)[0,:,:].cpu().numpy())
+    #         axes[1,1].set_title("Aleatoric (RGB)")
+
+    #         axes[1,2].imshow(mean_outputs['d'][:,channels:,:,:].mean(1)[0,:,:].cpu().numpy())
+    #         # axes[1,2].imshow(mean_outputs['rgb'][:,:channels,:,:].mean(1)[0,:,:].cpu().numpy())
+    #         axes[1,2].set_title("Aleatoric (D)")
+
+    #     else:
+    #         channels = int(mean_outputs['rgb'].shape[1])
+
+    #     if cfg['models']['rgb']['mcdo_passes']>1:
+    #         axes[2,1].imshow(var_outputs['rgb'][:,:channels,:,:].mean(1)[0,:,:].cpu().numpy())
+    #         axes[2,1].set_title("Epistemic (RGB)")
+
+    #         axes[2,2].imshow(var_outputs['d'][:,:channels,:,:].mean(1)[0,:,:].cpu().numpy())
+    #         # axes[2,2].imshow(var_outputs['rgb'][:,channels:,:,:].mean(1)[0,:,:].cpu().numpy())
+    #         axes[2,2].set_title("Epistemic (D)")
+
+
+        
+
+
+    path = "{}/{}".format(logdir,k)
+    if not os.path.exists(path):
+        os.makedirs(path)
+    plt.savefig("{}/{}_{}.png".format(path,i_val,i))
+    plt.close(fig)    
+
+
 
 
 if __name__ == "__main__":
@@ -235,7 +461,7 @@ if __name__ == "__main__":
         "--config",
         nargs="?",
         type=str,
-        default="configs/fcn8s_airsim.yml",
+        default="configs/segnet_airsim_normal.yml",
         help="Configuration file to use",
     )
 
@@ -245,7 +471,7 @@ if __name__ == "__main__":
         cfg = yaml.load(fp)
         # cfg is a  with two-level dictionary ['training','data','model']['batch_size']
 
-    run_id = random.randint(1, 100000)
+    run_id = cfg["id"]
     logdir = os.path.join("runs", os.path.basename(args.config)[:-4], str(run_id))
     writer = SummaryWriter(log_dir=logdir)
 
@@ -255,4 +481,5 @@ if __name__ == "__main__":
     logger = get_logger(logdir)
     logger.info("Let the games begin")
 
-    train(cfg, writer, logger)
+    # baseline train (concatenation, warping baselines)
+    train(cfg, writer, logger, logdir)

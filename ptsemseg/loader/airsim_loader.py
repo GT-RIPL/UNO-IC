@@ -570,7 +570,7 @@ class airsimLoader(data.Dataset):
                 vis_txt_height-=30
 
         plt.savefig('region.png', dpi=200)
-        plt.close()
+        # plt.close()
 
         ## Visualization with respect to train/val/test
         fig, ax = plt.subplots(figsize=(30, 15))
@@ -608,7 +608,7 @@ class airsimLoader(data.Dataset):
 
                     #ax.annotate(txt, (x, y))
         plt.savefig('train_val_test.png', dpi=200)
-        plt.close()
+        # plt.close()
 
         return dataset_div
 

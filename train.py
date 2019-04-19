@@ -216,6 +216,8 @@ def train(cfg, writer, logger, logdir):
             images = inputs["rgb"][:bs,:,:,:]
             labels = labels[:bs,:,:]
 
+            if labels.shape[0]<=1:
+                continue
 
             # images = images_list[0]
             # labels = labels_list[0]
@@ -360,6 +362,9 @@ def train(cfg, writer, logger, logdir):
                             bs = cfg['training']['batch_size']
                             images_val = inputs[m][:bs,:,:,:]
                             labels_val = labels[:bs,:,:]
+
+                            if labels_val.shape[0]<=1:
+                                continue
 
                             output_bp, mean, variance = models[m](images_val)
                             outputs = output_bp

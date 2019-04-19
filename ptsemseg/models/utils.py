@@ -278,7 +278,7 @@ class unetUp(nn.Module):
 
 class segnetDown2MCDO(nn.Module):
     def __init__(self, in_size, out_size, pMCDO=0.1):
-        super(segnetDown2, self).__init__()
+        super(segnetDown2MCDO, self).__init__()
         self.conv1 = conv2DBatchNormRelu(in_size, out_size, 3, 1, 1)
         self.conv2 = conv2DBatchNormRelu(out_size, out_size, 3, 1, 1)
         self.dropout = nn.Dropout(p=pMCDO)
@@ -306,7 +306,7 @@ class segnetDown2MCDO(nn.Module):
 
 class segnetDown3MCDO(nn.Module):
     def __init__(self, in_size, out_size, pMCDO=0.1):
-        super(segnetDown3, self).__init__()
+        super(segnetDown3MCDO, self).__init__()
         self.conv1 = conv2DBatchNormRelu(in_size, out_size, 3, 1, 1)
         self.conv2 = conv2DBatchNormRelu(out_size, out_size, 3, 1, 1)
         self.conv3 = conv2DBatchNormRelu(out_size, out_size, 3, 1, 1)
@@ -337,7 +337,7 @@ class segnetDown3MCDO(nn.Module):
 
 class segnetUp2MCDO(nn.Module):
     def __init__(self, in_size, out_size, pMCDO=0.1):
-        super(segnetUp2, self).__init__()
+        super(segnetUp2MCDO, self).__init__()
         self.unpool = nn.MaxUnpool2d(2, 2)
         self.conv1 = conv2DBatchNormRelu(in_size, in_size, 3, 1, 1)
         self.conv2 = conv2DBatchNormRelu(in_size, out_size, 3, 1, 1)
@@ -363,7 +363,7 @@ class segnetUp2MCDO(nn.Module):
 
 class segnetUp3MCDO(nn.Module):
     def __init__(self, in_size, out_size, pMCDO=0.1):
-        super(segnetUp3, self).__init__()
+        super(segnetUp3MCDO, self).__init__()
         self.unpool = nn.MaxUnpool2d(2, 2)
         self.conv1 = conv2DBatchNormRelu(in_size, in_size, 3, 1, 1)
         self.conv2 = conv2DBatchNormRelu(in_size, in_size, 3, 1, 1)
@@ -392,7 +392,7 @@ class segnetUp3MCDO(nn.Module):
 
 class segnetDown2MCDO(nn.Module):
     def __init__(self, in_size, out_size, pMCDO=0.1):
-        super(segnetDown2, self).__init__()
+        super(segnetDown2MCDO, self).__init__()
         self.conv1 = conv2DBatchNormRelu(in_size, out_size, 3, 1, 1)
         self.conv2 = conv2DBatchNormRelu(out_size, out_size, 3, 1, 1)
         self.maxpool_with_argmax = nn.MaxPool2d(2, 2, return_indices=True)
@@ -420,7 +420,7 @@ class segnetDown2MCDO(nn.Module):
 
 class segnetDown3MCDO(nn.Module):
     def __init__(self, in_size, out_size, pMCDO=0.1):
-        super(segnetDown3, self).__init__()
+        super(segnetDown3MCDO, self).__init__()
         self.conv1 = conv2DBatchNormRelu(in_size, out_size, 3, 1, 1)
         self.conv2 = conv2DBatchNormRelu(out_size, out_size, 3, 1, 1)
         self.conv3 = conv2DBatchNormRelu(out_size, out_size, 3, 1, 1)
@@ -443,7 +443,7 @@ class segnetDown3MCDO(nn.Module):
         outputs = self.dropout(outputs)
         outputs = self.conv3(outputs)
         outputs = self.dropout(outputs)
-        
+
         unpooled_shape = outputs.size()
         outputs, indices = self.maxpool_with_argmax(outputs)
         return outputs, indices, unpooled_shape

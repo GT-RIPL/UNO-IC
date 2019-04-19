@@ -12,6 +12,7 @@ from tqdm import tqdm
 import cv2
 
 # from ptsemseg.process_img import generate_noise
+from ptsemseg.models.recalibrator import *
 from ptsemseg.models import get_model
 from ptsemseg.loss import get_loss_function
 from ptsemseg.loader import get_loader
@@ -106,9 +107,9 @@ def train(cfg, writer, logger, logdir):
     val_CE_loss_meter = {env:averageMeter() for env in valloaders.keys()}
     val_REG_loss_meter = {env:averageMeter() for env in valloaders.keys()}
     time_meter = averageMeter()
-    
 
-
+    # Load Recalibration Model
+    calibration = {m:{'model':Recalibrator(device),'fit':False} for m in cfg["models"].keys()}
 
 
 
@@ -200,9 +201,15 @@ def train(cfg, writer, logger, logdir):
     flag = True
 
     while i <= cfg["training"]["train_iters"] and flag:
+
+        #################################################################################
+        # Training
+        #################################################################################
         for (images_list, labels_list, aux_list) in trainloader:
 
             inputs, labels = parseEightCameras( images_list, labels_list, aux_list, device )
+
+            m = list(cfg["models"].keys())[0]
 
             # Read batch from only one camera
             bs = cfg['training']['batch_size']
@@ -217,16 +224,16 @@ def train(cfg, writer, logger, logdir):
 
             i += 1
             start_ts = time.time()
-
-            m = "rgb"
+            
             [schedulers[m].step() for m in schedulers.keys()]
             [models[m].train() for m in models.keys()]
             [optimizers[m].zero_grad() for m in optimizers.keys()]
 
-            # images = images.to(device)
-            # labels = labels.to(device)
+            m = list(cfg["models"].keys())[0]
+            output_bp, mean, variance = models[m](images)
+            outputs = output_bp
 
-            outputs = models[m](images)
+            # outputs = models[m](images)
 
             loss = loss_fn(input=outputs, target=labels)
 
@@ -249,45 +256,114 @@ def train(cfg, writer, logger, logdir):
                 # writer.add_scalar('loss/train_CE_loss', CE_loss.item(), i+1)
                 # writer.add_scalar('loss/train_REG_loss', REG_loss, i+1)
                 time_meter.reset()
-
+            #################################################################################
 
 
 
 
             ###  Validation 
-            if (i + 1) % cfg["training"]["val_interval"] == 0 or (i + 1) == cfg["training"][
-                "train_iters"
-            ]:
+            if (i + 1) % cfg["training"]["val_interval"] == 0 or \
+               (i + 1) == cfg["training"]["train_iters"]:
 
 
                 [models[m].eval() for m in models.keys()]
 
+                # #################################################################################
+                # # Recalibration
+                # #################################################################################
+                # steps = 10
+
+                # ranges = list(zip([1.*a/steps for a in range(steps+2)][:-2],
+                #                   [1.*a/steps for a in range(steps+2)][1:]))
+                                  
+                # val = ['sumval_pred_in_range',
+                #        'num_obs_in_range',
+                #        'num_in_range',
+                #        'sumval_pred_below_range',
+                #        'num_obs_below_range',
+                #        'num_below_range',
+                #        'num_correct']   
+
+                # per_class_match_var = {m:{r:{c:{v:0 for v in val} for c in range(n_classes)} for r in ranges} for m in cfg['models'].keys()}
+                # overall_match_var = {m:{r:{v:0 for v in val} for r in ranges} for m in cfg['models'].keys()}
+
+                # with torch.no_grad():
+                #     for i_recal, (images_list, labels_list, aux_list) in tqdm(enumerate(recalloader)):
+                    
+                #         inputs, labels = parseEightCameras( images_list, labels_list, aux_list, device )
+
+                #         m = "rgb"
+
+                #         # Read batch from only one camera
+                #         bs = cfg['training']['batch_size']
+                #         images_recal = inputs[m][:bs,:,:,:]
+                #         labels_recal = labels[:bs,:,:]
+
+                #         output_bp, mean, variance = models[m](images_recal)
+                #         outputs = output_bp                
+
+                #         overall_match_var = accumulateEmpirical(overall_match_var,ranges,labels_recal,mean,variance)
+
+                # calibration, overall_match_var = fitCalibration(calibration,overall_match_var,ranges,device)
+
+                # showCalibration(calibration,overall_match_var,ranges,logdir,cfg,n_classes,i,i_recal,device)
+
+
+                # with torch.no_grad():
+                #     for i_recal, (images_list, labels_list, aux_list) in tqdm(enumerate(recalloader)):
+                    
+                #         inputs, labels = parseEightCameras( images_list, labels_list, aux_list, device )
+
+                #         m = "rgb"
+
+                #         # Read batch from only one camera
+                #         bs = cfg['training']['batch_size']
+                #         images_recal = inputs[m][:bs,:,:,:]
+                #         labels_recal = labels[:bs,:,:]
+
+                #         output_bp, mean, variance = models[m](images_recal)
+                #         outputs = output_bp                
+
+                #         pred = outputs.data.max(1)[1].cpu().numpy()
+                #         gt = labels_recal.data.cpu().numpy()
+
+                #         plotMeansVariances(logdir,cfg,n_classes,i,i_recal,"pre_recal",inputs,pred,gt,mean,variance)
+
+                #         variance_recal = calibration[m]['model'].predict(variance.reshape(-1)).reshape(variance.shape)
+
+                #         plotMeansVariances(logdir,cfg,n_classes,i,i_recal,"post_recal",inputs,pred,gt,mean,variance_recal)
+
+
+
+                #         exit()
+
+
+
+
+                # print(overall_match_var)
+                # exit()
+                # #################################################################################
+
+
+                #################################################################################
+                # Validation
+                #################################################################################
                 with torch.no_grad():
                     for k,valloader in valloaders.items():
                         for i_val, (images_list, labels_list, aux_list) in tqdm(enumerate(valloader)):
 
                             inputs, labels = parseEightCameras( images_list, labels_list, aux_list, device )
 
+                            m = list(cfg["models"].keys())[0]
+
                             # Read batch from only one camera
                             bs = cfg['training']['batch_size']
-                            images_val = inputs["rgb"][:bs,:,:,:]
+                            images_val = inputs[m][:bs,:,:,:]
                             labels_val = labels[:bs,:,:]
 
+                            output_bp, mean, variance = models[m](images_val)
+                            outputs = output_bp
 
-                            # images_val = generate_noise(images_val,cfg["data"]["noisy_type"])
-                            # No need to predict 
-
-
-                            #tmp_img = np.transpose(images_val.numpy()[0],(1,2,0))
-                            # print((tmp_img).shape)
-                            #imsave('val'+cfg["data"]["noisy_type"]+cfg["model"]["communication"]+'1.png',tmp_img[:,:,0:3])
-
-
-                            # images_val = images_val.to(device)
-                            # labels_val = labels_val.to(device)
-
-                            m = "rgb"
-                            outputs = models[m](images_val)
                             val_loss = loss_fn(input=outputs, target=labels_val)
 
 
@@ -301,6 +377,7 @@ def train(cfg, writer, logger, logdir):
 
                             if i_val % cfg["training"]["png_frames"] == 0:
                                 plotPrediction(logdir,cfg,n_classes,i,i_val,k,inputs,pred,gt)
+                                plotMeansVariances(logdir,cfg,n_classes,i,i_val,k,inputs,pred,gt,mean,variance)
 
                             running_metrics_val[k].update(gt, pred)
 
@@ -351,7 +428,7 @@ def train(cfg, writer, logger, logdir):
                                                      cfg['model']['arch'],
                                                      cfg['data']['dataset']))
                         torch.save(state, save_path)
-
+                #################################################################################
 
 
             if (i + 1) == cfg["training"]["train_iters"]:
@@ -446,6 +523,23 @@ def plotPrediction(logdir,cfg,n_classes,i,i_val,k,inputs,pred,gt):
 
 
     path = "{}/{}".format(logdir,k)
+    if not os.path.exists(path):
+        os.makedirs(path)
+    plt.savefig("{}/{}_{}.png".format(path,i_val,i))
+    plt.close(fig)    
+
+def plotMeansVariances(logdir,cfg,n_classes,i,i_val,k,inputs,pred,gt,mean,variance):
+    fig, axes = plt.subplots(4,n_classes//2+1)
+    [axi.set_axis_off() for axi in axes.ravel()]
+
+    for c in range(n_classes):
+        axes[2*(c%2),c//2].imshow(mean[0,c,:,:].cpu().numpy())
+        axes[2*(c%2),c//2].set_title(str(c)+" Mean")
+
+        axes[2*(c%2)+1,c//2].imshow(variance[0,c,:,:].cpu().numpy())
+        axes[2*(c%2)+1,c//2].set_title(str(c)+" Var")
+
+    path = "{}/{}/{}".format(logdir,"meanvar",k)
     if not os.path.exists(path):
         os.makedirs(path)
     plt.savefig("{}/{}_{}.png".format(path,i_val,i))

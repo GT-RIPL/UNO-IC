@@ -10,9 +10,9 @@ import yaml
 import os
 
 include = [
-           'run1',
+           # 'run1',
            # 'run2',
-           # 'run3',
+           'run3',
            # 'run4',
            # 'run5',
            # 'run6',
@@ -34,10 +34,33 @@ run_comments = {
             "rgb_dropout_between_layers_0.3",
             "rgb_dropout_between_layers_0.5",
             "rgb_dropout_between_layers_0.9",
+            # "rgb_baseline_0.1dropout_extensiveDropout",
+            # "d_baseline_0.5dropout_extensiveDropout",
+            # "rgb_baseline_0.1dropout_extensiveDropout",
+            # "d_baseline_0.5dropout_extensiveDropout",            
         ],
         "text":
             """testing for best dropout performance (0.1,0.3,0.5,0.9); dropout after each layer; batch size 2""",
     },
+    "run3": {
+        "names": [
+            "rgb_baseline_0.1dropout_extensiveDropout_MCDO_fusion",
+            "rgb_baseline_0.1dropout_extensiveDropout_MCDO_fusion_evenWeights",
+            "rgb_baseline_0.5dropout_extensiveDropout_MCDO_fusion_evenWeights",
+            "rgb_BayesianSegnet_0.0dropout_cumulativeRecalibration_test",
+            "rgb_BayesianSegnet_0.0dropout_recalibration_test",
+            "rgb_BayesianSegnet_0.1dropout_test",
+            "rgb_BayesianSegnet_0.5dropout_test",
+            "rgbd_baseline_0.1dropout_extensiveDropout",
+        ],
+        "text":
+            """testing fusion based on uncertainty""",
+    },
+
+
+
+
+
 }
 
 
@@ -113,13 +136,17 @@ for k,v in runs.items():
     v['std_config']['comments'] = [vv["text"] for kk,vv in run_comments.items() if v['raw_config']['file_only'] in vv["names"]][0]
     v['std_config']['run_group'] = [kk for kk,vv in run_comments.items() if v['raw_config']['file_only'] in vv["names"]][0]
 
-    # if c['start_layers'] is None or len(list(c['models']))==1:
-    if len(list(c['models']))==1:
-        model = list(c['models'].keys())[0]
-        v['std_config']['block'] = model
-    else:
-        model = "rgb"
-        v['std_config']['block'] = "-".join(c['start_layers'])
+    print(c)
+
+    # # if c['start_layers'] is None or len(list(c['models']))==1:
+    # if len(list(c['models']))==1:
+    #     model = list(c['models'].keys())[0]
+    #     v['std_config']['block'] = model
+    # else:
+    #     model = "rgb"
+    #     v['std_config']['block'] = "-".join(c['start_layers'])
+
+    model = list(c['models'].keys())[0]
 
 
     v['std_config']['reduction'] = c['models'][model]['reduction']    
@@ -238,8 +265,8 @@ df = df[data_fields]
 df['unique_id'] = (df.groupby(id_fields).cumcount()) 
 
 # full string identifier
+ # df['block']+", "+\
 df['full'] = df['size']+", "+\
-             df['block']+", "+\
              df['mcdo_passes'].map(str)+" mcdo_passes, "+\
              df['fuse_mech'].map(str)+" fuse_mech, "+\
              df['pretrained'].map(str)+" pretrained, "+\

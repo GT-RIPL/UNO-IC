@@ -113,6 +113,7 @@ def train(cfg, writer, logger, logdir):
 
     # Load Recalibration Model
     calibration = {m:{'model':Recalibrator(device),'fit':False} for m in cfg["models"].keys()}
+    calibrationPerClass = {m:{n:{'model':Recalibrator(device),'fit':False} for n in range(n_classes)} for m in cfg["models"].keys()}
 
 
 
@@ -286,90 +287,101 @@ def train(cfg, writer, logger, logdir):
                 #################################################################################
                 # Recalibration
                 #################################################################################
-                steps = 10
+                # steps = 50
 
-                ranges = list(zip([1.*a/steps for a in range(steps+2)][:-2],
-                                  [1.*a/steps for a in range(steps+2)][1:]))
+                # ranges = list(zip([1.*a/steps for a in range(steps+2)][:-2],
+                #                   [1.*a/steps for a in range(steps+2)][1:]))
                                   
-                val = ['sumval_pred_in_range',
-                       'num_obs_in_range',
-                       'num_in_range',
-                       'sumval_pred_below_range',
-                       'num_obs_below_range',
-                       'num_below_range',
-                       'num_correct']   
+                # val = ['sumval_pred_in_range',
+                #        'num_obs_in_range',
+                #        'num_in_range',
+                #        'sumval_pred_below_range',
+                #        'num_obs_below_range',
+                #        'num_below_range',
+                #        'num_correct']   
 
-                per_class_match_var = {m:{r:{c:{v:0 for v in val} for c in range(n_classes)} for r in ranges} for m in cfg['models'].keys()}
-                overall_match_var = {m:{r:{v:0 for v in val} for r in ranges} for m in cfg['models'].keys()}
+                # overall_match_var = {m:{r:{v:0 for v in val} for r in ranges} for m in cfg['models'].keys()}
+                # per_class_match_var = {m:{r:{c:{v:0 for v in val} for c in range(n_classes)} for r in ranges} for m in cfg['models'].keys()}
 
-                with torch.no_grad():
-                    for i_recal, (images_list, labels_list, aux_list) in tqdm(enumerate(recalloader)):
+                # with torch.no_grad():
+                #     for i_recal, (images_list, labels_list, aux_list) in tqdm(enumerate(recalloader)):
                     
-                        inputs, labels = parseEightCameras( images_list, labels_list, aux_list, device )
+                #         inputs, labels = parseEightCameras( images_list, labels_list, aux_list, device )
 
-                        # Read batch from only one camera
-                        bs = cfg['training']['batch_size']
-                        images_recal = {m:inputs[m][:bs,:,:,:] for m in cfg["models"].keys()}
-                        labels_recal = labels[:bs,:,:]
+                #         # Read batch from only one camera
+                #         bs = cfg['training']['batch_size']
+                #         images_recal = {m:inputs[m][:bs,:,:,:] for m in cfg["models"].keys()}
+                #         labels_recal = labels[:bs,:,:]
 
-                        # Run Models
-                        output_bp = {}; mean = {}; variance = {}; outputs_recal = {}; 
-                        for m in cfg["models"].keys():
-                            # m = list(cfg["models"].keys())[0]
-                            output_bp[m], mean[m], variance[m] = models[m](images_recal[m])
-                            outputs_recal[m] = output_bp[m]
+                #         # Run Models
+                #         output_bp = {}; mean = {}; variance = {}; outputs_recal = {}; 
+                #         for m in cfg["models"].keys():
+                #             # m = list(cfg["models"].keys())[0]
+                #             output_bp[m], mean[m], variance[m] = models[m](images_recal[m])
+                #             outputs_recal[m] = output_bp[m]
 
-                            overall_match_var = accumulateEmpirical(overall_match_var,ranges,m,labels_recal,mean,variance)
+                #             overall_match_var,per_class_match_var = accumulateEmpirical(overall_match_var,per_class_match_var,ranges,n_classes,m,labels_recal,mean,variance)
 
-                for m in cfg["models"].keys():
+                # for m in cfg["models"].keys():
 
-                    calibration, overall_match_var = fitCalibration(calibration,overall_match_var,ranges,m,device)
+                #     calibration, calibrationPerClass, overall_match_var, per_class_match_var = fitCalibration(calibration,calibrationPerClass,overall_match_var,per_class_match_var,ranges,n_classes,m,device)
 
 
-                    for k,v in overall_match_var[m].items():
-                        print(k,v["num_in_range"],v["pred"],v["obs"])
+                #     for k,v in overall_match_var[m].items():
+                #         print(k,v["num_in_range"],v["pred"],v["obs"])
 
-                    showCalibration(calibration,overall_match_var,ranges,m,logdir,cfg,n_classes,i,i_recal,device)
+                #         for c in range(n_classes):
+                #             print("   ",c,per_class_match_var[m][k][c]["num_in_range"],
+                #                           per_class_match_var[m][k][c]["pred"],
+                #                           per_class_match_var[m][k][c]["obs"])
 
-                exit()
+                #     showCalibration(calibration,calibrationPerClass,overall_match_var,per_class_match_var,ranges,m,logdir,cfg,n_classes,i,i_recal,device)
 
-                with torch.no_grad():
-                    for i_recal, (images_list, labels_list, aux_list) in tqdm(enumerate(recalloader)):
+                #     # predictCalibration(calibration,calibrationPerClass,overall_match_var,per_class_match_var):
+
+                # with torch.no_grad():
+                #     for i_recal, (images_list, labels_list, aux_list) in tqdm(enumerate(recalloader)):
                     
-                        inputs, labels = parseEightCameras( images_list, labels_list, aux_list, device )
+                #         inputs, labels = parseEightCameras( images_list, labels_list, aux_list, device )
 
-                        # Read batch from only one camera
-                        bs = cfg['training']['batch_size']
-                        images_recal = {m:inputs[m][:bs,:,:,:] for m in cfg["models"].keys()}
-                        labels_recal = labels[:bs,:,:]
+                #         # Read batch from only one camera
+                #         bs = cfg['training']['batch_size']
+                #         images_recal = {m:inputs[m][:bs,:,:,:] for m in cfg["models"].keys()}
+                #         labels_recal = labels[:bs,:,:]
 
-                        # Run Models
-                        output_bp = {}; mean = {}; variance = {}; outputs_recal = {}; 
-                        for m in cfg["models"].keys():
-                            # m = list(cfg["models"].keys())[0]
-                            output_bp[m], mean[m], variance[m] = models[m](images_recal[m])
-                            outputs_recal[m] = output_bp[m]
+                #         # Run Models
+                #         output_bp = {}; mean = {}; variance = {}; outputs_recal = {}; 
+                #         for m in cfg["models"].keys():
+                #             # m = list(cfg["models"].keys())[0]
+                #             output_bp[m], mean[m], variance[m] = models[m](images_recal[m])
+                #             outputs_recal[m] = output_bp[m]
 
-                            outputs = outputs_recal[m]
+                #             outputs = outputs_recal[m]
 
-                            pred = outputs.data.max(1)[1].cpu().numpy()
-                            gt = labels_recal.data.cpu().numpy()
+                #             pred = outputs.data.max(1)[1].cpu().numpy()
+                #             gt = labels_recal.data.cpu().numpy()
 
-                            plotMeansVariances(logdir,cfg,n_classes,i,i_recal,m,"pre_recal",inputs,pred,gt,mean[m],variance[m])
+                #             softmax_mu = {}
+                #             softmax_mu[m] = torch.nn.Softmax(1)(mean[m])
+                #             plotMeansVariances(logdir,cfg,n_classes,i,i_recal,m,"pre_recal",inputs,pred,gt,mean,softmax_mu)
 
-                            variance_recal = calibration[m]['model'].predict(variance[m].reshape(-1)).reshape(variance[m].shape)
+                #             softmax_mu_recal = softmax_mu
+                #             for c in range(n_classes):
+                #                 softmax_mu_recal[m][:,c,:,:] = calibrationPerClass[m][c]['model'].predict(softmax_mu[m][:,c,:,:].reshape(-1)).reshape(softmax_mu[m][:,c,:,:].shape)
 
-                            plotMeansVariances(logdir,cfg,n_classes,i,i_recal,m,"post_recal",inputs,pred,gt,mean[m],variance_recal)
+                #             plotMeansVariances(logdir,cfg,n_classes,i,i_recal,m,"post_recal",inputs,pred,gt,mean,softmax_mu_recal)
+
+                #             pred = softmax_mu_recal[m].data.max(1)[1].cpu().numpy()
+                #             plotPrediction(logdir,cfg,n_classes,i,i_val,"afterRecal",inputs,pred,gt)
+
+
+                #         exit()
 
 
 
-                        exit()
 
-
-
-
-                print(overall_match_var)
-                exit()
+                # print(overall_match_var)
+                # exit()
                 #################################################################################
 
 

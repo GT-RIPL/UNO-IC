@@ -1,4 +1,4 @@
-id: rgb_BayesianSegnet_0.0dropout_recalibration_test
+id: rgb_BayesianSegnet_0.0dropout_cumulativeRecalibration_test
 model:
     arch: segnet_mcdo
 models:

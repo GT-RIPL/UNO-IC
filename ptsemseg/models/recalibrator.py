@@ -54,7 +54,7 @@ class Recalibrator():
 
         return self.W[i]*x + self.b[i]
 
-def accumulateEmpirical(overall_match_var,ranges,m,label,mean,variance):
+def accumulateEmpirical(overall_match_var,per_class_match_var,ranges,n_classes,m,label,mean,variance):
 
     softmax_mu = torch.nn.Softmax(1)(mean[m])
     variance = softmax_mu
@@ -75,16 +75,17 @@ def accumulateEmpirical(overall_match_var,ranges,m,label,mean,variance):
 
 
     # Define Ground Truth, Prediction, and Associated Prediction Probability
-    # pred = max_mu_i
+    pred = max_mu_i
     gt = label
     pred_var = max_sigma #softmax_mu
     
 
-    for c in range(mean[m].shape[1]):
+    # for c in range(mean[m].shape[1]):
+    if True:
         for r in ranges:
 
-            pred = c
-            pred_var = softmax_mu[:,c,:,:]
+            # pred = c
+            # pred_var = softmax_mu[:,c,:,:]
 
             # for each probability range
             # (1) tally correct labels (classes) for empirical confidence 
@@ -118,40 +119,44 @@ def accumulateEmpirical(overall_match_var,ranges,m,label,mean,variance):
             overall_match_var[m][r]['num_correct'] += num_correct.cpu().numpy()
 
 
-            # for c in range(n_classes):
-            #     # for each class, record number of correct labels for each confidence bin
-            #     # for each class, record average confidence for each confidence bin 
+            for c in range(n_classes):
+                # for each class, record number of correct labels for each confidence bin
+                # for each class, record average confidence for each confidence bin 
 
-            #     low,high = r
-            #     idx_pred_gt_match = (pred==gt)&(pred==c) # everywhere correctly labeled to correct class
-            #     idx_pred_var_in_range = (low<=full[:,c,:,:])&(full[:,c,:,:]<high) # everywhere with specified confidence level
-            #     idx_pred_var_below_range = (full[:,c,:,:]<high) # everywhere with specified confidence level
+                pred = c
+                pred_var = softmax_mu[:,c,:,:]
+                full = softmax_mu
 
-            #     sumval_pred_var_in_range = np.sum(pred_var[idx_pred_var_in_range][:])
-            #     sumval_pred_var_below_range = np.sum(pred_var[idx_pred_var_below_range][:])
+                low,high = r
+                idx_pred_gt_match = (pred==gt) #&(pred==c) # everywhere correctly labeled to correct class
+                idx_pred_var_in_range = (low<=full[:,c,:,:])&(full[:,c,:,:]<high) # everywhere with specified confidence level
+                idx_pred_var_below_range = (full[:,c,:,:]<high) # everywhere with specified confidence level
 
-            #     num_obs_var_in_range = np.sum((idx_pred_gt_match&idx_pred_var_in_range)[:])
-            #     num_obs_var_below_range = np.sum((idx_pred_gt_match&idx_pred_var_below_range)[:])
+                sumval_pred_var_in_range = torch.sum(pred_var[idx_pred_var_in_range])
+                sumval_pred_var_below_range = torch.sum(pred_var[idx_pred_var_below_range])
 
-            #     num_in_range = np.sum(idx_pred_var_in_range[:])
-            #     num_below_range = np.sum(idx_pred_var_below_range[:])
-            #     num_correct = np.sum(idx_pred_gt_match[:]) 
+                num_obs_var_in_range = torch.sum((idx_pred_gt_match&idx_pred_var_in_range))
+                num_obs_var_below_range = torch.sum((idx_pred_gt_match&idx_pred_var_below_range))
 
-            #     per_class_match_var[m][r][c]['sumval_pred_in_range'] += sumval_pred_var_below_range
-            #     per_class_match_var[m][r][c]['num_obs_in_range'] += num_obs_var_in_range
-            #     per_class_match_var[m][r][c]['num_in_range'] += num_in_range
+                num_in_range = torch.sum(idx_pred_var_in_range)
+                num_below_range = torch.sum(idx_pred_var_below_range)
+                num_correct = torch.sum(idx_pred_gt_match) 
 
-            #     per_class_match_var[m][r][c]['sumval_pred_below_range'] += sumval_pred_var_below_range
-            #     per_class_match_var[m][r][c]['num_obs_below_range'] += num_obs_var_below_range
-            #     per_class_match_var[m][r][c]['num_below_range'] += num_below_range
+                per_class_match_var[m][r][c]['sumval_pred_in_range'] += sumval_pred_var_in_range.cpu().numpy()
+                per_class_match_var[m][r][c]['num_obs_in_range'] += num_obs_var_in_range.cpu().numpy()
+                per_class_match_var[m][r][c]['num_in_range'] += num_in_range.cpu().numpy()
 
-            #     per_class_match_var[m][r][c]['num_correct'] += num_correct
+                per_class_match_var[m][r][c]['sumval_pred_below_range'] += sumval_pred_var_below_range.cpu().numpy()
+                per_class_match_var[m][r][c]['num_obs_below_range'] += num_obs_var_below_range.cpu().numpy()
+                per_class_match_var[m][r][c]['num_below_range'] += num_below_range.cpu().numpy()
+
+                per_class_match_var[m][r][c]['num_correct'] += num_correct.cpu().numpy()
 
 
 
-    return overall_match_var
+    return overall_match_var, per_class_match_var
 
-def fitCalibration(calibration,overall_match_var,ranges,m,device):
+def fitCalibration(calibration,calibrationPerClass,overall_match_var,per_class_match_var,ranges,n_classes,m,device):
 
     for r in ranges:
         low,high = r
@@ -178,28 +183,33 @@ def fitCalibration(calibration,overall_match_var,ranges,m,device):
 
         if overall_match_var[m][r]['num_in_range']==0:
             overall_match_var[m][r]['pred'] = (low+high)/2.0
+        overall_match_var[m][r]['pred_below'] = (low+high)/2.0
 
-        # for c in range(n_classes):
-        #     # den = per_class_match_var[m][r][c]['num_correct']
-        #     # den = den if den>0 else 1
-        #     # per_class_match_var[m][r][c]['pred'] = 1.*per_class_match_var[m][r][c]['sumval_pred_in_range']/den #per_class_match_var[m][r][c]['num_in_range']
-        #     # per_class_match_var[m][r][c]['obs'] = 1.*per_class_match_var[m][r][c]['num_obs_in_range']/den #per_class_match_var[m][r][c]['num_in_range']           
+        for c in range(n_classes):
+            # den = per_class_match_var[m][r][c]['num_correct']
+            # den = den if den>0 else 1
+            # per_class_match_var[m][r][c]['pred'] = 1.*per_class_match_var[m][r][c]['sumval_pred_in_range']/den #per_class_match_var[m][r][c]['num_in_range']
+            # per_class_match_var[m][r][c]['obs'] = 1.*per_class_match_var[m][r][c]['num_obs_in_range']/den #per_class_match_var[m][r][c]['num_in_range']           
 
-        #     den = per_class_match_var[m][r][c]['num_in_range']
-        #     den = den if den>0 else 1
-        #     per_class_match_var[m][r][c]['pred'] = 1.*per_class_match_var[m][r][c]['sumval_pred_in_range']/den #per_class_match_var[m][r][c]['num_in_range']
-        #     per_class_match_var[m][r][c]['obs'] = 1.*per_class_match_var[m][r][c]['num_obs_in_range']/den #per_class_match_var[m][r][c]['num_in_range']
+            den = per_class_match_var[m][r][c]['num_in_range']
+            den = den if den>0 else 1
+            per_class_match_var[m][r][c]['pred'] = 1.*per_class_match_var[m][r][c]['sumval_pred_in_range']/den #per_class_match_var[m][r][c]['num_in_range']
+            per_class_match_var[m][r][c]['obs'] = 1.*per_class_match_var[m][r][c]['num_obs_in_range']/den #per_class_match_var[m][r][c]['num_in_range']
 
-        #     # den = per_class_match_var[m][r][c]['num_correct']
-        #     # den = den if den>0 else 1
-        #     # per_class_match_var[m][r][c]['pred_below'] = high
-        #     # per_class_match_var[m][r][c]['obs_below'] = 1.*per_class_match_var[m][r][c]['num_obs_below_range']/den #per_class_match_var[m][r][c]['num_in_range']           
+            # den = per_class_match_var[m][r][c]['num_correct']
+            # den = den if den>0 else 1
+            # per_class_match_var[m][r][c]['pred_below'] = high
+            # per_class_match_var[m][r][c]['obs_below'] = 1.*per_class_match_var[m][r][c]['num_obs_below_range']/den #per_class_match_var[m][r][c]['num_in_range']           
 
-        #     den = per_class_match_var[m][r][c]['num_below_range']
-        #     den = den if den>0 else 1
-        #     per_class_match_var[m][r][c]['pred_below'] = 1.*per_class_match_var[m][r][c]['sumval_pred_below_range']/den #per_class_match_var[m][r][c]['num_in_range']
-        #     per_class_match_var[m][r][c]['obs_below'] = 1.*per_class_match_var[m][r][c]['num_obs_below_range']/den #overall_match_var[m][r]['num_in_range']
+            den = per_class_match_var[m][r][c]['num_below_range']
+            den = den if den>0 else 1
+            per_class_match_var[m][r][c]['pred_below'] = 1.*per_class_match_var[m][r][c]['sumval_pred_below_range']/den #per_class_match_var[m][r][c]['num_in_range']
+            per_class_match_var[m][r][c]['obs_below'] = 1.*per_class_match_var[m][r][c]['num_obs_below_range']/den #overall_match_var[m][r]['num_in_range']
 
+
+            if per_class_match_var[m][r][c]['num_in_range']==0:
+                per_class_match_var[m][r][c]['pred'] = (low+high)/2.0
+            per_class_match_var[m][r][c]['pred_below'] = (low+high)/2.0
 
 
     x = np.array([overall_match_var[m][r]['pred'] for r in ranges])
@@ -220,11 +230,22 @@ def fitCalibration(calibration,overall_match_var,ranges,m,device):
         calibration[m]['model'].fit(x,y,device)
         calibration[m]['fit'] = True # True
 
+    for c in range(n_classes):
+            x = np.array([per_class_match_var[m][r][c]['pred'] for r in ranges])
+            y = np.array([per_class_match_var[m][r][c]['obs'] for r in ranges])
 
-    return calibration, overall_match_var
+            x = torch.from_numpy(x.reshape(-1,1)).float()
+            y = torch.from_numpy(y).float()
+
+            # Fit Calibration if Not Already
+            if not calibrationPerClass[m][c]['fit']:
+                calibrationPerClass[m][c]['model'].fit(x,y,device)
+                calibrationPerClass[m][c]['fit'] = True # True
+
+    return calibration, calibrationPerClass, overall_match_var, per_class_match_var
 
 
-def showCalibration(calibration,overall_match_var,ranges,m,logdir,cfg,n_classes,i,i_recal,device):
+def showCalibration(calibration,calibrationPerClass,overall_match_var,per_class_match_var,ranges,m,logdir,cfg,n_classes,i,i_recal,device):
 
 
     ###########
@@ -294,34 +315,54 @@ def showCalibration(calibration,overall_match_var,ranges,m,logdir,cfg,n_classes,
     path = "{}/{}/{}".format(logdir,'calibration',m)
     if not os.path.exists(path):
         os.makedirs(path)
-    plt.savefig("{}/calibOverall{}.png".format(path,i))
+    plt.savefig("{}/calibratedOverall{}.png".format(path,i))
     plt.close(fig)
 
 
-    # ###############
-    # # All Classes #
-    # ###############
-    # fig, axes = plt.subplots(3,n_classes//3+1)
-    # # [axi.set_axis_off() for axi in axes.ravel()]
+    ############################
+    # All Classes Uncalibrated #
+    ############################
+    fig, axes = plt.subplots(3,n_classes//3+1)
+    # [axi.set_axis_off() for axi in axes.ravel()]
 
-    # # x = [overall_match_var[m][r]['pred_below'] for r in ranges]
-    # # y = [overall_match_var[m][r]['obs_below'] for r in ranges]
-    # x = [overall_match_var[m][r]['pred'] for r in ranges]
-    # y = [overall_match_var[m][r]['obs'] for r in ranges]
-    # axes[0,0].plot(x,y)
+    for c in range(n_classes):
+        # x = [per_class_match_var[m][r][c]['pred_below'] for r in ranges]
+        # y = [per_class_match_var[m][r][c]['obs_below'] for r in ranges]                        
+        x = [per_class_match_var[m][r][c]['pred'] for r in ranges]
+        y = [per_class_match_var[m][r][c]['obs'] for r in ranges]                                        
+        axes[(c+1)//(n_classes//3+1),(c+1)%(n_classes//3+1)].plot(x,y)
+        axes[(c+1)//(n_classes//3+1),(c+1)%(n_classes//3+1)].set_title("Class: {}".format(c))
 
-    # for c in range(n_classes):
-    #     # x = [per_class_match_var[m][r][c]['pred_below'] for r in ranges]
-    #     # y = [per_class_match_var[m][r][c]['obs_below'] for r in ranges]                        
-    #     x = [per_class_match_var[m][r][c]['pred'] for r in ranges]
-    #     y = [per_class_match_var[m][r][c]['obs'] for r in ranges]                                        
-    #     axes[(c+1)//(n_classes//3+1),(c+1)%(n_classes//3+1)].plot(x,y)
-    #     axes[(c+1)//(n_classes//3+1),(c+1)%(n_classes//3+1)].set_title("Class: {}".format(c))
+    path = "{}/{}/{}".format(logdir,'calibration',m)
+    if not os.path.exists(path):
+        os.makedirs(path)
+    plt.savefig("{}/uncalibratedPerClass{}.png".format(path,i))
+    plt.close(fig)
 
-    # path = "{}/{}/{}/{}".format(logdir,'calibration',split,m)
-    # if not os.path.exists(path):
-    #     os.makedirs(path)
-    # plt.savefig("{}/calib{}.png".format(path,i))
-    # plt.close(fig)
+    ##########################
+    # All Classes Calibrated #
+    ##########################
+    fig, axes = plt.subplots(3,n_classes//3+1)
+    # [axi.set_axis_off() for axi in axes.ravel()]
+
+    for c in range(n_classes):
+        # x = [per_class_match_var[m][r][c]['pred_below'] for r in ranges]
+        # y = [per_class_match_var[m][r][c]['obs_below'] for r in ranges]                        
+        x = np.array([per_class_match_var[m][r][c]['pred'] for r in ranges])
+        y = np.array([per_class_match_var[m][r][c]['obs'] for r in ranges])
+
+        x = torch.from_numpy(x.reshape(-1,1)).float()
+
+        y_pred = calibrationPerClass[m][c]["model"].predict(x.to(device))
+        y_pred = y_pred.cpu().numpy()
+
+        axes[(c+1)//(n_classes//3+1),(c+1)%(n_classes//3+1)].plot(y,y_pred)
+        axes[(c+1)//(n_classes//3+1),(c+1)%(n_classes//3+1)].set_title("Class: {}".format(c))
+
+    path = "{}/{}/{}".format(logdir,'calibration',m)
+    if not os.path.exists(path):
+        os.makedirs(path)
+    plt.savefig("{}/calibratedPerClass{}.png".format(path,i))
+    plt.close(fig)
 
     # print(overall_match_var[m])    

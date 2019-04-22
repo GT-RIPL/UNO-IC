@@ -25,8 +25,8 @@ class segnet_mcdo(nn.Module):
         self.mcdo_passes = mcdo_passes
 
         self.layers = {
-            "down1": segnetDown2MCDO(self.in_channels, 64, pMCDO=dropoutP),
-            "down2": segnetDown2MCDO(64, 128,   pMCDO=dropoutP),
+            "down1": segnetDown2(self.in_channels, 64),
+            "down2": segnetDown2(64, 128),
             "down3": segnetDown3MCDO(128, 256,  pMCDO=dropoutP),
             "down4": segnetDown3MCDO(256, 512,  pMCDO=dropoutP),
             "down5": segnetDown3MCDO(512, 512,  pMCDO=dropoutP),
@@ -34,8 +34,8 @@ class segnet_mcdo(nn.Module):
             "up5": segnetUp3MCDO(512, 512,      pMCDO=dropoutP),
             "up4": segnetUp3MCDO(512, 256,      pMCDO=dropoutP),
             "up3": segnetUp3MCDO(256, 128,      pMCDO=dropoutP),
-            "up2": segnetUp2MCDO(128, 64,       pMCDO=dropoutP),
-            "up1": segnetUp2MCDO(64, n_classes, pMCDO=dropoutP),
+            "up2": segnetUp2(128, 64),
+            "up1": segnetUp2(64, n_classes),
         }
 
         self.dropouts = {k:nn.Dropout2d(p=dropoutP, inplace=False) for k in self.layers.keys()}
@@ -69,11 +69,11 @@ class segnet_mcdo(nn.Module):
         mcdo = (self.mcdo_passes>1)
 
         if "down1" in self.reduced_layers:
-            down1, indices_1, unpool_shape1 = self.layers["down1"](inputs, MCDO=False)
+            down1, indices_1, unpool_shape1 = self.layers["down1"](inputs)
             # down1 = self.dropouts["down1"](down1)
         
         if "down2" in self.reduced_layers:
-            down2, indices_2, unpool_shape2 = self.layers["down2"](down1, MCDO=False)
+            down2, indices_2, unpool_shape2 = self.layers["down2"](down1)
             # down2 = self.dropouts["down2"](down2)
 
         if "down3" in self.reduced_layers:
@@ -101,11 +101,11 @@ class segnet_mcdo(nn.Module):
             # up3 = self.dropouts["up3"](up3)
 
         if "up2" in self.reduced_layers:
-            up2 = self.layers["up2"](up3, indices_2, unpool_shape2, MCDO=False)
+            up2 = self.layers["up2"](up3, indices_2, unpool_shape2)
             # up2 = self.dropouts["up2"](up2)
 
         if "up1" in self.reduced_layers:
-            up1 = self.layers["up1"](up2, indices_1, unpool_shape1, MCDO=False)
+            up1 = self.layers["up1"](up2, indices_1, unpool_shape1)
             # up1 = self.dropouts["up1"](up1)
 
         return up1

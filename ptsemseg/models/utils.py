@@ -281,8 +281,8 @@ class segnetDown2MCDO(nn.Module):
         super(segnetDown2MCDO, self).__init__()
         self.conv1 = conv2DBatchNormRelu(in_size, out_size, 3, 1, 1)
         self.conv2 = conv2DBatchNormRelu(out_size, out_size, 3, 1, 1)
-        self.dropout = nn.Dropout(p=pMCDO)
         self.maxpool_with_argmax = nn.MaxPool2d(2, 2, return_indices=True)
+        self.dropout = nn.Dropout(p=pMCDO)
 
     def forward(self, inputs, MCDO=False):
         # Determine Type of Dropout
@@ -295,12 +295,10 @@ class segnetDown2MCDO(nn.Module):
                 self.dropout.eval()
 
         outputs = self.conv1(inputs)
-        outputs = self.dropout(outputs)
         outputs = self.conv2(outputs)
-        outputs = self.dropout(outputs)
-
         unpooled_shape = outputs.size()
         outputs, indices = self.maxpool_with_argmax(outputs)
+        outputs = self.dropout(outputs)
         return outputs, indices, unpooled_shape
 
 
@@ -310,8 +308,8 @@ class segnetDown3MCDO(nn.Module):
         self.conv1 = conv2DBatchNormRelu(in_size, out_size, 3, 1, 1)
         self.conv2 = conv2DBatchNormRelu(out_size, out_size, 3, 1, 1)
         self.conv3 = conv2DBatchNormRelu(out_size, out_size, 3, 1, 1)
-        self.dropout = nn.Dropout(p=pMCDO)
         self.maxpool_with_argmax = nn.MaxPool2d(2, 2, return_indices=True)
+        self.dropout = nn.Dropout(p=pMCDO)
 
     def forward(self, inputs, MCDO=False):
         # Determine Type of Dropout
@@ -324,14 +322,11 @@ class segnetDown3MCDO(nn.Module):
                 self.dropout.eval()
 
         outputs = self.conv1(inputs)
-        outputs = self.dropout(outputs)
         outputs = self.conv2(outputs)
-        outputs = self.dropout(outputs)
         outputs = self.conv3(outputs)
-        outputs = self.dropout(outputs)
-
         unpooled_shape = outputs.size()
         outputs, indices = self.maxpool_with_argmax(outputs)
+        outputs = self.dropout(outputs)
         return outputs, indices, unpooled_shape
 
 
@@ -355,7 +350,6 @@ class segnetUp2MCDO(nn.Module):
 
         outputs = self.unpool(input=inputs, indices=indices, output_size=output_shape)
         outputs = self.conv1(outputs)
-        outputs = self.dropout(outputs)
         outputs = self.conv2(outputs)
         outputs = self.dropout(outputs)
         return outputs
@@ -382,9 +376,7 @@ class segnetUp3MCDO(nn.Module):
 
         outputs = self.unpool(input=inputs, indices=indices, output_size=output_shape)
         outputs = self.conv1(outputs)
-        outputs = self.dropout(outputs)
         outputs = self.conv2(outputs)
-        outputs = self.dropout(outputs)
         outputs = self.conv3(outputs)
         outputs = self.dropout(outputs)
         return outputs
@@ -409,12 +401,10 @@ class segnetDown2MCDO(nn.Module):
                 self.dropout.eval()
 
         outputs = self.conv1(inputs)
-        outputs = self.dropout(outputs)
         outputs = self.conv2(outputs)
-        outputs = self.dropout(outputs)
-
         unpooled_shape = outputs.size()
         outputs, indices = self.maxpool_with_argmax(outputs)
+        outputs = self.dropout(outputs)        
         return outputs, indices, unpooled_shape
 
 
@@ -424,8 +414,8 @@ class segnetDown3MCDO(nn.Module):
         self.conv1 = conv2DBatchNormRelu(in_size, out_size, 3, 1, 1)
         self.conv2 = conv2DBatchNormRelu(out_size, out_size, 3, 1, 1)
         self.conv3 = conv2DBatchNormRelu(out_size, out_size, 3, 1, 1)
-        self.dropout = nn.Dropout(p=pMCDO)
         self.maxpool_with_argmax = nn.MaxPool2d(2, 2, return_indices=True)
+        self.dropout = nn.Dropout(p=pMCDO)
 
     def forward(self, inputs, MCDO=False):
         # Determine Type of Dropout
@@ -438,14 +428,11 @@ class segnetDown3MCDO(nn.Module):
                 self.dropout.eval()
 
         outputs = self.conv1(inputs)
-        outputs = self.dropout(outputs)
         outputs = self.conv2(outputs)
-        outputs = self.dropout(outputs)
         outputs = self.conv3(outputs)
-        outputs = self.dropout(outputs)
-
         unpooled_shape = outputs.size()
         outputs, indices = self.maxpool_with_argmax(outputs)
+        outputs = self.dropout(outputs)
         return outputs, indices, unpooled_shape
 
 

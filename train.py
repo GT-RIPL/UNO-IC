@@ -1,3 +1,6 @@
+import matplotlib
+matplotlib.use('Agg')
+
 import os
 import yaml
 import time
@@ -103,7 +106,7 @@ def train(cfg, writer, logger, logdir):
     running_metrics_val = {env:runningScore(n_classes) for env in valloaders.keys()}
 
     # Setup Meters
-    val_loss_meter = {env:averageMeter() for env in valloaders.keys()}
+    val_loss_meter = {m:{env:averageMeter() for env in valloaders.keys()} for m in cfg["models"].keys()}
     val_CE_loss_meter = {env:averageMeter() for env in valloaders.keys()}
     val_REG_loss_meter = {env:averageMeter() for env in valloaders.keys()}
     time_meter = averageMeter()
@@ -211,9 +214,11 @@ def train(cfg, writer, logger, logdir):
 
             m = list(cfg["models"].keys())[0]
 
+
             # Read batch from only one camera
             bs = cfg['training']['batch_size']
-            images = inputs["rgb"][:bs,:,:,:]
+            images = {m:inputs[m][:bs,:,:,:] for m in cfg["models"].keys()}
+            # images = torch.cat((inputs["rgb"][:bs,:,:,:],inputs["d"][:bs,:,:,:]),1)
             labels = labels[:bs,:,:]
 
             if labels.shape[0]<=1:
@@ -231,35 +236,43 @@ def train(cfg, writer, logger, logdir):
             [models[m].train() for m in models.keys()]
             [optimizers[m].zero_grad() for m in optimizers.keys()]
 
-            m = list(cfg["models"].keys())[0]
-            output_bp, mean, variance = models[m](images)
-            outputs = output_bp
+            # Run Models
+            output_bp = {}; mean = {}; variance = {}; outputs = {}; loss = {}
+            for m in cfg["models"].keys():
+                # m = list(cfg["models"].keys())[0]
+                output_bp[m], mean[m], variance[m] = models[m](images[m])
+                outputs[m] = output_bp[m]
+
+                loss[m] = loss_fn(input=outputs[m], target=labels)
+                loss[m].backward()
+                optimizers[m].step()
+
+
+
 
             # outputs = models[m](images)
-
-            loss = loss_fn(input=outputs, target=labels)
-
-            loss.backward()
-
-            [optimizers[m].step() for m in optimizers.keys()]
+            # loss = loss_fn(input=outputs, target=labels)
+            # loss.backward()
+            # [optimizers[m].step() for m in optimizers.keys()]
 
 
             time_meter.update(time.time() - start_ts)
             if (i + 1) % cfg['training']['print_interval'] == 0:
-                fmt_str = "Iter [{:d}/{:d}]  Loss: {:.4f}  Time/Image: {:.4f}"
-                print_str = fmt_str.format(i + 1,
-                                           cfg['training']['train_iters'], 
-                                           loss.item(),
-                                           time_meter.avg / cfg['training']['batch_size'])
+                for m in cfg["models"].keys():
+                    fmt_str = "Iter [{:d}/{:d}]  Loss {}: {:.4f}  Time/Image: {:.4f}"
+                    print_str = fmt_str.format(i + 1,
+                                               cfg['training']['train_iters'], 
+                                               m,
+                                               loss[m].item(),
+                                               time_meter.avg / cfg['training']['batch_size'])
 
-                print(print_str)
-                logger.info(print_str)
-                writer.add_scalar('loss/train_loss', loss.item(), i+1)
-                # writer.add_scalar('loss/train_CE_loss', CE_loss.item(), i+1)
-                # writer.add_scalar('loss/train_REG_loss', REG_loss, i+1)
+                    print(print_str)
+                    logger.info(print_str)
+                    writer.add_scalar('loss/train_loss/'+m, loss[m].item(), i+1)
+                    # writer.add_scalar('loss/train_CE_loss', CE_loss.item(), i+1)
+                    # writer.add_scalar('loss/train_REG_loss', REG_loss, i+1)
                 time_meter.reset()
             #################################################################################
-
 
 
 
@@ -360,18 +373,41 @@ def train(cfg, writer, logger, logdir):
 
                             # Read batch from only one camera
                             bs = cfg['training']['batch_size']
-                            images_val = inputs[m][:bs,:,:,:]
+                            images_val = {m:inputs[m][:bs,:,:,:] for m in cfg["models"].keys()}
+                            # images_val = inputs[m][:bs,:,:,:]                                          
+                            # images_val = torch.cat((inputs["rgb"][:bs,:,:,:],inputs["d"][:bs,:,:,:]),1)                            
                             labels_val = labels[:bs,:,:]
 
                             if labels_val.shape[0]<=1:
                                 continue
 
-                            output_bp, mean, variance = models[m](images_val)
-                            outputs = output_bp
+                            # Run Models
+                            output_bp = {}; mean = {}; variance = {}; outputs_val = {}; val_loss = {}
+                            for m in cfg["models"].keys():
+                                # m = list(cfg["models"].keys())[0]
+                                output_bp[m], mean[m], variance[m] = models[m](images_val[m])
+                                outputs_val[m] = output_bp[m]
 
-                            val_loss = loss_fn(input=outputs, target=labels_val)
+                                val_loss[m] = loss_fn(input=outputs_val[m], target=labels_val)
 
+                            # output_bp, mean, variance = models[m](images_val)
+                            # outputs = output_bp
+                            # val_loss = loss_fn(input=outputs, target=labels_val)
 
+                            # Fusion Type
+                            if cfg["fusion"]=="None":
+                                outputs = outputs_val[list(cfg["models"].keys())[0]]
+                            elif cfg["fusion"]=="scores_variance_weighted":
+                                outputs = mean["rgb"]*variance["d"]+mean["d"]*variance["rgb"]                                
+                            elif cfg["fusion"]=="scores_even_weighted":
+                                outputs = mean["rgb"]*0.5+mean["d"]*0.5
+                            elif cfg["fusion"]=="softmax_variance_weighted":
+                                outputs = torch.nn.Softmax(1)(mean["rgb"])*variance["d"]+torch.nn.Softmax(1)(mean["d"])*variance["rgb"]
+                            elif cfg["fusion"]=="softmax_even_weighted":
+                                outputs = torch.nn.Softmax(1)(mean["rgb"])*0.5+torch.nn.Softmax(1)(mean["d"])*0.5
+                            else:
+                                print("Fusion Type Not Supported")
+                                exit()                              
 
                             pred = outputs.data.max(1)[1].cpu().numpy()
                             gt = labels_val.data.cpu().numpy()
@@ -382,21 +418,25 @@ def train(cfg, writer, logger, logdir):
 
                             if i_val % cfg["training"]["png_frames"] == 0:
                                 plotPrediction(logdir,cfg,n_classes,i,i_val,k,inputs,pred,gt)
-                                plotMeansVariances(logdir,cfg,n_classes,i,i_val,k,inputs,pred,gt,mean,variance)
+
+                                for m in cfg["models"]:
+                                    plotMeansVariances(logdir,cfg,n_classes,i,i_val,m,k,inputs,pred,gt,mean,variance)
 
                             running_metrics_val[k].update(gt, pred)
 
-                            val_loss_meter[k].update(val_loss.item())
-                            # val_CE_loss_meter[k].update(CE_loss.item())
-                            # val_REG_loss_meter[k].update(REG_loss)
+                            for m in cfg["models"].keys():
+                                val_loss_meter[m][k].update(val_loss[m].item())
+                                # val_CE_loss_meter[k].update(CE_loss.item())
+                                # val_REG_loss_meter[k].update(REG_loss)
 
 
 
-                    for k in valloaders.keys():
-                        writer.add_scalar('loss/val_loss/{}'.format(k), val_loss_meter[k].avg, i+1)
-                        # writer.add_scalar('loss/val_CE_loss/{}'.format(k), val_CE_loss_meter[k].avg, i+1)
-                        # writer.add_scalar('loss/val_REG_loss/{}'.format(k), val_REG_loss_meter[k].avg, i+1)
-                        logger.info("%s Iter %d Loss: %.4f" % (k, i + 1, val_loss_meter[k].avg))
+                    for m in cfg["models"].keys():
+                        for k in valloaders.keys():
+                            writer.add_scalar('loss/val_loss/{}/{}'.format(m,k), val_loss_meter[m][k].avg, i+1)
+                            # writer.add_scalar('loss/val_CE_loss/{}'.format(k), val_CE_loss_meter[k].avg, i+1)
+                            # writer.add_scalar('loss/val_REG_loss/{}'.format(k), val_REG_loss_meter[k].avg, i+1)
+                            logger.info("%s %s Iter %d Loss: %.4f" % (m, k, i + 1, val_loss_meter[m][k].avg))
                 
                 for env,valloader in valloaders.items():
                     score, class_iou = running_metrics_val[env].get_scores()
@@ -409,7 +449,8 @@ def train(cfg, writer, logger, logdir):
                         logger.info('{}: {}'.format(k, v))
                         writer.add_scalar('val_metrics/{}/cls_{}'.format(env,k), v, i+1)
 
-                    val_loss_meter[env].reset()
+                    for m in cfg["models"].keys():
+                        val_loss_meter[m][env].reset()
                     running_metrics_val[env].reset()
 
 
@@ -533,18 +574,18 @@ def plotPrediction(logdir,cfg,n_classes,i,i_val,k,inputs,pred,gt):
     plt.savefig("{}/{}_{}.png".format(path,i_val,i))
     plt.close(fig)    
 
-def plotMeansVariances(logdir,cfg,n_classes,i,i_val,k,inputs,pred,gt,mean,variance):
+def plotMeansVariances(logdir,cfg,n_classes,i,i_val,m,k,inputs,pred,gt,mean,variance):
     fig, axes = plt.subplots(4,n_classes//2+1)
     [axi.set_axis_off() for axi in axes.ravel()]
 
     for c in range(n_classes):
-        axes[2*(c%2),c//2].imshow(mean[0,c,:,:].cpu().numpy())
+        axes[2*(c%2),c//2].imshow(mean[m][0,c,:,:].cpu().numpy())
         axes[2*(c%2),c//2].set_title(str(c)+" Mean")
 
-        axes[2*(c%2)+1,c//2].imshow(variance[0,c,:,:].cpu().numpy())
+        axes[2*(c%2)+1,c//2].imshow(variance[m][0,c,:,:].cpu().numpy())
         axes[2*(c%2)+1,c//2].set_title(str(c)+" Var")
 
-    path = "{}/{}/{}".format(logdir,"meanvar",k)
+    path = "{}/{}/{}/{}".format(logdir,"meanvar",m,k)
     if not os.path.exists(path):
         os.makedirs(path)
     plt.savefig("{}/{}_{}.png".format(path,i_val,i))

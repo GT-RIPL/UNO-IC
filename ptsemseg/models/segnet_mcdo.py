@@ -120,8 +120,13 @@ class segnet_mcdo(nn.Module):
                 with torch.no_grad():
                     x = torch.cat((x,self.forwardOnce(inputs).unsqueeze(-1)),-1)
 
-        mean = x.mean(-1)
-        variance = x.pow(2).mean(-1)-mean.pow(2)
+        # Standard Mean and Variance
+        # mean = x.mean(-1)
+        # variance = x.pow(2).mean(-1)-mean.pow(2)
+
+        # Softmax Mean and Variance
+        mean = torch.nn.Softmax(1)(x).mean(-1)
+        variance = torch.nn.Softmax(1)(x).pow(2).mean(-1)-mean.pow(2)
 
         return x_bp, mean, variance
 
@@ -178,7 +183,17 @@ class segnet_mcdo(nn.Module):
 
         for l1, l2 in zip(vgg_layers, merged_layers):
             if isinstance(l1, nn.Conv2d) and isinstance(l2, nn.Conv2d):
-                assert l1.weight.size() == l2.weight.size()
-                assert l1.bias.size() == l2.bias.size()
-                l2.weight.data = l1.weight.data
-                l2.bias.data = l1.bias.data
+                if l1.weight.size() == l2.weight.size() and l1.bias.size() == l2.bias.size():
+                    assert l1.weight.size() == l2.weight.size()
+                    assert l1.bias.size() == l2.bias.size()
+                    l2.weight.data = l1.weight.data
+                    l2.bias.data = l1.bias.data
+                else:
+
+                    num_orig = int(l1.weight.size()[1])
+                    num_tiles = int(l2.weight.size()[1])//int(l1.weight.size()[1])
+
+                    for i in range(num_tiles):
+                        l2.weight.data[:,i*num_orig:(i+1)*num_orig,:,:] = l1.weight.data
+                    l2.bias.data = l1.bias.data
+

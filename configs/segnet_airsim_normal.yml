@@ -1,4 +1,4 @@
-id: rgb_BayesianSegnet_0.5dropout
+id: rgb_BayesianSegnet_0.0dropout_recalibration_test
 model:
     arch: segnet_mcdo
 models:
@@ -7,12 +7,12 @@ models:
         start_layer: down1
         end_layer: up1
         reduction: 1.0
-        mcdo_passes: 5
-        dropoutP: 0.5
+        mcdo_passes: 1
+        dropoutP: 0.0
         mcdo_start_iter: 0
         mcdo_backprop: False
         learned_uncertainty: "no"
-        resume: None #models/rgb_BayesianSegnet_p0.5/rgb_segnet_mcdo_airsim_best_model.pkl #runs/segnet_airsim_normal/83811/rgb_segnet_airsim_best_model.pkl #None
+        resume: models/rgb_BayesianSegnet_p0.1/rgb_segnet_mcdo_airsim_best_model.pkl #runs/segnet_airsim_normal/83811/rgb_segnet_airsim_best_model.pkl #None
     # d:
     #     in_channels: 3
     #     start_layer: down1

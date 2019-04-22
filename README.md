@@ -1,4 +1,99 @@
-# pytorch-semseg
+# pytorch-semseg (RIPL README)
+
+(1) Follow original readme installation instructions
+(2) Modify configs/XXX.yml file
+(3) Run: python train.py
+
+Notable Things:
+- configuration files are stored in ./configs directory
+- tensorboard files, checkpoint weights, log files, and corresponding run config files are stored in ./runs directory
+
+
+- fusion
+```yaml
+# Model Configuration
+id: <pretty name for the current test>
+
+model:
+    arch: <name> [options: 'segnet_mcdo, fcn[8,16,32]s, unet, segnet, pspnet, icnet, icnetBN, linknet, frrn[A,B]'
+    <model_keyarg_1>:<value>
+
+models: # list of model dicts that will be spawned
+    rgb: (or d)
+        in_channels: 3              #number of input channels
+        start_layer: down1          #start layer (inclusive) of architecture (used for mid mcdo fusion)
+        end_layer: up1              #final layer (inclusive) of architecture (used for mid mcdo fusion)
+        reduction: 1.0              #not implemented (used for reducing the number of parameters in the network)
+        mcdo_passes: 1              #number of passes for MCDO
+        dropoutP: 0.0               #dropout probability for MCDO
+        mcdo_start_iter: 0          #not implemented
+        mcdo_backprop: False        #not implemented
+        learned_uncertainty: "no"   #not implemented
+        resume: None                #path to the .pkl checkpoint file
+
+
+# Data Configuration
+data:
+    dataset: <name> [options: 'airsim, pascal, camvid, ade20k, mit_sceneparsing_benchmark, cityscapes, nyuv2, sunrgbd, vistas'] 
+    train_split: <split_to_train_on>
+    train_subsplit: ['<specific_environment_folder_to_train_on>']
+    train_reduction: 1.0 #fractional reduction of train set size
+    val_split: <spit_to_validate_on>
+    val_subsplit: ['<specific_environment_folder_to_validate_on>']
+    val_reduction: 1.0 #fractional reduction of validation set size
+    img_rows: 512
+    img_cols: 512
+    path: <path/to/data>
+    <dataset_keyarg1>:<value>
+
+# Training Configuration
+training:
+    n_workers: 64
+    train_iters: 35000
+    batch_size: 16
+    val_interval: 500
+    print_interval: 25
+    loss:
+        name: <loss_type> [options: 'cross_entropy, bootstrapped_cross_entropy, multi_scale_crossentropy']
+        <loss_keyarg1>:<value>
+
+    # Optmizer Configuration
+    optimizer:
+        name: <optimizer_name> [options: 'sgd, adam, adamax, asgd, adadelta, adagrad, rmsprop']
+        lr: 1.0e-3
+        <optimizer_keyarg1>:<value>
+
+        # Warmup LR Configuration
+        warmup_iters: <iters for lr warmup>
+        mode: <'constant' or 'linear' for warmup'>
+        gamma: <gamma for warm up>
+       
+    # Augmentations Configuration
+    augmentations:
+        gamma: x                                     #[gamma varied in 1 to 1+x]
+        hue: x                                       #[hue varied in -x to x]
+        brightness: x                                #[brightness varied in 1-x to 1+x]
+        saturation: x                                #[saturation varied in 1-x to 1+x]
+        contrast: x                                  #[contrast varied in 1-x to 1+x]
+        rcrop: [h, w]                                #[crop of size (h,w)]
+        translate: [dh, dw]                          #[reflective translation by (dh, dw)]
+        rotate: d                                    #[rotate -d to d degrees]
+        scale: [h,w]                                 #[scale to size (h,w)]
+        ccrop: [h,w]                                 #[center crop of (h,w)]
+        hflip: p                                     #[flip horizontally with chance p]
+        vflip: p                                     #[flip vertically with chance p]
+
+    # LR Schedule Configuration
+    lr_schedule:
+        name: <schedule_type> [options: 'constant_lr, poly_lr, multi_step, cosine_annealing, exp_lr']
+        <scheduler_keyarg1>:<value>
+
+    # Resume from checkpoint  
+    resume: <path_to_checkpoint>
+```
+
+
+# pytorch-semseg (Original README)
 
 [![license](https://img.shields.io/github/license/mashape/apistatus.svg)](https://github.com/meetshah1995/pytorch-semseg/blob/master/LICENSE)
 [![pypi](https://img.shields.io/pypi/v/pytorch_semseg.svg)](https://pypi.python.org/pypi/pytorch-semseg/0.1.2)
@@ -16,7 +111,6 @@ This repository aims at mirroring popular semantic segmentation architectures in
 <img src="https://meetshah1995.github.io/images/blog/ss/ptsemseg.png" width="49%"/>
 </p>
 
-
 ### Networks implemented
 
 * [PSPNet](https://arxiv.org/abs/1612.01105) - With support for loading pretrained models w/o caffe dependency
@@ -28,13 +122,9 @@ This repository aims at mirroring popular semantic segmentation architectures in
 * [Segnet](https://arxiv.org/abs/1511.00561) - With Unpooling using Maxpool indices
 
 
-#### Upcoming 
-
-* [E-Net](https://arxiv.org/abs/1606.02147)
-* [RefineNet](https://arxiv.org/abs/1611.06612)
-
 ### DataLoaders implemented
 
+* [AirSim](https://github.com/Microsoft/AirSim)
 * [CamVid](http://mi.eng.cam.ac.uk/research/projects/VideoRec/CamVid/)
 * [Pascal VOC](http://host.robots.ox.ac.uk/pascal/VOC/voc2012/segexamples/index.html)
 * [ADE20K](http://groups.csail.mit.edu/vision/datasets/ADE20K/)

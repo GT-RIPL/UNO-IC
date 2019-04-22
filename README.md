@@ -1,15 +1,17 @@
 # pytorch-semseg (RIPL README)
 
-(1) Follow original readme installation instructions
-(2) Modify configs/XXX.yml file
-(3) Run: python train.py
+[1] Follow original readme installation instructions
+[2] Modify configs/XXX.yml file
+[3] Run: python train.py
 
 Notable Things:
 - configuration files are stored in ./configs directory
 - tensorboard files, checkpoint weights, log files, and corresponding run config files are stored in ./runs directory
+- almost all code is contained in train.py, ./ptsemseg/models/{semseg_mcdo.py,recalibrator.py} files
 
 
-- fusion
+Fusion Specific Configuration File:
+
 ```yaml
 # Model Configuration
 id: <pretty name for the current test>

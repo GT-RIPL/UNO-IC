@@ -69,11 +69,11 @@ class segnet_mcdo(nn.Module):
         mcdo = (self.mcdo_passes>1)
 
         if "down1" in self.reduced_layers:
-            down1, indices_1, unpool_shape1 = self.layers["down1"](inputs, MCDO=mcdo)
+            down1, indices_1, unpool_shape1 = self.layers["down1"](inputs, MCDO=False)
             # down1 = self.dropouts["down1"](down1)
         
         if "down2" in self.reduced_layers:
-            down2, indices_2, unpool_shape2 = self.layers["down2"](down1, MCDO=mcdo)
+            down2, indices_2, unpool_shape2 = self.layers["down2"](down1, MCDO=False)
             # down2 = self.dropouts["down2"](down2)
 
         if "down3" in self.reduced_layers:
@@ -101,17 +101,17 @@ class segnet_mcdo(nn.Module):
             # up3 = self.dropouts["up3"](up3)
 
         if "up2" in self.reduced_layers:
-            up2 = self.layers["up2"](up3, indices_2, unpool_shape2, MCDO=mcdo)
+            up2 = self.layers["up2"](up3, indices_2, unpool_shape2, MCDO=False)
             # up2 = self.dropouts["up2"](up2)
 
         if "up1" in self.reduced_layers:
-            up1 = self.layers["up1"](up2, indices_1, unpool_shape1, MCDO=mcdo)
+            up1 = self.layers["up1"](up2, indices_1, unpool_shape1, MCDO=False)
             # up1 = self.dropouts["up1"](up1)
 
         return up1
 
     def forwardMultiple(self, inputs):
-        
+        # First pass has backpropagation; others do not
         for i in range(self.mcdo_passes):
             if i == 0:
                 x_bp = self.forwardOnce(inputs)

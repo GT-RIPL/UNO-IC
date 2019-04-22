@@ -585,6 +585,9 @@ def plotMeansVariances(logdir,cfg,n_classes,i,i_val,m,k,inputs,pred,gt,mean,vari
         axes[2*(c%2)+1,c//2].imshow(variance[m][0,c,:,:].cpu().numpy())
         axes[2*(c%2)+1,c//2].set_title(str(c)+" Var")
 
+    axes[-1,-1].imshow(variance[m][0,:,:,:].mean(0).cpu().numpy())
+    axes[-1,-1].set_title("Average Variance")
+
     path = "{}/{}/{}/{}".format(logdir,"meanvar",m,k)
     if not os.path.exists(path):
         os.makedirs(path)

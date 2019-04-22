@@ -7,12 +7,12 @@ models:
         start_layer: down1
         end_layer: up1
         reduction: 1.0
-        mcdo_passes: 1
+        mcdo_passes: 5
         dropoutP: 0.5
         mcdo_start_iter: 0
         mcdo_backprop: False
         learned_uncertainty: "no"
-        resume: None #models/rgb_0.5/rgb_segnet_mcdo_airsim_best_model.pkl #runs/segnet_airsim_normal/83811/rgb_segnet_airsim_best_model.pkl #None
+        resume: None #models/rgb_BayesianSegnet_p0.5/rgb_segnet_mcdo_airsim_best_model.pkl #runs/segnet_airsim_normal/83811/rgb_segnet_airsim_best_model.pkl #None
     # d:
     #     in_channels: 3
     #     start_layer: down1
@@ -47,10 +47,10 @@ data:
 training:
     train_iters: 100000
     batch_size: 2
-    val_interval: 5000
+    val_interval: 50 #5000
     n_workers: 8
     print_interval: 50
-    png_frames: 5000
+    png_frames: 50 #5000
     optimizer:
         name: 'adam'
         lr: 1.0e-5

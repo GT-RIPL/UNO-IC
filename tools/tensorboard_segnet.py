@@ -10,10 +10,10 @@ import yaml
 import os
 
 include = [
-           # 'run1',
+           'run1',
            # 'run2',
-           'run3',
-           # 'run4',
+           # 'run3',
+           'run4',
            # 'run5',
            # 'run6',
            # 'run7',
@@ -33,28 +33,30 @@ run_comments = {
             "rgb_dropout_between_layers_0.1",
             "rgb_dropout_between_layers_0.3",
             "rgb_dropout_between_layers_0.5",
-            "rgb_dropout_between_layers_0.9",
-            # "rgb_baseline_0.1dropout_extensiveDropout",
-            # "d_baseline_0.5dropout_extensiveDropout",
-            # "rgb_baseline_0.1dropout_extensiveDropout",
-            # "d_baseline_0.5dropout_extensiveDropout",            
+            "rgb_dropout_between_layers_0.9",        
         ],
         "text":
-            """testing for best dropout performance (0.1,0.3,0.5,0.9); dropout after each layer; batch size 2""",
+            """testing for best dropout performance (0.1,0.3,0.5,0.9); dropout after each block; batch size 2""",
     },
     "run3": {
         "names": [
-            "rgb_baseline_0.1dropout_extensiveDropout_MCDO_fusion",
-            "rgb_baseline_0.1dropout_extensiveDropout_MCDO_fusion_evenWeights",
-            "rgb_baseline_0.5dropout_extensiveDropout_MCDO_fusion_evenWeights",
-            "rgb_BayesianSegnet_0.0dropout_cumulativeRecalibration_test",
-            "rgb_BayesianSegnet_0.0dropout_recalibration_test",
-            "rgb_BayesianSegnet_0.1dropout_test",
-            "rgb_BayesianSegnet_0.5dropout_test",
-            "rgbd_baseline_0.1dropout_extensiveDropout",
+            "rgb_baseline_0.1dropout_extensiveDropout",
+            "rgb_baseline_0.5dropout_extensiveDropout",
+            "d_baseline_0.1dropout_extensiveDropout",
+            "d_baseline_0.5dropout_extensiveDropout",            
         ],
         "text":
-            """testing fusion based on uncertainty""",
+            """testing for best dropout performance (0.1,0.3,0.5,0.9); dropout after each convolutional layer; batch size 2""",
+    },    
+    "run4": {
+        "names": [
+            "d_BayesianSegnet_0.1",
+            "rgb_BayesianSegnet_0.1",
+            "d_BayesianSegnet_0.5",
+            "rgb_BayesianSegnet_0.5",
+        ],
+        "text":
+            """following architecture from BayesSegnet paper""",
     },
 
 

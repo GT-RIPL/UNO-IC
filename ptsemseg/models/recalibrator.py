@@ -56,7 +56,7 @@ class Recalibrator():
 
 def accumulateEmpirical(overall_match_var,per_class_match_var,ranges,n_classes,m,label,mean,variance):
 
-    softmax_mu = torch.nn.Softmax(1)(mean[m])
+    softmax_mu = mean[m] #torch.nn.Softmax(1)(mean[m])
     variance = softmax_mu
 
     max_mu_i = torch.argmax(mean[m],dim=1)

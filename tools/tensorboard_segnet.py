@@ -61,8 +61,8 @@ run_comments = {
     "run5": {
         "names": [
             ("outputFusion_calibratedSoftmaxMultiply",   "Output Fusion: Calibrated Softmax Multiply"),
-            ("outputFusion_uncalibratedSoftmaxDonly",    "Output Fusion: Uncalibrated Softmax Depth Only"),
             ("outputFusion_uncalibratedSoftmaxMultiply", "Output Fusion: Uncalibrated Softmax Multiply"),
+            ("outputFusion_uncalibratedSoftmaxDonly",    "Output Fusion: Uncalibrated Softmax Depth Only"),
             ("outputFusion_uncalibratedSoftmaxRGBonly",  "Output Fusion: Uncalibrated Softmax RGB Only"),
         ],
         "text":

@@ -10,11 +10,11 @@ import yaml
 import os
 
 include = [
-           'run1',
+           # 'run1',
            # 'run2',
            # 'run3',
-           'run4',
-           # 'run5',
+           # 'run4',
+           'run5',
            # 'run6',
            # 'run7',
            # 'run8',
@@ -23,40 +23,50 @@ include = [
 run_comments = {
     "run1": {
         "names": [
-            "83811",
+            ("83811",None),
         ],
         "text":
             """initial test on RGB only; no dropout; batch size 2""",
     },
     "run2": {
         "names": [
-            "rgb_dropout_between_layers_0.1",
-            "rgb_dropout_between_layers_0.3",
-            "rgb_dropout_between_layers_0.5",
-            "rgb_dropout_between_layers_0.9",        
+            ("rgb_dropout_between_layers_0.1",None),
+            ("rgb_dropout_between_layers_0.3",None),
+            ("rgb_dropout_between_layers_0.5",None),
+            ("rgb_dropout_between_layers_0.9",None),
         ],
         "text":
             """testing for best dropout performance (0.1,0.3,0.5,0.9); dropout after each block; batch size 2""",
     },
     "run3": {
         "names": [
-            "rgb_baseline_0.1dropout_extensiveDropout",
-            "rgb_baseline_0.5dropout_extensiveDropout",
-            "d_baseline_0.1dropout_extensiveDropout",
-            "d_baseline_0.5dropout_extensiveDropout",            
+            ("rgb_baseline_0.1dropout_extensiveDropout",None),
+            ("rgb_baseline_0.5dropout_extensiveDropout",None),
+            ("d_baseline_0.1dropout_extensiveDropout",None),
+            ("d_baseline_0.5dropout_extensiveDropout",None),            
         ],
         "text":
             """testing for best dropout performance (0.1,0.3,0.5,0.9); dropout after each convolutional layer; batch size 2""",
     },    
     "run4": {
         "names": [
-            "d_BayesianSegnet_0.1",
-            "rgb_BayesianSegnet_0.1",
-            "d_BayesianSegnet_0.5",
-            "rgb_BayesianSegnet_0.5",
+            # "d_BayesianSegnet_0.1",
+            # "rgb_BayesianSegnet_0.1",
+            ("d_BayesianSegnet_0.5",None),
+            ("rgb_BayesianSegnet_0.5",None),
         ],
         "text":
             """following architecture from BayesSegnet paper""",
+    },
+    "run5": {
+        "names": [
+            ("outputFusion_calibratedSoftmaxMultiply",   "Output Fusion: Calibrated Softmax Multiply"),
+            ("outputFusion_uncalibratedSoftmaxDonly",    "Output Fusion: Uncalibrated Softmax Depth Only"),
+            ("outputFusion_uncalibratedSoftmaxMultiply", "Output Fusion: Uncalibrated Softmax Multiply"),
+            ("outputFusion_uncalibratedSoftmaxRGBonly",  "Output Fusion: Uncalibrated Softmax RGB Only"),
+        ],
+        "text":
+            """calibrated softmaxes before adding values for fusion""",            
     },
 
 
@@ -82,7 +92,7 @@ for i,file in enumerate(glob.glob("./**/*tfevents*",recursive=True)):
     with open(yaml_file,"r") as f:
         configs = yaml.load(f)
 
-    if any([file.split("/")[-2] in vv['names'] and not kk in include for kk,vv in run_comments.items()]):
+    if any([file.split("/")[-2] in [vvv for vvv,_ in vv['names']] and not kk in include for kk,vv in run_comments.items()]):
         continue
         
     name = configs['id']
@@ -118,7 +128,7 @@ for i,file in enumerate(glob.glob("./**/*tfevents*",recursive=True)):
 #standardize config
 del_runs = []
 for k,v in runs.items():
-    if not any([v['raw_config']['file_only'] in vv["names"] for kk,vv in run_comments.items()]):
+    if not any([v['raw_config']['file_only'] in [vvv for vvv,_ in vv['names']] for kk,vv in run_comments.items()]):
         del_runs.append(k)
 
 for k in del_runs:
@@ -132,13 +142,13 @@ for k,v in runs.items():
     v['std_config'] = {}
     v['std_config']['size'] = "{}x{}".format(c['data']['img_rows'],c['data']['img_cols'])
     v['std_config']['id'] = v['raw_config']['id']
-  
+    v['std_config']['pretty'] = [vvv1 if not vvv1 is None else v['raw_config']['id'] for vvv0,vvv1 in [vv["names"] for kk,vv in run_comments.items() if v['raw_config']['file_only'] in [vvv for vvv,_ in vv['names']]][0] if vvv0==v['raw_config']['file_only']][0]
 
     # Extract comments for run
-    v['std_config']['comments'] = [vv["text"] for kk,vv in run_comments.items() if v['raw_config']['file_only'] in vv["names"]][0]
-    v['std_config']['run_group'] = [kk for kk,vv in run_comments.items() if v['raw_config']['file_only'] in vv["names"]][0]
+    v['std_config']['comments'] = [vv["text"] for kk,vv in run_comments.items() if v['raw_config']['file_only'] in [vvv for vvv,_ in vv['names']]][0]
+    v['std_config']['run_group'] = [kk for kk,vv in run_comments.items() if v['raw_config']['file_only'] in [vvv for vvv,_ in vv['names']]][0]
 
-    print(c)
+    print(v)
 
     # # if c['start_layers'] is None or len(list(c['models']))==1:
     # if len(list(c['models']))==1:
@@ -268,16 +278,17 @@ df['unique_id'] = (df.groupby(id_fields).cumcount())
 
 # full string identifier
  # df['block']+", "+\
-df['full'] = df['size']+", "+\
-             df['mcdo_passes'].map(str)+" mcdo_passes, "+\
-             df['fuse_mech'].map(str)+" fuse_mech, "+\
-             df['pretrained'].map(str)+" pretrained, "+\
-             df['mcdo_start_iter'].map(str)+" burn-in, "+\
-             df['multipass_backprop'].map(str)+" multipass_backprop, "+\
-             df['learned_uncertainty'].map(str)+" learned_uncertainty, "+\
-             df['dropoutP'].map(str)+" dropoutP ("+\
-             df['unique_id'].map(str)+")"+\
-             df['id'].map(str)
+df['full'] = df['pretty'] #+", "+\
+             # df['size']+", "+\
+             # df['mcdo_passes'].map(str)+" mcdo_passes, "+\
+             # df['fuse_mech'].map(str)+" fuse_mech, "+\
+             # df['pretrained'].map(str)+" pretrained, "+\
+             # df['mcdo_start_iter'].map(str)+" burn-in, "+\
+             # df['multipass_backprop'].map(str)+" multipass_backprop, "+\
+             # df['learned_uncertainty'].map(str)+" learned_uncertainty, "+\
+             # df['dropoutP'].map(str)+" dropoutP ("+\
+             # df['unique_id'].map(str)+")"+\
+             # df['id'].map(str)
 
 # sort by id fields
 df = df.sort_values(by=id_fields)

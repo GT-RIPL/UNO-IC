@@ -15,8 +15,8 @@ include = [
            # 'run3',
            # 'run4',
            'run5',
-           # 'run6',
-           # 'run7',
+           'run6',
+           'run7',
            # 'run8',
            ]
 
@@ -60,7 +60,7 @@ run_comments = {
     },
     "run5": {
         "names": [
-            ("outputFusion_calibratedSoftmaxMultiply",   "Output Fusion: Calibrated Softmax Multiply"),
+            ("outputFusion_calibratedSoftmaxMultiply",   "Output Fusion: Calibrated on Fog000, Softmax Multiply"),
             ("outputFusion_uncalibratedSoftmaxMultiply", "Output Fusion: Uncalibrated Softmax Multiply"),
             ("outputFusion_uncalibratedSoftmaxDonly",    "Output Fusion: Uncalibrated Softmax Depth Only"),
             ("outputFusion_uncalibratedSoftmaxRGBonly",  "Output Fusion: Uncalibrated Softmax RGB Only"),
@@ -68,7 +68,24 @@ run_comments = {
         "text":
             """calibrated softmaxes before adding values for fusion""",            
     },
-
+    "run6": {
+        "names": [
+            ("outputFusion_calibratedSoftmaxMultiply_recalibrateOn050", "Output Fusion: Calibrated on Fog050, Softmax Multiply"),
+            ("outputFusion_calibratedSoftmaxMultiply_recalibrateOn100", "Output Fusion: Calibrated on Fog100, Softmax Multiply"),
+            ("outputFusion_calibratedSoftmaxMultiply_recalibrateOn100DBlackout", "Output Fusion: Calibrated on Fog100, D Blackout, Softmax Multiply"),
+            ("outputFusion_calibratedSoftmaxMultiply_recalibrateOn100RGBBlackout", "Output Fusion: Calibrated on Fog100, RGB Blackout, Softmax Multiply"),
+            ("outputFusion_calibratedSoftmaxMultiply_recalibrateOnAllSplit", "Output Fusion: Calibrated on All Splits, Softmax Multiply"),            
+        ],
+        "text":
+            """recalibrating on testing distribution""",            
+    },
+    "run7": {
+        "names": [
+            ("inputFusion_baseline", "RGBD Input Fusion"),
+        ],
+        "text":
+            """input fusion baseline""",            
+    },    
 
 
 

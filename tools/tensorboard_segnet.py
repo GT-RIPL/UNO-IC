@@ -10,10 +10,10 @@ import yaml
 import os
 
 include = [
-           # 'run1',
+           'run1',
            # 'run2',
            # 'run3',
-           # 'run4',
+           'run4',
            'run5',
            'run6',
            'run7',
@@ -23,7 +23,7 @@ include = [
 run_comments = {
     "run1": {
         "names": [
-            ("83811",None),
+            ("83811","RGB Only (No Dropout)"),
         ],
         "text":
             """initial test on RGB only; no dropout; batch size 2""",
@@ -50,38 +50,38 @@ run_comments = {
     },    
     "run4": {
         "names": [
-            # "d_BayesianSegnet_0.1",
-            # "rgb_BayesianSegnet_0.1",
-            ("d_BayesianSegnet_0.5",None),
-            ("rgb_BayesianSegnet_0.5",None),
+            ("d_BayesianSegnet_0.1","Depth Only (Bayesian Segnet, p = 0.1)"),
+            ("rgb_BayesianSegnet_0.1","RGB Only (Bayesian Segnet, p = 0.1)"),
+            ("d_BayesianSegnet_0.5","Depth Only (Bayesian Segnet, p = 0.5)"),
+            ("rgb_BayesianSegnet_0.5","RGB Only (Bayesian Segnet, p = 0.5)"),
         ],
         "text":
             """following architecture from BayesSegnet paper""",
     },
     "run5": {
         "names": [
-            ("outputFusion_calibratedSoftmaxMultiply",   "Output Fusion: Calibrated on Fog000, Softmax Multiply"),
-            ("outputFusion_uncalibratedSoftmaxMultiply", "Output Fusion: Uncalibrated Softmax Multiply"),
-            ("outputFusion_uncalibratedSoftmaxDonly",    "Output Fusion: Uncalibrated Softmax Depth Only"),
-            ("outputFusion_uncalibratedSoftmaxRGBonly",  "Output Fusion: Uncalibrated Softmax RGB Only"),
+            ("outputFusion_calibratedSoftmaxMultiply",   "[Train on 000, Recal on 000] RGB x D"),
+            ("outputFusion_uncalibratedSoftmaxMultiply", "[Train on 000, No Recal] RGB x D"),
+            ("outputFusion_uncalibratedSoftmaxDonly",    "[Train on 000, No Recal] D"),
+            ("outputFusion_uncalibratedSoftmaxRGBonly",  "[Train on 000, No Recal] RGB"),
         ],
         "text":
             """calibrated softmaxes before adding values for fusion""",            
     },
     "run6": {
         "names": [
-            ("outputFusion_calibratedSoftmaxMultiply_recalibrateOn050", "Output Fusion: Calibrated on Fog050, Softmax Multiply"),
-            ("outputFusion_calibratedSoftmaxMultiply_recalibrateOn100", "Output Fusion: Calibrated on Fog100, Softmax Multiply"),
-            ("outputFusion_calibratedSoftmaxMultiply_recalibrateOn100DBlackout", "Output Fusion: Calibrated on Fog100, D Blackout, Softmax Multiply"),
-            ("outputFusion_calibratedSoftmaxMultiply_recalibrateOn100RGBBlackout", "Output Fusion: Calibrated on Fog100, RGB Blackout, Softmax Multiply"),
-            ("outputFusion_calibratedSoftmaxMultiply_recalibrateOnAllSplit", "Output Fusion: Calibrated on All Splits, Softmax Multiply"),            
+            ("outputFusion_calibratedSoftmaxMultiply_recalibrateOn050",            "[Train on 000, Recal on 050] RGB x D"),
+            ("outputFusion_calibratedSoftmaxMultiply_recalibrateOn100",            "[Train on 000, Recal on 100] RGB x D"),
+            ("outputFusion_calibratedSoftmaxMultiply_recalibrateOn100DBlackout",   "[Train on 000, Recal on 100 / No D] RGB x D"),
+            ("outputFusion_calibratedSoftmaxMultiply_recalibrateOn100RGBBlackout", "[Train on 000, Recal on 100 / No RGB] RGB x D"),
+            ("outputFusion_calibratedSoftmaxMultiply_recalibrateOnAllSplit",       "[Train on 000, Recal on All] RGB x D"),            
         ],
         "text":
             """recalibrating on testing distribution""",            
     },
     "run7": {
         "names": [
-            ("inputFusion_baseline", "RGBD Input Fusion"),
+            ("inputFusion_baseline", "[Train on 000, No Recal] RGBD Input Fusion"),
         ],
         "text":
             """input fusion baseline""",            

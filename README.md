@@ -1,8 +1,14 @@
 # pytorch-semseg (RIPL README)
 
-[1] Follow original readme installation instructions
-[2] Modify configs/XXX.yml file
-[3] Run: python train.py
+0. Download airsim dataset
+- currently stored on ripl-w3 (ripl@143.215.207.42)
+  - /home/datasets/airsim_03-30-2019
+- ask Yen-Chang for password
+- path parameter in config file should point to /home/datasets/airsim_03-30-2019/airsim_data_async
+- folder should contain subfolders of modalities: (depth, depth_encoded, pose, scene, segmentation)
+1. Follow original readme installation instructions
+2. Modify configs/XXX.yml file
+3. Run: python train.py
 
 Notable Things:
 - configuration files are stored in ./configs directory

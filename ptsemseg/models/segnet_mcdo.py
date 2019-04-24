@@ -23,6 +23,7 @@ class segnet_mcdo(nn.Module):
         self.in_channels = in_channels
         self.is_unpooling = is_unpooling
         self.mcdo_passes = mcdo_passes
+        self.n_classes = n_classes
 
         self.layers = {
             "down1": segnetDown2(self.in_channels, 64),
@@ -110,7 +111,7 @@ class segnet_mcdo(nn.Module):
 
         return up1
 
-    def forwardMultiple(self, inputs):
+    def forwardMultiple(self, inputs, calibrationPerClass):
         # First pass has backpropagation; others do not
         for i in range(self.mcdo_passes):
             if i == 0:
@@ -123,6 +124,13 @@ class segnet_mcdo(nn.Module):
         # Standard Mean and Variance
         # mean = x.mean(-1)
         # variance = x.pow(2).mean(-1)-mean.pow(2)
+
+        # Recalibrate MCDO
+        if not calibrationPerClass is None:
+            for c in range(self.n_classes):
+                if calibrationPerClass[c]['fit'] == True:
+                    x[:,c,:,:,:] = calibrationPerClass[c]['model'].predict(x[:,c,:,:,:].reshape(-1)).reshape(x[:,c,:,:,:].shape)
+
 
         # Softmax Mean and Variance
         mean = torch.nn.Softmax(1)(x).mean(-1)
@@ -145,11 +153,11 @@ class segnet_mcdo(nn.Module):
                     self.dropouts[k].eval()
 
 
-    def forward(self, inputs):
+    def forward(self, inputs, calibrationPerClass=None):
 
-        # self.configureDropout()
+        self.configureDropout()
 
-        output_bp, mean, variance = self.forwardMultiple(inputs)
+        output_bp, mean, variance = self.forwardMultiple(inputs, calibrationPerClass)
 
         return output_bp, mean, variance
 

@@ -11,9 +11,9 @@
 2. Modify configs/XXX.yml file
 3. Run: CUDA_VISIBLE_DEVICES=0 python train.py
 
-- To train RGB leg: CUDA_VISIBLE_DEVICES=0 python train.py --config BayesianSegnet/rgb_BayesianSegnet_0.5_T000.yml
-- To train D leg: CUDA_VISIBLE_DEVICES=0 python train.py --config BayesianSegnet/d_BayesianSegnet_0.5_T000.yml
-- To train/test SoftmaxFusion: CUDA_VISIBLE_DEVICES=0 python train.py --config BayesianSegnet/outputFusion_FusionSoftmaxMultiply_Train000_Recal{None,000,050,100}.yml
+- To train RGB leg: CUDA_VISIBLE_DEVICES=0 python train.py --config configs/BayesianSegnet/rgb_BayesianSegnet_0.5_T000.yml
+- To train D leg: CUDA_VISIBLE_DEVICES=0 python train.py --config configs/BayesianSegnet/d_BayesianSegnet_0.5_T000.yml
+- To train/test SoftmaxFusion: CUDA_VISIBLE_DEVICES=0 python train.py --config configs/BayesianSegnet/outputFusion_FusionSoftmaxMultiply_Train000_Recal{None,000,050,100}.yml
 
 
 

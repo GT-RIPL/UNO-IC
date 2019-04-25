@@ -49,7 +49,7 @@ data:
     path: ../../ros/data/airsim_03-30-2019/airsim_data_async
     noisy_type: None 
 training:
-    train_iters: 100000
+    train_iters: 100050
     batch_size: 2
     val_interval: 50 #5000
     n_workers: 8

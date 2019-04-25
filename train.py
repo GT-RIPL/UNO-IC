@@ -199,7 +199,6 @@ def train(cfg, writer, logger, logdir):
 
 
 
-
     best_iou = -100.0
     i = start_iter
     flag = True
@@ -209,12 +208,10 @@ def train(cfg, writer, logger, logdir):
         #################################################################################
         # Training
         #################################################################################
+        print("="*10,"TRAINING,RECALIBRATING,VALIDATING","="*10)
         for (images_list, labels_list, aux_list) in trainloader:
 
             inputs, labels = parseEightCameras( images_list, labels_list, aux_list, device )
-
-            m = list(cfg["models"].keys())[0]
-
 
             # Read batch from only one camera
             bs = cfg['training']['batch_size']
@@ -224,11 +221,6 @@ def train(cfg, writer, logger, logdir):
 
             if labels.shape[0]<=1:
                 continue
-
-            # images = images_list[0]
-            # labels = labels_list[0]
-            # images = generate_noise(images,cfg["data"]["noisy_type"])
-            #labels = generate_noise(labels,cfg["data"]["noisy_type"])
 
             i += 1
             start_ts = time.time()
@@ -250,8 +242,6 @@ def train(cfg, writer, logger, logdir):
                 loss[m] = loss_fn(input=outputs[m], target=labels)
                 loss[m].backward()
                 optimizers[m].step()
-
-
 
 
             # outputs = models[m](images)
@@ -290,6 +280,7 @@ def train(cfg, writer, logger, logdir):
                 #################################################################################
                 # Recalibration
                 #################################################################################
+                print("="*10,"RECALIBRATING","="*10)
                 if cfg["recal"]!="None":
                     steps = 50
 
@@ -523,10 +514,12 @@ def train(cfg, writer, logger, logdir):
                                                      cfg['model']['arch'],
                                                      cfg['data']['dataset']))
                         torch.save(state, save_path)
+
+                if cfg["recal"]!="None":
+                    exit()
                 #################################################################################
 
-            if cfg["recal"]!="None":
-                exit()
+
 
             if (i + 1) == cfg["training"]["train_iters"]:
                 flag = False

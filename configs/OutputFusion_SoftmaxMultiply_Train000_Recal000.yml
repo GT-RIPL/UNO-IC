@@ -1,4 +1,4 @@
-id: outputFusion_FusionSoftmaxMultiply_Train000_RecalNone
+id: outputFusion_FusionSoftmaxMultiply_Train000_Recal000
 model:
     arch: segnet_mcdo
 models:
@@ -12,7 +12,7 @@ models:
         mcdo_start_iter: 0
         mcdo_backprop: False
         learned_uncertainty: "no"
-        resume: models/rgb_BayesianSegnet_0.5_T000/rgb_segnet_mcdo_airsim_best_model.pkl #runs/segnet_airsim_normal/83811/rgb_segnet_airsim_best_model.pkl #None
+        resume: models/BayesianSegnet/rgb_BayesianSegnet_0.5_T000/rgb_segnet_mcdo_airsim_best_model.pkl #runs/segnet_airsim_normal/83811/rgb_segnet_airsim_best_model.pkl #None
     d:
         in_channels: 3
         start_layer: down1
@@ -23,9 +23,9 @@ models:
         mcdo_start_iter: 0
         mcdo_backprop: False
         learned_uncertainty: "no"
-        resume: models/d_BayesianSegnet_0.5_T000/d_segnet_mcdo_airsim_best_model.pkl #runs/segnet_airsim_normal/83811/rgb_segnet_airsim_best_model.pkl #None
+        resume: models/BayesianSegnet/d_BayesianSegnet_0.5_T000/d_segnet_mcdo_airsim_best_model.pkl #runs/segnet_airsim_normal/83811/rgb_segnet_airsim_best_model.pkl #None
 fusion: SoftmaxMultiply #{None,SoftmaxMultiply}
-recal: None #{None,afterMcdo,beforeMcdo}
+recal: afterMCDO #{None,afterMcdo,beforeMcdo}
 data:
     dataset: airsim
     train_split: train

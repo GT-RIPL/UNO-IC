@@ -111,7 +111,7 @@ class segnet_mcdo(nn.Module):
 
         return up1
 
-    def forwardMultiple(self, inputs, calibrationPerClass):
+    def forwardMultiple(self, inputs, calibrationPerClass, recalType):
         # First pass has backpropagation; others do not
         for i in range(self.mcdo_passes):
             if i == 0:
@@ -121,22 +121,35 @@ class segnet_mcdo(nn.Module):
                 with torch.no_grad():
                     x = torch.cat((x,self.forwardOnce(inputs).unsqueeze(-1)),-1)
 
-        # Standard Mean and Variance
-        # mean = x.mean(-1)
-        # variance = x.pow(2).mean(-1)-mean.pow(2)
+        # Uncalibrated Softmax Mean and Variance
+        uncal_mean = torch.nn.Softmax(1)(x).mean(-1)
+        uncal_variance = torch.nn.Softmax(1)(x).pow(2).mean(-1)-uncal_mean.pow(2)
+        mean = uncal_mean
+        variance = uncal_variance
 
-        # Recalibrate MCDO
-        if not calibrationPerClass is None:
-            for c in range(self.n_classes):
+        if recalType=="beforeMCDO":
+            # Recalibrate MCDO
+            if not calibrationPerClass is None:
+                for c in range(self.n_classes):
+                    if calibrationPerClass[c]['fit'] == True:
+                        x[:,c,:,:,:] = calibrationPerClass[c]['model'].predict(x[:,c,:,:,:].reshape(-1)).reshape(x[:,c,:,:,:].shape)
+
                 if calibrationPerClass[c]['fit'] == True:
-                    x[:,c,:,:,:] = calibrationPerClass[c]['model'].predict(x[:,c,:,:,:].reshape(-1)).reshape(x[:,c,:,:,:].shape)
+                    mean = torch.nn.Softmax(1)(x).mean(-1)
+                    variance = torch.nn.Softmax(1)(x).pow(2).mean(-1)-mean.pow(2)
 
 
-        # Softmax Mean and Variance
-        mean = torch.nn.Softmax(1)(x).mean(-1)
-        variance = torch.nn.Softmax(1)(x).pow(2).mean(-1)-mean.pow(2)
+        if recalType=="afterMCDO":
+            # Recalibrate MCDO
+            if not calibrationPerClass is None:
+                for c in range(self.n_classes):
+                    if calibrationPerClass[c]['fit'] == True:
+                        mean[:,c,:,:] = calibrationPerClass[c]['model'].predict(uncal_mean[:,c,:,:].reshape(-1)).reshape(uncal_mean[:,c,:,:].shape)            
 
-        return x_bp, mean, variance
+
+
+
+        return x_bp, mean, variance, uncal_mean, uncal_variance
 
     def configureDropout(self):
 
@@ -153,13 +166,13 @@ class segnet_mcdo(nn.Module):
                     self.dropouts[k].eval()
 
 
-    def forward(self, inputs, calibrationPerClass=None):
+    def forward(self, inputs, calibrationPerClass=None, recalType="None"):
 
         self.configureDropout()
 
-        output_bp, mean, variance = self.forwardMultiple(inputs, calibrationPerClass)
+        output_bp, mean, variance, uncal_mean, uncal_variance = self.forwardMultiple(inputs, calibrationPerClass, recalType)
 
-        return output_bp, mean, variance
+        return output_bp, mean, variance, uncal_mean, uncal_variance
 
     def init_vgg16_params(self, vgg16):
         blocks = [self.down1, self.down2, self.down3, self.down4, self.down5]

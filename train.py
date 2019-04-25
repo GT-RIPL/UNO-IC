@@ -525,7 +525,8 @@ def train(cfg, writer, logger, logdir):
                         torch.save(state, save_path)
                 #################################################################################
 
-                # exit()
+            if cfg["recal"]!="None":
+                exit()
 
             if (i + 1) == cfg["training"]["train_iters"]:
                 flag = False

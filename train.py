@@ -453,9 +453,6 @@ def train(cfg, writer, logger, logdir):
                             gt = labels_val.data.cpu().numpy()
 
 
-
-
-
                             if i_val % cfg["training"]["png_frames"] == 0:
                                 plotPrediction(logdir,cfg,n_classes,i,i_val,k,inputs,pred,gt)
 
@@ -528,7 +525,7 @@ def train(cfg, writer, logger, logdir):
                         torch.save(state, save_path)
                 #################################################################################
 
-                exit()
+                # exit()
 
             if (i + 1) == cfg["training"]["train_iters"]:
                 flag = False

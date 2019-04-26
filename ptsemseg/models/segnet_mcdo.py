@@ -168,7 +168,7 @@ class segnet_mcdo(nn.Module):
 
     def forward(self, inputs, calibrationPerClass=None, recalType="None"):
 
-        self.configureDropout()
+        # self.configureDropout()
 
         output_bp, mean, variance, uncal_mean, uncal_variance = self.forwardMultiple(inputs, calibrationPerClass, recalType)
 

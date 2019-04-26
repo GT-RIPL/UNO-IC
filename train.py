@@ -389,6 +389,7 @@ def train(cfg, writer, logger, logdir):
                 #################################################################################
                 # Validation
                 #################################################################################
+                print("="*10,"VALIDATING","="*10)
                 with torch.no_grad():
                     for k,valloader in valloaders.items():
                         for i_val, (images_list, labels_list, aux_list) in tqdm(enumerate(valloader)):
@@ -415,7 +416,7 @@ def train(cfg, writer, logger, logdir):
                                 # m = list(cfg["models"].keys())[0]
                                 output_bp[m], mean[m], variance[m], uncal_mean[m], uncal_variance[m] = \
                                     models[m](images_val[m],calibrationPerClass[m],cfg["recal"])
-                                outputs_val[m] = output_bp[m]
+                                outputs_val[m] = mean[m]
 
                                 val_loss[m] = loss_fn(input=outputs_val[m], target=labels_val)
 
@@ -662,7 +663,7 @@ if __name__ == "__main__":
         "--config",
         nargs="?",
         type=str,
-        default="configs/segnet_airsim_normal.yml",
+        default="configs/BayesianSegnet/segnet_airsim_normal.yml",
         help="Configuration file to use",
     )
 

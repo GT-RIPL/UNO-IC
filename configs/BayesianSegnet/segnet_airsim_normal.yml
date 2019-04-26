@@ -1,4 +1,4 @@
-id: rgb_BayesianSegnet_0.5_T000_24MCDO_Pretrained
+id: rgb_BayesianSegnet_0.5_T000_TestingMCDO
 model:
     arch: segnet_mcdo
 models:
@@ -7,8 +7,8 @@ models:
         start_layer: down1
         end_layer: up1
         reduction: 1.0
-        mcdo_passes: 24
-        dropoutP: 0.5
+        mcdo_passes: 6
+        dropoutP: 0.1
         mcdo_start_iter: 0
         mcdo_backprop: False
         learned_uncertainty: "no"
@@ -46,7 +46,7 @@ data:
     val_reduction: 1.0
     img_rows: 512
     img_cols: 512
-    path: ../../ros/data/airsim_03-30-2019/airsim_data_async
+    path: datasets/airsim_data_async #../../ros/data/airsim_03-30-2019/airsim_data_async
     noisy_type: None 
 training:
     train_iters: 100000

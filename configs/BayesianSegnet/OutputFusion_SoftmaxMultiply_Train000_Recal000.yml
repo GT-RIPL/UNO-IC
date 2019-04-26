@@ -46,7 +46,7 @@ data:
     val_reduction: 1.0
     img_rows: 512
     img_cols: 512
-    path: ../../ros/data/airsim_03-30-2019/airsim_data_async
+    path: datasets/airsim_data_async #../../ros/data/airsim_03-30-2019/airsim_data_async
     noisy_type: None 
 training:
     train_iters: 100050

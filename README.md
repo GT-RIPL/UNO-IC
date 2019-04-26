@@ -4,7 +4,8 @@
 - currently stored on ripl-w3 (ripl@143.215.207.42)
   - /home/datasets/airsim_03-30-2019
 - ask Yen-Chang for password
-- path parameter in config file should point to /home/datasets/airsim_03-30-2019/airsim_data_async
+- path parameter in config file should point to ./datasets/airsim_data_async
+- symbolic link ./datasets/airsim_data_async to dataset (airsim_03-30-2019/airsim_data_async)
 - no trailing backslash in path variable
 - folder should contain subfolders of modalities: (depth, depth_encoded, pose, scene, segmentation)
 1. Follow original readme installation instructions

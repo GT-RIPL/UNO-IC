@@ -286,19 +286,22 @@ class segnetDown2MCDO(nn.Module):
 
     def forward(self, inputs, MCDO=False):
         # Determine Type of Dropout
+        dropout_scale = 1.0
         if self.training:
             self.dropout.train(mode=True)
         else:
             if MCDO:
                 self.dropout.train(mode=True)
+                dropout_scale = 1.0/self.dropout.p
             else:
                 self.dropout.eval()
+
 
         outputs = self.conv1(inputs)
         outputs = self.conv2(outputs)
         unpooled_shape = outputs.size()
         outputs, indices = self.maxpool_with_argmax(outputs)
-        outputs = self.dropout(outputs)
+        outputs = dropout_scale*self.dropout(outputs)
         return outputs, indices, unpooled_shape
 
 
@@ -313,11 +316,13 @@ class segnetDown3MCDO(nn.Module):
 
     def forward(self, inputs, MCDO=False):
         # Determine Type of Dropout
+        dropout_scale = 1.0
         if self.training:
             self.dropout.train(mode=True)
         else:
             if MCDO:
                 self.dropout.train(mode=True)
+                dropout_scale = 1.0/self.dropout.p
             else:
                 self.dropout.eval()
 
@@ -326,7 +331,7 @@ class segnetDown3MCDO(nn.Module):
         outputs = self.conv3(outputs)
         unpooled_shape = outputs.size()
         outputs, indices = self.maxpool_with_argmax(outputs)
-        outputs = self.dropout(outputs)
+        outputs = dropout_scale*self.dropout(outputs)
         return outputs, indices, unpooled_shape
 
 
@@ -340,18 +345,20 @@ class segnetUp2MCDO(nn.Module):
 
     def forward(self, inputs, indices, output_shape, MCDO=False):
         # Determine Type of Dropout
+        dropout_scale = 1.0
         if self.training:
             self.dropout.train(mode=True)
         else:
             if MCDO:
                 self.dropout.train(mode=True)
+                dropout_scale = 1.0/self.dropout.p
             else:
                 self.dropout.eval()
 
         outputs = self.unpool(input=inputs, indices=indices, output_size=output_shape)
         outputs = self.conv1(outputs)
         outputs = self.conv2(outputs)
-        outputs = self.dropout(outputs)
+        outputs = dropout_scale*self.dropout(outputs)
         return outputs
 
 
@@ -366,11 +373,13 @@ class segnetUp3MCDO(nn.Module):
 
     def forward(self, inputs, indices, output_shape, MCDO=False):
         # Determine Type of Dropout
+        dropout_scale = 1.0
         if self.training:
             self.dropout.train(mode=True)
         else:
             if MCDO:
                 self.dropout.train(mode=True)
+                dropout_scale = 1.0/self.dropout.p
             else:
                 self.dropout.eval()
 
@@ -378,7 +387,7 @@ class segnetUp3MCDO(nn.Module):
         outputs = self.conv1(outputs)
         outputs = self.conv2(outputs)
         outputs = self.conv3(outputs)
-        outputs = self.dropout(outputs)
+        outputs = dropout_scale*self.dropout(outputs)
         return outputs
 
 

@@ -1,6 +1,7 @@
 # pytorch-semseg (RIPL README)
 
 0. Download airsim dataset
+
 - currently stored on ripl-w3 (ripl@143.215.207.42)
   - /home/datasets/airsim_03-30-2019
 - ask Yen-Chang for password
@@ -8,13 +9,37 @@
 - symbolic link ./datasets/airsim_data_async to dataset (airsim_03-30-2019/airsim_data_async)
 - no trailing backslash in path variable
 - folder should contain subfolders of modalities: (depth, depth_encoded, pose, scene, segmentation)
-1. Follow original readme installation instructions
-2. Modify configs/XXX.yml file
-3. Run: CUDA_VISIBLE_DEVICES=0 python train.py
+1. Install: follow original readme installation instructions
+2. Adjust configuration: configs/XXX.yml file
+3. Train:
 
+- General command: CUDA_VISIBLE_DEVICES=0 python train.py
 - To train RGB leg: CUDA_VISIBLE_DEVICES=0 python train.py --config configs/BayesianSegnet/rgb_BayesianSegnet_0.5_T000.yml
 - To train D leg: CUDA_VISIBLE_DEVICES=0 python train.py --config configs/BayesianSegnet/d_BayesianSegnet_0.5_T000.yml
 - To train/test SoftmaxFusion: CUDA_VISIBLE_DEVICES=0 python train.py --config configs/BayesianSegnet/outputFusion_FusionSoftmaxMultiply_Train000_Recal{None,000,050,100}.yml
+
+4. Tensorboard progress monitor: run tensorboard from within the "runs" directory
+
+- How to read?
+- Set pagination limit in tensorboard to match number of plots for a given split
+- First scrollable page shows training and validation losses
+- Second scrollable page shows accuracies
+- Title of plots describes the validation split (i.e. async_fog_000_clear_...)
+
+5. Compare final results: tools/tensorboard_segnet.py
+
+- This file generates a bar chart comparing the final data points from the training run
+- This file needs to be symlinked into a folder that contains the runs you want to compare
+  - the first level should have folders that group similar tests together
+  - the second level should have the folders produced by the training code (these folders themselves should have the tensorboard log files)
+- Things to change in the file itself
+  - include = ... (should have a list of of those previously created grouping folders, you can comment out specific groupings here if you don't want their results in the final barchart)
+  - run_comments
+    - keys in dictionary should be the folder names listed in "include"
+      - "names" should have a list of tuples
+        - the left element should be the name of the folder produced by the training code
+        - the right element should be a pretty name that describes the specific test
+      - "text" should be your comments about the grouping of tests
 
 
 

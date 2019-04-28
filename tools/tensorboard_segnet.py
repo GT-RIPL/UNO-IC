@@ -10,14 +10,14 @@ import yaml
 import os
 
 include = [
-           'run1',
+           # 'run1',
            # 'run2',
            # 'run3',
-           'run4',
+           # 'run4',
            'run5',
            'run6',
-           'run7',
-           # 'run8',
+           # 'run7',
+           'run8',
            ]
 
 run_comments = {
@@ -86,7 +86,14 @@ run_comments = {
         "text":
             """input fusion baseline""",            
     },    
-
+    "run8": {
+        "names": [
+            ("outputFusion_FusionSoftmaxMultiply_Train000_Recal000", "[Train on 000, Recal on 000] RGB x D Redo"),
+            ("outputFusion_FusionSoftmaxMultiply_Train000_Recal100", "[Train on 000, Recal on 100] RGB x D Redo"),
+        ],
+        "text":
+            """refactored code check""",            
+    },    
 
 
 
@@ -101,7 +108,8 @@ for i,file in enumerate(glob.glob("./**/*tfevents*",recursive=True)):
 
     directory = "/".join(file.split("/")[:-1])
     # yaml_file = "{}/pspnet_airsim.yml".format(directory)
-    yaml_file = "{}/segnet_airsim_normal.yml".format(directory)
+    # yaml_file = "{}/segnet_airsim_normal.yml".format(directory)
+    yaml_file = glob.glob("{}/*.yml".format(directory))[0]
 
     if not os.path.isfile(yaml_file):
         continue
@@ -280,6 +288,7 @@ for run in runs.keys():
 
 df = pd.DataFrame(data)
 
+print(df)
 
 df = df[(df.cls=="Mean_IoU____")]
 # df = df[(df.test=="fog_000")]

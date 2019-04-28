@@ -1,4 +1,4 @@
-id: rgb_BayesianSegnet_0.5_T000_RNone_6MCDO
+id: rgb_BayesianSegnet_0.5_T000_RNone_12MCDO
 model:
     arch: segnet_mcdo
 models:
@@ -7,7 +7,7 @@ models:
         start_layer: down1
         end_layer: up1
         reduction: 1.0
-        mcdo_passes: 6
+        mcdo_passes: 12
         dropoutP: 0.5
         mcdo_start_iter: 0
         mcdo_backprop: False

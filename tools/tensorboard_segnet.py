@@ -17,7 +17,8 @@ include = [
            'run5',
            'run6',
            # 'run7',
-           'run8',
+           # 'run8',
+           'run9',
            ]
 
 run_comments = {
@@ -62,8 +63,8 @@ run_comments = {
         "names": [
             ("outputFusion_calibratedSoftmaxMultiply",   "[Train on 000, Recal on 000] RGB x D"),
             ("outputFusion_uncalibratedSoftmaxMultiply", "[Train on 000, No Recal] RGB x D"),
-            ("outputFusion_uncalibratedSoftmaxDonly",    "[Train on 000, No Recal] D"),
-            ("outputFusion_uncalibratedSoftmaxRGBonly",  "[Train on 000, No Recal] RGB"),
+            # ("outputFusion_uncalibratedSoftmaxDonly",    "[Train on 000, No Recal] D"),
+            # ("outputFusion_uncalibratedSoftmaxRGBonly",  "[Train on 000, No Recal] RGB"),
         ],
         "text":
             """calibrated softmaxes before adding values for fusion""",            
@@ -72,9 +73,9 @@ run_comments = {
         "names": [
             ("outputFusion_calibratedSoftmaxMultiply_recalibrateOn050",            "[Train on 000, Recal on 050] RGB x D"),
             ("outputFusion_calibratedSoftmaxMultiply_recalibrateOn100",            "[Train on 000, Recal on 100] RGB x D"),
-            ("outputFusion_calibratedSoftmaxMultiply_recalibrateOn100DBlackout",   "[Train on 000, Recal on 100 / No D] RGB x D"),
-            ("outputFusion_calibratedSoftmaxMultiply_recalibrateOn100RGBBlackout", "[Train on 000, Recal on 100 / No RGB] RGB x D"),
-            ("outputFusion_calibratedSoftmaxMultiply_recalibrateOnAllSplit",       "[Train on 000, Recal on All] RGB x D"),            
+            # ("outputFusion_calibratedSoftmaxMultiply_recalibrateOn100DBlackout",   "[Train on 000, Recal on 100 / No D] RGB x D"),
+            # ("outputFusion_calibratedSoftmaxMultiply_recalibrateOn100RGBBlackout", "[Train on 000, Recal on 100 / No RGB] RGB x D"),
+            # ("outputFusion_calibratedSoftmaxMultiply_recalibrateOnAllSplit",       "[Train on 000, Recal on All] RGB x D"),            
         ],
         "text":
             """recalibrating on testing distribution""",            
@@ -93,6 +94,15 @@ run_comments = {
         ],
         "text":
             """refactored code check""",            
+    },    
+    "run9": {
+        "names": [
+            ("outputFusion_BayesianSegnet_0.5_T100_R000","[Train on 100, Recal on 000] RGB x D"),
+            ("outputFusion_BayesianSegnet_0.5_T100_R050","[Train on 100, Recal on 050] RGB x D"),
+            ("outputFusion_BayesianSegnet_0.5_T100_R100","[Train on 100, Recal on 100] RGB x D"),
+        ],
+        "text":
+            """train on 100pct fog levels""",
     },    
 
 

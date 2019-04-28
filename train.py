@@ -229,7 +229,6 @@ def train(cfg, writer, logger, logdir):
             [models[m].train() for m in models.keys()]
             [optimizers[m].zero_grad() for m in optimizers.keys()]
 
-
             # Run Models
             output_bp = {}; mean = {}; variance = {}; uncal_mean = {}; uncal_variance = {}
             outputs = {}; loss = {}
@@ -238,6 +237,12 @@ def train(cfg, writer, logger, logdir):
                 output_bp[m], mean[m], variance[m], uncal_mean[m], uncal_variance[m] = \
                     models[m](images[m],calibrationPerClass[m],cfg["recal"])
                 outputs[m] = output_bp[m]
+
+
+                # pred = outputs[m].data.max(1)[1].cpu().numpy()
+                # gt = labels.data.cpu().numpy()
+                # plotPrediction(logdir,cfg,n_classes,i,i,"train",inputs,pred,gt)
+                # exit()
 
                 loss[m] = loss_fn(input=outputs[m], target=labels)
                 loss[m].backward()
@@ -385,6 +390,7 @@ def train(cfg, writer, logger, logdir):
 
                 #################################################################################
 
+                [models[m].eval() for m in models.keys()]
 
                 #################################################################################
                 # Validation
@@ -417,6 +423,7 @@ def train(cfg, writer, logger, logdir):
                                 output_bp[m], mean[m], variance[m], uncal_mean[m], uncal_variance[m] = \
                                     models[m](images_val[m],calibrationPerClass[m],cfg["recal"])
                                 outputs_val[m] = mean[m]
+                                # outputs_val[m] = output_bp[m]
 
                                 val_loss[m] = loss_fn(input=outputs_val[m], target=labels_val)
 
@@ -447,6 +454,8 @@ def train(cfg, writer, logger, logdir):
 
                             if i_val % cfg["training"]["png_frames"] == 0:
                                 plotPrediction(logdir,cfg,n_classes,i,i_val,k,inputs,pred,gt)
+                                plotMeansVariances(logdir,cfg,n_classes,i,i_val,m,k+"/meanvar",inputs,pred,gt,mean,variance)
+
 
                                 if cfg["recal"]!="None":
                                     for m in cfg["models"]:

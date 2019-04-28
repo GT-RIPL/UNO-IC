@@ -292,7 +292,7 @@ class segnetDown2MCDO(nn.Module):
         else:
             if MCDO:
                 self.dropout.train(mode=True)
-                dropout_scale = 1.0/self.dropout.p
+                dropout_scale = 1.0/(1.0-self.dropout.p)
             else:
                 self.dropout.eval()
 
@@ -322,7 +322,7 @@ class segnetDown3MCDO(nn.Module):
         else:
             if MCDO:
                 self.dropout.train(mode=True)
-                dropout_scale = 1.0/self.dropout.p
+                dropout_scale = 1.0/(1.0-self.dropout.p)
             else:
                 self.dropout.eval()
 
@@ -351,7 +351,7 @@ class segnetUp2MCDO(nn.Module):
         else:
             if MCDO:
                 self.dropout.train(mode=True)
-                dropout_scale = 1.0/self.dropout.p
+                dropout_scale = 1.0/(1.0-self.dropout.p)
             else:
                 self.dropout.eval()
 
@@ -379,7 +379,7 @@ class segnetUp3MCDO(nn.Module):
         else:
             if MCDO:
                 self.dropout.train(mode=True)
-                dropout_scale = 1.0/self.dropout.p
+                dropout_scale = 1.0/(1.0-self.dropout.p)
             else:
                 self.dropout.eval()
 

@@ -10,116 +10,27 @@ import yaml
 import os
 
 include = [
-           # 'run1',
-           # 'run2',
-           # 'run3',
-           # 'run4',
-           'run5',
-           'run6',
-           # 'run7',
-           # 'run8',
-           # 'run9',
-           'run10',
+           'run1',
+           'run2',
            ]
 
 run_comments = {
     "run1": {
         "names": [
-            ("83811","RGB Only (No Dropout)"),
+            ("d_BayesianSegnet_0.1","Depth Only (Bayesian Segnet, p = 0.1)"),
+            ("rgb_BayesianSegnet_0.1","RGB Only (Bayesian Segnet, p = 0.1)"),
         ],
         "text":
-            """initial test on RGB only; no dropout; batch size 2""",
+            """following architecture from BayesSegnet paper, dropout p = 0.1""",
     },
     "run2": {
         "names": [
-            ("rgb_dropout_between_layers_0.1",None),
-            ("rgb_dropout_between_layers_0.3",None),
-            ("rgb_dropout_between_layers_0.5",None),
-            ("rgb_dropout_between_layers_0.9",None),
-        ],
-        "text":
-            """testing for best dropout performance (0.1,0.3,0.5,0.9); dropout after each block; batch size 2""",
-    },
-    "run3": {
-        "names": [
-            ("rgb_baseline_0.1dropout_extensiveDropout",None),
-            ("rgb_baseline_0.5dropout_extensiveDropout",None),
-            ("d_baseline_0.1dropout_extensiveDropout",None),
-            ("d_baseline_0.5dropout_extensiveDropout",None),            
-        ],
-        "text":
-            """testing for best dropout performance (0.1,0.3,0.5,0.9); dropout after each convolutional layer; batch size 2""",
-    },    
-    "run4": {
-        "names": [
-            ("d_BayesianSegnet_0.1","Depth Only (Bayesian Segnet, p = 0.1)"),
-            ("rgb_BayesianSegnet_0.1","RGB Only (Bayesian Segnet, p = 0.1)"),
             ("d_BayesianSegnet_0.5","Depth Only (Bayesian Segnet, p = 0.5)"),
             ("rgb_BayesianSegnet_0.5","RGB Only (Bayesian Segnet, p = 0.5)"),
         ],
         "text":
-            """following architecture from BayesSegnet paper""",
-    },
-    "run5": {
-        "names": [
-            ("outputFusion_calibratedSoftmaxMultiply",   "[Train on 000, Recal on 000] RGB x D"),
-            ("outputFusion_uncalibratedSoftmaxMultiply", "[Train on 000, No Recal] RGB x D"),
-            # ("outputFusion_uncalibratedSoftmaxDonly",    "[Train on 000, No Recal] D"),
-            # ("outputFusion_uncalibratedSoftmaxRGBonly",  "[Train on 000, No Recal] RGB"),
-        ],
-        "text":
-            """calibrated softmaxes before adding values for fusion""",            
-    },
-    "run6": {
-        "names": [
-            ("outputFusion_calibratedSoftmaxMultiply_recalibrateOn050",            "[Train on 000, Recal on 050] RGB x D"),
-            ("outputFusion_calibratedSoftmaxMultiply_recalibrateOn100",            "[Train on 000, Recal on 100] RGB x D"),
-            # ("outputFusion_calibratedSoftmaxMultiply_recalibrateOn100DBlackout",   "[Train on 000, Recal on 100 / No D] RGB x D"),
-            # ("outputFusion_calibratedSoftmaxMultiply_recalibrateOn100RGBBlackout", "[Train on 000, Recal on 100 / No RGB] RGB x D"),
-            # ("outputFusion_calibratedSoftmaxMultiply_recalibrateOnAllSplit",       "[Train on 000, Recal on All] RGB x D"),            
-        ],
-        "text":
-            """recalibrating on testing distribution""",            
-    },
-    "run7": {
-        "names": [
-            ("inputFusion_baseline", "[Train on 000, No Recal] RGBD Input Fusion"),
-        ],
-        "text":
-            """input fusion baseline""",            
+            """following architecture from BayesSegnet paper, dropout p = 0.5""",
     },    
-    "run8": {
-        "names": [
-            ("outputFusion_FusionSoftmaxMultiply_Train000_Recal000", "[Train on 000, Recal on 000] RGB x D Redo"),
-            ("outputFusion_FusionSoftmaxMultiply_Train000_Recal100", "[Train on 000, Recal on 100] RGB x D Redo"),
-        ],
-        "text":
-            """refactored code check""",            
-    },    
-    "run9": {
-        "names": [
-            # ("outputFusion_BayesianSegnet_0.5_T100_R000","[Train on 100, Recal on 000] RGB x D"),
-            # ("outputFusion_BayesianSegnet_0.5_T100_R050","[Train on 100, Recal on 050] RGB x D"),
-            # ("outputFusion_BayesianSegnet_0.5_T100_R100","[Train on 100, Recal on 100] RGB x D"),
-            ("outputFusion_BayesianSegnet_0.5_T050_R000","[Train on 050, Recal on 000] RGB x D"),
-            ("outputFusion_BayesianSegnet_0.5_T050_R050","[Train on 050, Recal on 050] RGB x D"),
-            ("outputFusion_BayesianSegnet_0.5_T050_R100","[Train on 050, Recal on 100] RGB x D"),            
-        ],
-        "text":
-            """train on 050,100pct fog levels""",
-    },    
-    "run10": {
-        "names": [
-            ("outputFusion_BayesianSegnet_0.5_Before6MCDO_T000_R000","[Train on 000, Sample Recal on 000] RGB x D MCDO Recal"),
-            ("outputFusion_BayesianSegnet_0.5_Before6MCDO_T000_R000.050.100","[Train on 000, Sample Recal on 000,050,100] RGB x D MCDO Recal"),
-            ("outputFusion_BayesianSegnet_0.5_Before6MCDO_T000_R050","[Train on 000, Sample Recal on 050] RGB x D MCDO Recal"),
-            ("outputFusion_BayesianSegnet_0.5_Before6MCDO_T000_R100","[Train on 000, Sample Recal on 100] RGB x D MCDO Recal"),
-        ],
-        "text":
-            """recalibrating 50pct dropout before mean var calculations""",
-    },    
-
-
 }
 
 

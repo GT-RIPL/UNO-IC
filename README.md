@@ -29,7 +29,10 @@
 5. Compare final results: tools/tensorboard_segnet.py
 
 - This file generates a bar chart comparing the final data points from the training run
-- This file needs to be symlinked into a folder that contains the runs you want to compare
+- Create a new folder somewhere that will store specific runs from the runs folder
+  - in the first level, create folders of your choice--these will group similar tests together
+  - in the second level, copy over the folders in the runs directory produced by the training code (these folders themselves should 
+- Symlink the tensorboard_segnet.py file into this folder that you create
   - the first level should have folders that group similar tests together
   - the second level should have the folders produced by the training code (these folders themselves should have the tensorboard log files)
 - Things to change in the file itself

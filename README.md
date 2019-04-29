@@ -26,17 +26,13 @@
 - Second scrollable page shows accuracies
 - Title of plots describes the validation split (i.e. async_fog_000_clear_...)
 
-5. Compare final results: tools/tensorboard_segnet.py
+5. Compare final results: ./analysis
 
-- This file generates a bar chart comparing the final data points from the training run
-- Create a new folder somewhere that will store specific runs from the runs folder
-  - in the first level, create folders of your choice--these will group similar tests together
-  - in the second level, copy over the folders in the runs directory produced by the training code (these folders themselves should 
-- Symlink the tensorboard_segnet.py file into this folder that you create
-  - the first level should have folders that group similar tests together
-  - the second level should have the folders produced by the training code (these folders themselves should have the tensorboard log files)
-- Things to change in the file itself
-  - include = ... (should have a list of of those previously created grouping folders, you can comment out specific groupings here if you don't want their results in the final barchart)
+- tensorboard_segnet.py file generates a bar chart comparing the final data points from the training logs
+- In the first level of the analysis folder, create folders of your choice--these will group similar tests together (i.e. run1, run2)
+- In the second level of the analysis folder, copy over relevant runs from the runs directory (these folders themselves should have the tensorboard log files in them)
+- Things to change in tensorboard_segnet.py
+  - include = ... (should have a list of of those first level grouping folders, you can comment out specific groupings here if you don't want their results in the final barchart)
   - run_comments
     - keys in dictionary should be the folder names listed in "include"
       - "names" should have a list of tuples

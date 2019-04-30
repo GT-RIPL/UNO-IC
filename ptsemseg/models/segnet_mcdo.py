@@ -41,6 +41,26 @@ class segnet_mcdo(nn.Module):
 
         self.dropouts = {k:nn.Dropout2d(p=dropoutP, inplace=False) for k in self.layers.keys()}
               
+        # self.dropout_layers = ["down3","down4","down5","up5","up4","up3"]
+
+        # inp = torch.Tensor(512,512,3)
+        # f = mod.forward(autograd.Variable(torch.Tensor(1, *inp.shape)))
+        # print( int(np.prod(f.size()[1:])) )
+
+        # print(dir(segnetDown3MCDO(128, 256,  pMCDO=dropoutP)))
+        # exit()
+
+        # self.dropout_masks = {
+        #     "down3": Variable(torch.bernoulli(torch.full_like()).fill_(dropoutP)))
+        #     "down4": Variable(torch.bernoulli(input1.data.new(input1.data.size()).fill_(dropoutP)))
+        #     "down5": Variable(torch.bernoulli(input1.data.new(input1.data.size()).fill_(dropoutP)))
+        #     "up5":   Variable(torch.bernoulli(input1.data.new(input1.data.size()).fill_(dropoutP)))
+        #     "up4":   Variable(torch.bernoulli(input1.data.new(input1.data.size()).fill_(dropoutP)))
+        #     "up3":   Variable(torch.bernoulli(input1.data.new(input1.data.size()).fill_(dropoutP)))
+        # }
+
+
+
         self.ordered_layers = [
             "down1",
             "down2",

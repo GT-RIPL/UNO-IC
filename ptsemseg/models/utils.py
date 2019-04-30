@@ -282,7 +282,7 @@ class segnetDown2MCDO(nn.Module):
         self.conv1 = conv2DBatchNormRelu(in_size, out_size, 3, 1, 1)
         self.conv2 = conv2DBatchNormRelu(out_size, out_size, 3, 1, 1)
         self.maxpool_with_argmax = nn.MaxPool2d(2, 2, return_indices=True)
-        self.dropout = nn.Dropout(p=pMCDO)
+        self.dropout = nn.Dropout2d(p=pMCDO)
 
     def forward(self, inputs, MCDO=False):
         # Determine Type of Dropout
@@ -312,7 +312,7 @@ class segnetDown3MCDO(nn.Module):
         self.conv2 = conv2DBatchNormRelu(out_size, out_size, 3, 1, 1)
         self.conv3 = conv2DBatchNormRelu(out_size, out_size, 3, 1, 1)
         self.maxpool_with_argmax = nn.MaxPool2d(2, 2, return_indices=True)
-        self.dropout = nn.Dropout(p=pMCDO)
+        self.dropout = nn.Dropout2d(p=pMCDO)
 
     def forward(self, inputs, MCDO=False):
         # Determine Type of Dropout
@@ -341,7 +341,7 @@ class segnetUp2MCDO(nn.Module):
         self.unpool = nn.MaxUnpool2d(2, 2)
         self.conv1 = conv2DBatchNormRelu(in_size, in_size, 3, 1, 1)
         self.conv2 = conv2DBatchNormRelu(in_size, out_size, 3, 1, 1)
-        self.dropout = nn.Dropout(p=pMCDO)
+        self.dropout = nn.Dropout2d(p=pMCDO)
 
     def forward(self, inputs, indices, output_shape, MCDO=False):
         # Determine Type of Dropout
@@ -369,7 +369,7 @@ class segnetUp3MCDO(nn.Module):
         self.conv1 = conv2DBatchNormRelu(in_size, in_size, 3, 1, 1)
         self.conv2 = conv2DBatchNormRelu(in_size, in_size, 3, 1, 1)
         self.conv3 = conv2DBatchNormRelu(in_size, out_size, 3, 1, 1)
-        self.dropout = nn.Dropout(p=pMCDO)
+        self.dropout = nn.Dropout2d(p=pMCDO)
 
     def forward(self, inputs, indices, output_shape, MCDO=False):
         # Determine Type of Dropout

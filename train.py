@@ -114,7 +114,7 @@ def train(cfg, writer, logger, logdir):
     time_meter = averageMeter()
 
     # Select Recalibrator
-    if cfg["recalibrator"]=="Historgram":
+    if cfg["recalibrator"]=="Histogram":
         Recalibrator = HistogramRecalibrator
         print("Recalibrator: Histogram")
     elif "Polynomial" in cfg["recalibrator"]:

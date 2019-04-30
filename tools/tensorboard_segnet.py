@@ -14,12 +14,13 @@ include = [
            # 'run2',
            # 'run3',
            # 'run4',
-           'run5',
-           'run6',
+           # 'run5',
+           # 'run6',
            # 'run7',
-           # 'run8',
+           'run8',
            # 'run9',
            'run10',
+           "run11",
            ]
 
 run_comments = {
@@ -90,17 +91,17 @@ run_comments = {
     },    
     "run8": {
         "names": [
-            ("outputFusion_FusionSoftmaxMultiply_Train000_Recal000", "[Train on 000, Recal on 000] RGB x D Redo"),
-            ("outputFusion_FusionSoftmaxMultiply_Train000_Recal100", "[Train on 000, Recal on 100] RGB x D Redo"),
+            ("outputFusion_FusionSoftmaxMultiply_Train000_Recal000", ".(p=0.5) [Train on 000, Recal on 000] RGB x D"),
+            ("outputFusion_FusionSoftmaxMultiply_Train000_Recal100", ".(p=0.5) [Train on 000, Recal on 100] RGB x D"),
         ],
         "text":
             """refactored code check""",            
     },    
     "run9": {
         "names": [
-            # ("outputFusion_BayesianSegnet_0.5_T100_R000","[Train on 100, Recal on 000] RGB x D"),
-            # ("outputFusion_BayesianSegnet_0.5_T100_R050","[Train on 100, Recal on 050] RGB x D"),
-            # ("outputFusion_BayesianSegnet_0.5_T100_R100","[Train on 100, Recal on 100] RGB x D"),
+            ("outputFusion_BayesianSegnet_0.5_T100_R000","[Train on 100, Recal on 000] RGB x D"),
+            ("outputFusion_BayesianSegnet_0.5_T100_R050","[Train on 100, Recal on 050] RGB x D"),
+            ("outputFusion_BayesianSegnet_0.5_T100_R100","[Train on 100, Recal on 100] RGB x D"),
             ("outputFusion_BayesianSegnet_0.5_T050_R000","[Train on 050, Recal on 000] RGB x D"),
             ("outputFusion_BayesianSegnet_0.5_T050_R050","[Train on 050, Recal on 050] RGB x D"),
             ("outputFusion_BayesianSegnet_0.5_T050_R100","[Train on 050, Recal on 100] RGB x D"),            
@@ -110,14 +111,24 @@ run_comments = {
     },    
     "run10": {
         "names": [
-            ("outputFusion_BayesianSegnet_0.5_Before6MCDO_T000_R000","[Train on 000, Sample Recal on 000] RGB x D MCDO Recal"),
-            ("outputFusion_BayesianSegnet_0.5_Before6MCDO_T000_R000.050.100","[Train on 000, Sample Recal on 000,050,100] RGB x D MCDO Recal"),
-            ("outputFusion_BayesianSegnet_0.5_Before6MCDO_T000_R050","[Train on 000, Sample Recal on 050] RGB x D MCDO Recal"),
-            ("outputFusion_BayesianSegnet_0.5_Before6MCDO_T000_R100","[Train on 000, Sample Recal on 100] RGB x D MCDO Recal"),
+            ("outputFusion_BayesianSegnet_0.5_Before6MCDO_T000_R000","(p=0.5) [Train on 000, Sample Recal on 000] RGB x D MCDO Recal"),
+            # ("outputFusion_BayesianSegnet_0.5_Before6MCDO_T000_R000.050.100","(p=0.5) [Train on 000, Sample Recal on 000,050,100] RGB x D MCDO Recal"),
+            # ("outputFusion_BayesianSegnet_0.5_Before6MCDO_T000_R050","(p=0.5) [Train on 000, Sample Recal on 050] RGB x D MCDO Recal"),
+            ("outputFusion_BayesianSegnet_0.5_Before6MCDO_T000_R100","(p=0.5) [Train on 000, Sample Recal on 100] RGB x D MCDO Recal"),
         ],
         "text":
             """recalibrating 50pct dropout before mean var calculations""",
-    },    
+    },     
+    "run11": {
+        "names": [
+            ("outputFusion_BayesianSegnet_0.1_After6MCDO_T000_R000",".(p=0.1) [Train on 000, Sample Recal on 000] RGB x D"),
+            ("outputFusion_BayesianSegnet_0.1_After6MCDO_T000_R100",".(p=0.1) [Train on 000, Sample Recal on 100] RGB x D"),
+            ("outputFusion_BayesianSegnet_0.1_Before6MCDO_T000_R000","(p=0.1) [Train on 000, Sample Recal on 000] RGB x D MCDO Recal"),
+            ("outputFusion_BayesianSegnet_0.1_Before6MCDO_T000_R100","(p=0.1) [Train on 000, Sample Recal on 100] RGB x D MCDO Recal"),            
+        ],
+        "text":
+            """trying recalibrating 10pct dropout before/after mean var calculations""",
+    },        
 
 
 }
@@ -437,6 +448,10 @@ df.to_csv('out.csv',index=False)
 
 df = df.set_index(["test"])
 df = df.pivot_table(index=df.index, values='mean', columns='full', aggfunc='first')
+
+df = df[:3]
+# exit()
+
 df.loc['combined'] = df.mean()
 
 print(df)

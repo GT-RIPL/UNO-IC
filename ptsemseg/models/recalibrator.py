@@ -6,7 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 
-class Recalibrator():
+class HistogramRecalibrator():
     def __init__(self,device):
 
         self.device = device
@@ -53,6 +53,69 @@ class Recalibrator():
         i = (1.*len(self.W)*torch.clamp(x,min=0,max=1)).floor().long()-1
 
         return self.W[i]*x + self.b[i]
+    
+
+class PolynomialRecalibrator():
+    def __init__(self,degree,device):
+
+        self.model = PolynomialRegressionModel(degree,device)
+
+        self.criterion = nn.MSELoss()
+        self.l_rate = 0.01
+        self.optimiser = torch.optim.SGD(self.model.parameters(),lr=self.l_rate)
+        self.epochs = 2000
+        self.device = device
+
+    def fit(self,x_init,y_init,device):
+
+        self.device = device
+        for epoch in range(self.epochs):
+            self.optimiser.zero_grad()
+            y_pred = self.model.forward(x_init)
+            loss = self.criterion(y_pred,y_init)
+            loss.backward()
+            self.optimiser.step()
+            print("Epoch {}, Loss {}".format(epoch,loss.data.cpu().numpy()))
+
+
+    def predict(self,x):
+        with torch.no_grad():
+            out = self.model.forward(x)
+        return out
+
+class LinearRegressionModel(nn.Module):
+    def __init__(self):
+        super(LinearRegressionModel, self).__init__() 
+        self.linear = nn.Linear(1,1)
+    def forward(self, x):
+        return self.linear(x)
+
+class PolynomialRegressionModel(torch.nn.Module):
+    def __init__(self, degree, device):
+        super(PolynomialRegressionModel, self).__init__()
+        self.degree = degree
+        self.W = torch.nn.Parameter(data=torch.ones(self.degree,1,device=device,dtype=torch.float), requires_grad=True)        
+    def forward(self, x):
+        self.W = self.W.to(x.device)
+        X = torch.cat(tuple([torch.pow(x,i).unsqueeze(1) for i in range(self.degree)]),1)
+        return torch.matmul(X,self.W).squeeze()
+
+
+
+# class CalibrationNet(torch.nn.Module):
+#     # def __init__(self, n_feature, n_hidden, n_output):
+#     def __init__(self):
+#         super(CalibrationNet, self).__init__()
+#         n_feature = 1
+#         n_hidden = 100
+#         n_output = 1
+#         self.hidden = torch.nn.Linear(n_feature, n_hidden)   # hidden layer
+#         self.predict = torch.nn.Linear(n_hidden, n_output)   # output layer
+#     def forward(self, x):
+#         x = F.relu(self.hidden(x))      # activation function for hidden layer
+#         x = self.predict(x)             # linear output
+#         return x
+
 
 def accumulateEmpirical(overall_match_var,per_class_match_var,ranges,n_classes,m,label,mean,variance):
 
@@ -222,8 +285,9 @@ def fitCalibration(calibration,calibrationPerClass,overall_match_var,per_class_m
     # x = np.array(xp)
     # y = np.array(yp)
 
-    x = torch.from_numpy(x.reshape(-1,1)).float()
-    y = torch.from_numpy(y).float()
+    # x = torch.from_numpy(x.reshape(-1,1)).float().to(device)
+    x = torch.from_numpy(x).float().to(device)
+    y = torch.from_numpy(y).float().to(device)
 
     # Fit Calibration if Not Already
     if not calibration[m]['fit']:
@@ -234,8 +298,9 @@ def fitCalibration(calibration,calibrationPerClass,overall_match_var,per_class_m
             x = np.array([per_class_match_var[m][r][c]['pred'] for r in ranges])
             y = np.array([per_class_match_var[m][r][c]['obs'] for r in ranges])
 
-            x = torch.from_numpy(x.reshape(-1,1)).float()
-            y = torch.from_numpy(y).float()
+            # x = torch.from_numpy(x.reshape(-1,1)).float().to(device)
+            x = torch.from_numpy(x).float().to(device)
+            y = torch.from_numpy(y).float().to(device)
 
             # Fit Calibration if Not Already
             if not calibrationPerClass[m][c]['fit']:
@@ -286,7 +351,8 @@ def showCalibration(calibration,calibrationPerClass,overall_match_var,per_class_
     x = np.array([overall_match_var[m][r]['pred'] for r in ranges])
     y = np.array([overall_match_var[m][r]['obs'] for r in ranges])
 
-    x = torch.from_numpy(x.reshape(-1,1)).float()
+    # x = torch.from_numpy(x.reshape(-1,1)).float()
+    x = torch.from_numpy(x).float()
 
     # y_pred = calibration[m]["model"](x)
     y_pred = calibration[m]["model"].predict(x.to(device))
@@ -299,7 +365,8 @@ def showCalibration(calibration,calibrationPerClass,overall_match_var,per_class_
 
     # Recalibration Curve
     x = np.arange(0,1,0.001)
-    x = torch.from_numpy(x.reshape(-1,1)).float()
+    # x = torch.from_numpy(x.reshape(-1,1)).float()
+    x = torch.from_numpy(x).float()
 
     # y = calibration[m]["model"](x)
     y = calibration[m]["model"].predict(x.to(device))
@@ -351,7 +418,8 @@ def showCalibration(calibration,calibrationPerClass,overall_match_var,per_class_
         x = np.array([per_class_match_var[m][r][c]['pred'] for r in ranges])
         y = np.array([per_class_match_var[m][r][c]['obs'] for r in ranges])
 
-        x = torch.from_numpy(x.reshape(-1,1)).float()
+        # x = torch.from_numpy(x.reshape(-1,1)).float()
+        x = torch.from_numpy(x).float()
 
         y_pred = calibrationPerClass[m][c]["model"].predict(x.to(device))
         y_pred = y_pred.cpu().numpy()

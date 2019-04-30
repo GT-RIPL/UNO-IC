@@ -28,6 +28,8 @@ from ptsemseg.optimizers import get_optimizer
 from tensorboardX import SummaryWriter
 from scipy.misc import imsave
 
+from functools import partial 
+
 import matplotlib.pyplot as plt
 
 def train(cfg, writer, logger, logdir):
@@ -111,11 +113,22 @@ def train(cfg, writer, logger, logdir):
     val_REG_loss_meter = {env:averageMeter() for env in valloaders.keys()}
     time_meter = averageMeter()
 
+    # Select Recalibrator
+    if cfg["recalibrator"]=="Historgram":
+        Recalibrator = HistogramRecalibrator
+        print("Recalibrator: Histogram")
+    elif "Polynomial" in cfg["recalibrator"]:
+        degree = int(cfg["recalibrator"].split("_")[-1]        )
+        Recalibrator = partial(PolynomialRecalibrator,degree)
+        print("Recalibrator: Polynomial ({})".format(degree))
+    else:
+        print("Recalibrator: Not Supported")
+        exit()
+
+
     # Load Recalibration Model
     calibration = {m:{'model':Recalibrator(device),'fit':False} for m in cfg["models"].keys()}
     calibrationPerClass = {m:{n:{'model':Recalibrator(device),'fit':False} for n in range(n_classes)} for m in cfg["models"].keys()}
-
-
 
     start_iter = 0
     models = {}
@@ -331,6 +344,7 @@ def train(cfg, writer, logger, logdir):
                                     overall_match_var,per_class_match_var = accumulateEmpirical(overall_match_var,per_class_match_var,ranges,n_classes,m,labels_recal,mean,variance)
                                 else:
                                     print("Recalibration Type Not Supported")
+
 
                     for m in cfg["models"].keys():
 

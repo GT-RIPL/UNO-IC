@@ -1,4 +1,4 @@
-id: outputFusion_BayesianSegnet_0.5_Before6MCDO_T000_R000
+id: outputFusion_LearnedRecalibrator_Polynomial2
 model:
     arch: segnet_mcdo
 models:
@@ -7,25 +7,26 @@ models:
         start_layer: down1
         end_layer: up1
         reduction: 1.0
-        mcdo_passes: 6
+        mcdo_passes: 1
         dropoutP: 0.5
         mcdo_start_iter: 0
         mcdo_backprop: False
         learned_uncertainty: "no"
-        resume: models/BayesianSegnet/rgb_BayesianSegnet_0.5_T050/rgb_segnet_mcdo_airsim_best_model.pkl
+        resume: models/BayesianSegnet/rgb_BayesianSegnet_0.5_T000/rgb_segnet_mcdo_airsim_best_model.pkl
     d:
         in_channels: 3
         start_layer: down1
         end_layer: up1
         reduction: 1.0
-        mcdo_passes: 6
+        mcdo_passes: 1
         dropoutP: 0.5
         mcdo_start_iter: 0
         mcdo_backprop: False
         learned_uncertainty: "no"
-        resume: models/BayesianSegnet/d_BayesianSegnet_0.5_T050/d_segnet_mcdo_airsim_best_model.pkl
+        resume: models/BayesianSegnet/d_BayesianSegnet_0.5_T000/d_segnet_mcdo_airsim_best_model.pkl
 fusion: SoftmaxMultiply #{None,SoftmaxMultiply}
-recal: beforeMCDO #{None,afterMCDO,beforeMCDO}
+recal: afterMCDO #{None,afterMCDO,beforeMCDO}
+recalibrator: Polynomial_2 #{Histogram,Polynomial_X}
 data:
     dataset: airsim
     train_split: train

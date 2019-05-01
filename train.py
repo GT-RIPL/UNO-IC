@@ -121,7 +121,7 @@ def train(cfg, writer, logger, logdir):
         Recalibrator = HistogramLinearRecalibrator
         print("Recalibrator: Histogram")        
     elif "Polynomial" in cfg["recalibrator"]:
-        degree = int(cfg["recalibrator"].split("_")[-1]        )
+        degree = int(cfg["recalibrator"].split("_")[-1])
         Recalibrator = partial(PolynomialRecalibrator,degree)
         print("Recalibrator: Polynomial ({})".format(degree))
     else:
@@ -146,13 +146,16 @@ def train(cfg, writer, logger, logdir):
         models[model] = get_model(cfg["model"], 
                                   n_classes,
                                   input_size=(cfg['data']['img_rows'],cfg['data']['img_cols']),
+                                  batch_size=cfg["training"]["batch_size"],
                                   in_channels=attr['in_channels'],
                                   start_layer=attr['start_layer'],
                                   end_layer=attr['end_layer'],
                                   mcdo_passes=attr['mcdo_passes'], 
+                                  fixed_mcdo=(attr['fixed_mcdo']=="Yes"),
                                   dropoutP=attr['dropoutP'],
                                   learned_uncertainty=attr['learned_uncertainty'],
-                                  reduction=attr['reduction']).to(device)
+                                  reduction=attr['reduction'],
+                                  device=device).to(device)
 
 
 

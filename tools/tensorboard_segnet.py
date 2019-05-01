@@ -14,7 +14,7 @@ include = [
            # 'run2',
            # 'run3',
            # 'run4',
-           # 'run5',
+           'run5',
            # 'run6',
            # 'run7',
            # 'run8',
@@ -23,7 +23,7 @@ include = [
            # "run11",
            # "run12",
            # "run13",
-           # "run14",
+           "run14",
            "run15",
            ]
 
@@ -162,6 +162,10 @@ run_comments = {
     },     
     "run15": {
         "names": [
+            ("outputFusion_HistogramLinear_3","[Train on 000, Recal on 000] RGB x D Hist3"),
+            ("outputFusion_HistogramLinear_5","[Train on 000, Recal on 000] RGB x D Hist5"),
+            ("outputFusion_HistogramLinear_7","[Train on 000, Recal on 000] RGB x D Hist7"),
+            ("outputFusion_HistogramLinear_9","[Train on 000, Recal on 000] RGB x D Hist9"),
             ("outputFusion_HistogramLinear_10","[Train on 000, Recal on 000] RGB x D Hist10"),
             ("outputFusion_HistogramLinear_20","[Train on 000, Recal on 000] RGB x D Hist20"),
             ("outputFusion_HistogramLinear_30","[Train on 000, Recal on 000] RGB x D Hist30"),
@@ -169,6 +173,18 @@ run_comments = {
         "text":
             """testing number of histogram bins""",
     },     
+    "run16": {
+        "names": [
+            ("outputFusion_HistogramLinear_4_R100","[Train on 000, Recal on 100] RGB x D Hist4"),
+            ("outputFusion_HistogramLinear_8_R100","[Train on 000, Recal on 100] RGB x D Hist8"),
+            ("outputFusion_HistogramLinear_16_R100","[Train on 000, Recal on 100] RGB x D Hist16"),
+            ("outputFusion_HistogramLinear_32_R100","[Train on 000, Recal on 100] RGB x D Hist32"),            
+        ],
+        "text":
+            """testing number of histogram bins""",
+    },     
+
+
 
 
 

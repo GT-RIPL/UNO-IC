@@ -13,14 +13,17 @@ from ptsemseg.models.frrn import *
 def get_model(model_dict, 
               n_classes, 
               input_size=(512,512),
+              batch_size=2,
               mcdo_passes=1,
+              fixed_mcdo=False,
               dropoutP=0.1,
               in_channels=3,
               start_layer="convbnrelu1_1",
               end_layer="classification",
               learned_uncertainty="none",
               version=None, 
-              reduction=1.0):
+              reduction=1.0,
+              device="cpu"):
     name = model_dict['arch']
     model = _get_model_instance(name)
     param_dict = copy.deepcopy(model_dict)
@@ -42,14 +45,17 @@ def get_model(model_dict,
     elif name == "segnet_mcdo":
         model = model(n_classes=n_classes, 
                       input_size=input_size,
+                      batch_size=batch_size,
                       version=version, 
                       reduction=reduction, 
                       mcdo_passes=mcdo_passes,
+                      fixed_mcdo=fixed_mcdo,
                       dropoutP=dropoutP,
                       learned_uncertainty=learned_uncertainty,
                       in_channels=in_channels,
                       start_layer=start_layer,
                       end_layer=end_layer,
+                      device=device,
                       **param_dict)
         vgg16 = models.vgg16(pretrained=True)
         model.init_vgg16_params(vgg16)

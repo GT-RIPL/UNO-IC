@@ -302,7 +302,7 @@ def train(cfg, writer, logger, logdir):
                 #################################################################################
                 print("="*10,"RECALIBRATING","="*10)
                 if cfg["recal"]!="None":
-                    steps = 50
+                    steps = cfg["bins"] #50
 
                     ranges = list(zip([1.*a/steps for a in range(steps+2)][:-2],
                                       [1.*a/steps for a in range(steps+2)][1:]))

@@ -13,14 +13,16 @@ include = [
            # 'run1',
            # 'run2',
            # 'run3',
-           # 'run4',
+           'run4',
            # 'run5',
            # 'run6',
            # 'run7',
-           'run8',
+           # 'run8',
            # 'run9',
-           'run10',
-           "run11",
+           # 'run10',
+           # "run11",
+           # "run12",
+           "run13",
            ]
 
 run_comments = {
@@ -53,8 +55,8 @@ run_comments = {
     },    
     "run4": {
         "names": [
-            ("d_BayesianSegnet_0.1","Depth Only (Bayesian Segnet, p = 0.1)"),
-            ("rgb_BayesianSegnet_0.1","RGB Only (Bayesian Segnet, p = 0.1)"),
+            # ("d_BayesianSegnet_0.1","Depth Only (Bayesian Segnet, p = 0.1)"),
+            # ("rgb_BayesianSegnet_0.1","RGB Only (Bayesian Segnet, p = 0.1)"),
             ("d_BayesianSegnet_0.5","Depth Only (Bayesian Segnet, p = 0.5)"),
             ("rgb_BayesianSegnet_0.5","RGB Only (Bayesian Segnet, p = 0.5)"),
         ],
@@ -63,8 +65,8 @@ run_comments = {
     },
     "run5": {
         "names": [
-            ("outputFusion_calibratedSoftmaxMultiply",   "[Train on 000, Recal on 000] RGB x D"),
-            ("outputFusion_uncalibratedSoftmaxMultiply", "[Train on 000, No Recal] RGB x D"),
+            ("outputFusion_calibratedSoftmaxMultiply",   "[Train on 000, Recal on 000] RGB x D Hist"),
+            ("outputFusion_uncalibratedSoftmaxMultiply", "[Train on 000, No Recal] RGB x D Hist"),
             # ("outputFusion_uncalibratedSoftmaxDonly",    "[Train on 000, No Recal] D"),
             # ("outputFusion_uncalibratedSoftmaxRGBonly",  "[Train on 000, No Recal] RGB"),
         ],
@@ -129,7 +131,23 @@ run_comments = {
         "text":
             """trying recalibrating 10pct dropout before/after mean var calculations""",
     },        
-
+    "run12": {
+        "names": [
+            ("outputFusion_LearnedRecalibrator_Polynomial4","[Train on 000, Recal on 000] RGB x D Poly4"),
+            ("outputFusion_LearnedRecalibrator_Polynomial8","[Train on 000, Recal on 000] RGB x D Poly8"),
+            ("outputFusion_LearnedRecalibrator_Polynomial16","[Train on 000, Recal on 000] RGB x D Poly16"),
+        ],
+        "text":
+            """trying learned parameterized recalibration curves""",
+    },     
+    "run13": {
+        "names": [
+            ("d_BayesianSegnet_0.5_dropout2d","D Only (Bayesian Segnet 2D, p = 0.5)"),
+            ("rgb_BayesianSegnet_0.5_dropout2d","RGB Only (Bayesian Segnet 2D, p = 0.5)"),
+        ],
+        "text":
+            """trying dropout2d instead of dropout, better suited for convnets""",
+    },     
 
 }
 

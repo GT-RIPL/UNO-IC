@@ -529,13 +529,13 @@ class airsimLoader(data.Dataset):
             dataset_div['train'][region_type][0] = total_distance - sum_distance
             dataset_div['train'][region_type][1] = tem_list
 
-        for div_type, one_region_dict in dataset_div.items():
-        ## Train, Val, Test
-            print(div_type)
-            for region_type, distance_and_path_list in one_region_dict.items():
-                print (region_type)
-                print(distance_and_path_list[0])
-            print('=========================================')
+        # for div_type, one_region_dict in dataset_div.items():
+        # ## Train, Val, Test
+        #     print(div_type)
+        #     for region_type, distance_and_path_list in one_region_dict.items():
+        #         print (region_type)
+        #         print(distance_and_path_list[0])
+        #     print('=========================================')
 
         color=['red','yellow','green','blue']
         ## Visualiaztion with respect to region

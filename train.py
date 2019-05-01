@@ -127,8 +127,10 @@ def train(cfg, writer, logger, logdir):
 
 
     # Load Recalibration Model
+    print("Loading Recalibration Model...",)
     calibration = {m:{'model':Recalibrator(device),'fit':False} for m in cfg["models"].keys()}
     calibrationPerClass = {m:{n:{'model':Recalibrator(device),'fit':False} for n in range(n_classes)} for m in cfg["models"].keys()}
+    print("DONE")
 
     start_iter = 0
     models = {}

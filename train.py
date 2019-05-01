@@ -114,9 +114,12 @@ def train(cfg, writer, logger, logdir):
     time_meter = averageMeter()
 
     # Select Recalibrator
-    if cfg["recalibrator"]=="Histogram":
-        Recalibrator = HistogramRecalibrator
+    if cfg["recalibrator"]=="HistogramFlat":
+        Recalibrator = HistogramFlatRecalibrator
         print("Recalibrator: Histogram")
+    elif cfg["recalibrator"]=="HistogramLinear":
+        Recalibrator = HistogramLinearRecalibrator
+        print("Recalibrator: Histogram")        
     elif "Polynomial" in cfg["recalibrator"]:
         degree = int(cfg["recalibrator"].split("_")[-1]        )
         Recalibrator = partial(PolynomialRecalibrator,degree)

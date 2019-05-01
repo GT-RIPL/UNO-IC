@@ -13,7 +13,7 @@ include = [
            # 'run1',
            # 'run2',
            # 'run3',
-           'run4',
+           # 'run4',
            # 'run5',
            # 'run6',
            # 'run7',
@@ -22,7 +22,9 @@ include = [
            # 'run10',
            # "run11",
            # "run12",
-           "run13",
+           # "run13",
+           # "run14",
+           "run15",
            ]
 
 run_comments = {
@@ -148,6 +150,27 @@ run_comments = {
         "text":
             """trying dropout2d instead of dropout, better suited for convnets""",
     },     
+    "run14": {
+        "names": [
+            ("outputFusion_LearnedRecalibrator_Polynomial2","[Train on 000, Recal on 000] RGB x D Poly2"),
+            ("outputFusion_LearnedRecalibrator_Polynomial4","[Train on 000, Recal on 000] RGB x D Poly4"),
+            ("outputFusion_LearnedRecalibrator_Polynomial16","[Train on 000, Recal on 000] RGB x D Poly16"),
+            ("outputFusion_LearnedRecalibrator_Polynomial64","[Train on 000, Recal on 000] RGB x D Poly64"),
+        ],
+        "text":
+            """polynomial reparameterized recalibration""",
+    },     
+    "run15": {
+        "names": [
+            ("outputFusion_HistogramLinear_10","[Train on 000, Recal on 000] RGB x D Hist10"),
+            ("outputFusion_HistogramLinear_20","[Train on 000, Recal on 000] RGB x D Hist20"),
+            ("outputFusion_HistogramLinear_30","[Train on 000, Recal on 000] RGB x D Hist30"),
+        ],
+        "text":
+            """testing number of histogram bins""",
+    },     
+
+
 
 }
 

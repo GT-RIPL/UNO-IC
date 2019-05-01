@@ -6,7 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 
-class HistogramRecalibrator():
+class HistogramLinearRecalibrator():
     def __init__(self,device):
 
         self.device = device
@@ -53,6 +53,47 @@ class HistogramRecalibrator():
         i = (1.*len(self.W)*torch.clamp(x,min=0,max=1)).floor().long()-1
 
         return self.W[i]*x + self.b[i]
+
+
+
+class HistogramFlatRecalibrator():
+    def __init__(self,device):
+
+        self.device = device
+
+        self.b = torch.zeros(1,device=device)
+
+    def fit(self,x_init,y_init,device):
+
+        self.device = device
+
+        self.b = torch.zeros(len(x_init),device=device)
+
+        x_init, y_init = zip(*sorted(zip(x_init,y_init)))
+        x_init = list(x_init)
+        y_init = list(y_init)
+
+        XX = zip(x_init[:-1],x_init[1:])
+        YY = zip(y_init[:-1],y_init[1:])
+
+        for i,XY in enumerate(zip(XX,YY)):
+            X,Y = XY
+            x1,x2 = X
+            y1,y2 = Y
+            
+            self.b[i] = 0.5*(y1+y2)
+
+        self.b.to(device)
+
+
+
+    def predict(self,x):
+
+        self.b.to(x.device)
+
+        i = (1.*len(self.b)*torch.clamp(x,min=0,max=1)).floor().long()-1
+
+        return self.b[i]
     
 
 class PolynomialRecalibrator():

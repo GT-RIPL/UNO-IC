@@ -129,6 +129,18 @@ class segnet_mcdo(nn.Module):
             up1 = self.layers["up1"](up2, indices_1, unpool_shape1)
             # up1 = self.dropouts["up1"](up1)
 
+        # print("inputs",inputs.shape)
+        # print("down1",down1.shape)
+        # print("down2",down2.shape)
+        # print("down3",down3.shape)
+        # print("down4",down4.shape)
+        # print("down5",down5.shape)
+        # print("up1",up1.shape)
+        # print("up2",up2.shape)
+        # print("up3",up3.shape)
+        # print("up4",up4.shape)
+        # print("up5",up5.shape)
+
         return up1
 
     def forwardMultiple(self, inputs, calibrationPerClass, recalType):

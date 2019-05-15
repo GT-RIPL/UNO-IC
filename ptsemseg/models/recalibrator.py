@@ -6,6 +6,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 
+from sklearn.isotonic import IsotonicRegression
+from sklearn.linear_model import LogisticRegression
+
 class HistogramLinearRecalibrator():
     def __init__(self,device):
 
@@ -124,6 +127,42 @@ class PolynomialRecalibrator():
             out = self.model.forward(x)
         return out
 
+class IsotonicRecalibrator():
+    def __init__(self,device):
+        self.device = device
+        self.ir = IsotonicRegression()
+
+    def fit(self,x_init,y_init,device):
+
+        x = x_init.data.cpu().numpy()
+        y = y_init.data.cpu().numpy()
+        self.ir.fit(x, y)
+
+    def predict(self,x):
+    
+        x = x_init.data.cpu().numpy()
+        
+        return torch.tensor(self.ir.predict(x))
+  
+
+class PlattRecalibrator(): # i.e. logistic regression
+    def __init__(self,device):
+        self.device = device
+        self.lr = LogisticRegression()               
+
+    def fit(self,x_init,y_init,device):
+
+        x = x_init.data.cpu().numpy()
+        y = y_init.data.cpu().numpy()
+                           
+        self.lr.fit(x, y)
+        
+    def predict(self,x):
+    
+        x = x_init.data.cpu().numpy()
+        
+        return torch.tensor(self.lr.predict_proba(x.reshape(-1, 1))[:,1])
+        
 class LinearRegressionModel(nn.Module):
     def __init__(self):
         super(LinearRegressionModel, self).__init__() 
@@ -140,8 +179,6 @@ class PolynomialRegressionModel(torch.nn.Module):
         self.W = self.W.to(x.device)
         X = torch.cat(tuple([torch.pow(x,i).unsqueeze(1) for i in range(self.degree)]),1)
         return torch.matmul(X,self.W).squeeze()
-
-
 
 # class CalibrationNet(torch.nn.Module):
 #     # def __init__(self, n_feature, n_hidden, n_output):

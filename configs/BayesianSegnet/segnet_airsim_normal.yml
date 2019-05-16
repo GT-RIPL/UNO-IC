@@ -27,9 +27,9 @@ models:
     #     learned_uncertainty: "no"
     #     resume: models/BayesianSegnet/d_BayesianSegnet_0.5_T000/d_segnet_mcdo_airsim_best_model.pkl
 fusion: None #{None,SoftmaxMultiply}
-recal: None #{None,afterMCDO,beforeMCDO}
+recal: afterMCDO #{None,afterMCDO,beforeMCDO}
 recalibrator: HistogramFlat #{Histogram,Polynomial_X}
-bins: 10
+bins: 20
 data:
     dataset: airsim
     train_split: train
@@ -54,8 +54,8 @@ data:
     noisy_type: None 
 training:
     train_iters: 100000
-    batch_size: 2
-    val_interval: 5000
+    batch_size: 4
+    val_interval: 100
     n_workers: 8
     print_interval: 50
     png_frames: 5000

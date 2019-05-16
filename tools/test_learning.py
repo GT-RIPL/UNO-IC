@@ -5,6 +5,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 
+from sklearn.isotonic import IsotonicRegression
+from sklearn.linear_model import LogisticRegression
+
 class HistogramRecalibrator():
     def __init__(self,device):
 
@@ -86,6 +89,43 @@ class LearnedRecalibrator():
 
         return out
 
+
+class IsotonicRecalibrator():
+    def __init__(self,device):
+        self.device = device
+        self.ir = IsotonicRegression()
+
+    def fit(self,x_init,y_init,device):
+
+        x = x_init.data.cpu().numpy()
+        y = y_init.data.cpu().numpy()
+        self.ir.fit(x, y)
+
+    def predict(self,x_init):
+    
+        x = x_init.data.cpu().numpy()
+        
+        return torch.tensor(self.ir.predict(x))
+  
+
+class PlattRecalibrator(): # i.e. logistic regression
+    def __init__(self,device):
+        self.device = device
+        self.lr = LogisticRegression()               
+
+    def fit(self,x_init,y_init,device):
+
+        x = x_init.data.cpu().numpy()
+        y = y_init.data.cpu().numpy()
+
+        self.lr.fit(x.reshape(-1, 1), y)
+        
+    def predict(self,x):
+    
+        x = x_init.data.cpu().numpy()
+        
+        return torch.tensor(self.lr.predict_proba(x.reshape(-1, 1))[:,1])
+
 class LinearRegressionModel(nn.Module):
     def __init__(self):
         super(LinearRegressionModel, self).__init__() 
@@ -113,8 +153,8 @@ if __name__ == "__main__":
     Y = X + 0.1*torch.rand(X.shape[0]).float()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-    lr = LearnedRecalibrator(100,device)
+    device = "cpu"
+    lr = PlattRecalibrator(device)
 
     lr.fit(X,Y,device)
 

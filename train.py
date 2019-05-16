@@ -124,6 +124,12 @@ def train(cfg, writer, logger, logdir):
         degree = int(cfg["recalibrator"].split("_")[-1])
         Recalibrator = partial(PolynomialRecalibrator,degree)
         print("Recalibrator: Polynomial ({})".format(degree))
+    elif "Isotonic" in cfg["recalibrator"]:
+        Recalibrator = IsotonicRecalibrator
+        print("Recalibrator: Isotonic")
+    elif "Platt" in cfg["recalibrator"]:
+        Recalibrator = PlattRecalibrator
+        print("Recalibrator: Platt")
     else:
         print("Recalibrator: Not Supported")
         exit()
@@ -324,6 +330,8 @@ def train(cfg, writer, logger, logdir):
                     overall_match_var = {m:{r:{v:0 for v in val} for r in ranges} for m in cfg['models'].keys()}
                     per_class_match_var = {m:{r:{c:{v:0 for v in val} for c in range(n_classes)} for r in ranges} for m in cfg['models'].keys()}
 
+                    # TODO collect outputs/labels to be used for isotonic/platt scaling
+                	# collect statistics
                     with torch.no_grad():
                         for i_recal, (images_list, labels_list, aux_list) in tqdm(enumerate(recalloader)):
                         
@@ -339,8 +347,7 @@ def train(cfg, writer, logger, logdir):
                             outputs_recal = {}; 
                             for m in cfg["models"].keys():
                                 # m = list(cfg["models"].keys())[0]
-                                output_bp[m], mean[m], variance[m], uncal_mean[m], uncal_variance[m] = \
-                                    models[m](images_recal[m],calibrationPerClass[m],cfg["recal"])
+                                output_bp[m], mean[m], variance[m], uncal_mean[m], uncal_variance[m] = models[m](images_recal[m],calibrationPerClass[m],cfg["recal"])
                                 outputs_recal[m] = output_bp[m]
 
                                 # USING SINGLE SAMPLE MCDO FOR RECALIBRATION
@@ -353,10 +360,11 @@ def train(cfg, writer, logger, logdir):
                                 else:
                                     print("Recalibration Type Not Supported")
 
-
+                    # fit calibration models
                     for m in cfg["models"].keys():
 
-                        calibration, calibrationPerClass, overall_match_var, per_class_match_var = fitCalibration(calibration,calibrationPerClass,overall_match_var,per_class_match_var,ranges,n_classes,m,device)
+                        calculateCalibrationStats(calibration,calibrationPerClass,overall_match_var,per_class_match_var,ranges,n_classes,m,device)
+                        calibration, calibrationPerClass = fitCalibration(calibration,calibrationPerClass,overall_match_var,per_class_match_var,ranges,n_classes,m,device)
 
 
                         for k,v in overall_match_var[m].items():
@@ -371,6 +379,7 @@ def train(cfg, writer, logger, logdir):
 
                         # predictCalibration(calibration,calibrationPerClass,overall_match_var,per_class_match_var):
 
+                    # plot mean/variances of predictions
                     with torch.no_grad():
                         for i_recal, (images_list, labels_list, aux_list) in tqdm(enumerate(recalloader)):
                         
@@ -387,8 +396,7 @@ def train(cfg, writer, logger, logdir):
                             pre_recal = {}; post_recal = {}                        
                             for m in cfg["models"].keys():
                                 # m = list(cfg["models"].keys())[0]
-                                output_bp[m], mean[m], variance[m], uncal_mean[m], uncal_variance[m] = \
-                                    models[m](images_recal[m],calibrationPerClass[m],cfg["recal"])
+                                output_bp[m], mean[m], variance[m], uncal_mean[m], uncal_variance[m] = models[m](images_recal[m],calibrationPerClass[m],cfg["recal"])
                                 outputs_recal[m] = output_bp[m]
 
                                 pre_recal[m] = uncal_mean[m] 
@@ -440,10 +448,10 @@ def train(cfg, writer, logger, logdir):
                             output_bp = {}; mean = {}; variance = {}; uncal_mean = {}; uncal_variance = {}
                             outputs_val = {}; val_loss = {}
                             pre_recal = {}; post_recal = {}
+                            pre_recal_var = {}; post_recal_var = {}
                             for m in cfg["models"].keys():
                                 # m = list(cfg["models"].keys())[0]
-                                output_bp[m], mean[m], variance[m], uncal_mean[m], uncal_variance[m] = \
-                                    models[m](images_val[m],calibrationPerClass[m],cfg["recal"])
+                                output_bp[m], mean[m], variance[m], uncal_mean[m], uncal_variance[m] = models[m](images_val[m],calibrationPerClass[m],cfg["recal"])
                                 outputs_val[m] = mean[m]
                                 # outputs_val[m] = output_bp[m]
 
@@ -452,6 +460,8 @@ def train(cfg, writer, logger, logdir):
                                 pre_recal[m] = uncal_mean[m] 
                                 post_recal[m] = mean[m]
 
+                                pre_recal_var[m] = uncal_variance[m] 
+                                post_recal_var[m] = variance[m] 
 
                                 # pre_cat = torch.cat((post_recal["rgb"].unsqueeze(0),post_recal["d"].unsqueeze(0)),0)
                                 # post_cat = torch.cat((post_recal["rgb"].unsqueeze(0),post_recal["d"].unsqueeze(0)),0)
@@ -466,33 +476,37 @@ def train(cfg, writer, logger, logdir):
                                     outputs = post_recal["rgb"]*post_recal["d"]
                                 else:
                                     outputs = pre_recal["rgb"]*pre_recal["d"]
+                            elif cfg["fusion"] == "WeightedVariance":
+                                if cfg["recal"]=="beforeMCDO" or cfg["recal"]=="afterMCDO":
+                                    outputs = ((post_recal["rgb"] * post_recal_var["rgb"]) + (post_recal["d"] * post_recal_var["d"])) / (post_recal_var["rgb"] + post_recal_var["d"])
+                                else:
+                                    outputs = ((pre_recal["rgb"] * pre_recal_var["rgb"]) + (pre_recal["d"] * pre_recal_var["d"])) / (pre_recal_var["rgb"] + pre_recal_var["d"])
                             else:
                                 print("Fusion Type Not Supported")
 
 
+                        	# plot ground truth vs mean/variance of outputs
                             pred = outputs.data.max(1)[1].cpu().numpy()
                             gt = labels_val.data.cpu().numpy()
 
 
                             if i_val % cfg["training"]["png_frames"] == 0:
+
                                 plotPrediction(logdir,cfg,n_classes,i,i_val,k,inputs,pred,gt)
                                 plotMeansVariances(logdir,cfg,n_classes,i,i_val,m,k+"/meanvar",inputs,pred,gt,mean,variance)
 
-
                                 if cfg["recal"]!="None":
                                     for m in cfg["models"]:
-                                        # plotMeansVariances(logdir,cfg,n_classes,i,i_val,m,k,inputs,pred,gt,mean,variance)
 
-                                        plotMeansVariances(logdir,cfg,n_classes,i,i_val,m,k+"/pre_recal_meanvar",inputs,pred,gt,mean,pre_recal)
-                                        plotMeansVariances(logdir,cfg,n_classes,i,i_val,m,k+"/post_recal_meanvar",inputs,pred,gt,mean,post_recal)
-
+                                		# plot precal predictions/variance
                                         pre_pred = pre_recal[m].data.max(1)[1].cpu().numpy()
                                         plotPrediction(logdir,cfg,n_classes,i,i_val,k+"/"+m+"/pre_recal_pred",inputs,pre_pred,gt)
+                                        plotMeansVariances(logdir,cfg,n_classes,i,i_val,m,k+"/pre_recal_meanvar",inputs,pred,gt,mean,pre_recal)
+
+                                		# plot postcal predictions/variance
                                         post_pred = post_recal[m].data.max(1)[1].cpu().numpy()
                                         plotPrediction(logdir,cfg,n_classes,i,i_val,k+"/"+m+"/post_recal_pred",inputs,post_pred,gt)
-
-                            
-
+                                        plotMeansVariances(logdir,cfg,n_classes,i,i_val,m,k+"/post_recal_meanvar",inputs,pred,gt,mean,post_recal)
 
                             running_metrics_val[k].update(gt, pred)
 
@@ -526,6 +540,7 @@ def train(cfg, writer, logger, logdir):
                     running_metrics_val[env].reset()
 
 
+            	# save best model
                 for m in optimizers.keys():
                     model = models[m]
                     optimizer = optimizers[m]
@@ -546,16 +561,12 @@ def train(cfg, writer, logger, logdir):
                                                      cfg['model']['arch'],
                                                      cfg['data']['dataset']))
                         torch.save(state, save_path)
-
-                if cfg["recal"]!="None":
-                    exit()
-                #################################################################################
-
-
-
-            if (i + 1) == cfg["training"]["train_iters"]:
-                flag = False
-                break
+            	
+#                if cfg["recal"]!="None":
+#                    exit()
+#            if (i + 1) == cfg["training"]["train_iters"]:
+#                flag = False
+#                break
 
 def parseEightCameras(images,labels,aux,device):
 

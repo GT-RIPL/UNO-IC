@@ -182,6 +182,9 @@ for run in runs.keys():
         # figures[test]
         x = runs[run][full]['step']
         y = runs[run][full]['value']
+        print('------------------------------------')
+        print(y)
+        print('------------------------------------')
         t = runs[run][full]['time']
         a_i = scopes.index(scope) // 4
         a_j = scopes.index(scope) % 4

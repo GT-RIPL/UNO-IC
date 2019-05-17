@@ -21,6 +21,8 @@ class HistogramLinearRecalibrator():
 
     def fit(self,confidence,accuracy):
 
+        confidence, accuracy = calcStatistics(self,output,label)
+
         self.W = torch.ones(len(confidence),device=self.device)
         self.b = torch.zeros(len(confidence),device=self.device)
 
@@ -71,8 +73,6 @@ class HistogramFlatRecalibrator():
 
         confidence, accuracy = calcStatistics(self,output,label)
 
-
-
         self.b = torch.zeros(len(confidence),device=self.device)
 
         confidence, accuracy = zip(*sorted(zip(confidence,accuracy)))
@@ -103,7 +103,7 @@ class HistogramFlatRecalibrator():
     
 
 class PolynomialRecalibrator():
-    def __init__(self,c, ranges, degree,device):
+    def __init__(self,c,ranges, degree,device):
 
         self.c = c
         self.ranges = ranges
@@ -116,8 +116,9 @@ class PolynomialRecalibrator():
         self.epochs = 2000
         self.device = device
 
-    def fit(self,confidence,accuracy):
+    def fit(self,output,label):
 
+        confidence, accuracy = calcStatistics(self,output,label)
         for epoch in range(self.epochs):
             self.optimiser.zero_grad()
             y_pred = self.model.forward(confidence)
@@ -137,8 +138,9 @@ class IsotonicRecalibrator():
         self.device = device
         self.ir = IsotonicRegression()
 
-    def fit(self,confidence,accuracy,device):
+    def fit(self,output,label):
 
+        # TODO preprocess label to match class
         x = confidence.data.cpu().numpy()
         y = accuracy.data.cpu().numpy()
         self.ir.fit(x, y)
@@ -151,14 +153,15 @@ class IsotonicRecalibrator():
   
 
 class PlattRecalibrator(): # i.e. logistic regression
-    def __init__(self,device):
-        self.device = device
+    def __init__(self,c):
+        self.c = c
         self.lr = LogisticRegression()               
 
-    def fit(self,confidence,accuracy,device):
+    def fit(self,output,label):
 
-        x = confidence.data.cpu().numpy()
-        y = accuracy.data.cpu().numpy()
+        # TODO preprocess label to match class
+        x = output.data.cpu().numpy()
+        y = label.data.cpu().numpy()
                            
         self.lr.fit(x, y)
         
@@ -238,26 +241,6 @@ def calcStatistics(self,mean,variance,label,ranges,c):
             confidence  = (low+high)/2.0
 
         return confidence, accuracy
-
-            
-def fitCalibration(outputs,labels,ranges,n_classes,m,device,cfg):
-
-    # TODO test and debug isotonic and platt recalibration
-    if recal == "Isotonic" or recal == "Platt":
-        x = outputs[m]
-        y = labels
-    else:
-        x = np.array([per_class_match_var[m][r][c]['pred'] for r in ranges])
-        y = np.array([per_class_match_var[m][r][c]['obs'] for r in ranges])
-
-        x = torch.from_numpy(x).float().to(device)
-        y = torch.from_numpy(y).float().to(device)
-
-# Fit Calibration if Not Already
-    calibrationPerClass[m][c]['model'].fit(x,y,device)
-    calibrationPerClass[m][c]['fit'] = True
-
-    return calibrationPerClass
 
 def showCalibration(calibrationPerClass, ranges,m,logdir,n_classes,device):
 

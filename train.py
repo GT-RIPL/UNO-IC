@@ -313,7 +313,7 @@ def train(cfg, writer, logger, logdir):
                             outputs_recal = {}; 
                             for m in cfg["models"].keys():
                                 # m = list(cfg["models"].keys())[0]
-                                output_bp[m], mean[m], variance[m], uncal_mean[m], uncal_variance[m] = models[m](images_recal[m],calibrationPerClass[m],cfg["recal"])
+                                output_bp[m], mean[m], variance[m], uncal_mean[m], uncal_variance[m] = models[m](images_recal[m],cfg["recal"])
                                 outputs_recal[m] = output_bp[m]
                                 outputs_all[m] += output_bp[m]
 
@@ -327,7 +327,7 @@ def train(cfg, writer, logger, logdir):
                     # fit calibration models
                     for m in cfg["models"].keys():
                         for c in range(n_classes):
-                            calibrationPerClass[m][c].fit(outputs_all[m],labels_all,c,device)
+                            models[m].calibrationPerClass[c].fit(outputs_all[m],labels_all)
 
                         showCalibration(outputs_all,calibrationPerClass,ranges,m,logdir,cfg,n_classes,device)
 
@@ -348,7 +348,7 @@ def train(cfg, writer, logger, logdir):
                             pre_recal = {}; post_recal = {}                        
                             for m in cfg["models"].keys():
                                 # m = list(cfg["models"].keys())[0]
-                                output_bp[m], mean[m], variance[m], uncal_mean[m], uncal_variance[m] = models[m](images_recal[m],calibrationPerClass[m],cfg["recal"])
+                                output_bp[m], mean[m], variance[m], uncal_mean[m], uncal_variance[m] = models[m](images_recal[m],cfg["recal"])
                                 outputs_recal[m] = output_bp[m]
 
                                 pre_recal[m] = uncal_mean[m] 
@@ -403,7 +403,7 @@ def train(cfg, writer, logger, logdir):
                             pre_recal_var = {}; post_recal_var = {}
                             for m in cfg["models"].keys():
                                 # m = list(cfg["models"].keys())[0]
-                                output_bp[m], mean[m], variance[m], uncal_mean[m], uncal_variance[m] = models[m](images_val[m],calibrationPerClass[m],cfg["recal"])
+                                output_bp[m], mean[m], variance[m], uncal_mean[m], uncal_variance[m] = models[m](images_val[m],cfg["recal"])
                                 outputs_val[m] = mean[m]
                                 # outputs_val[m] = output_bp[m]
 

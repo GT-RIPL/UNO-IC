@@ -20,8 +20,8 @@ class segnet_mcdo(nn.Module):
                  end_layer="up1",
                  reduction=1.0,
                  device="cpu",
-                 recalibrator="HistogramFlat",
-                 bins=20
+                 recalibrator=None,
+                 bins=0
                 ):
         super(segnet_mcdo, self).__init__()
 
@@ -36,29 +36,24 @@ class segnet_mcdo(nn.Module):
 
 
         # Select Recalibrator
-        ranges = list(zip([1.*a/bins for a in range(bins+2)][:-2],
-                          [1.*a/bins for a in range(bins+2)][1:]))
-        if recalibrator=="HistogramFlat":
-            Recalibrator = HistogramFlatRecalibrator
-            print("Recalibrator: Histogram")
-        elif recalibrator=="HistogramLinear":
-            Recalibrator = HistogramLinearRecalibrator
-            print("Recalibrator: Histogram")        
-        elif "Polynomial" in recalibrator:
-            degree = int(recalibrator.split("_")[-1])
-            Recalibrator = partial(PolynomialRecalibrator,degree)
-            print("Recalibrator: Polynomial ({})".format(degree))
-        elif "Isotonic" in recalibrator:
-            Recalibrator = IsotonicRecalibrator
-            print("Recalibrator: Isotonic")
-        elif "Platt" in recalibrator:
-            Recalibrator = PlattRecalibrator
-            print("Recalibrator: Platt")
-        else:
-            print("Recalibrator: Not Supported")
-            exit()
+        if recalibrator is not None and bins > 0:
+            ranges = list(zip([1.*a/bins for a in range(bins+2)][:-2],
+                              [1.*a/bins for a in range(bins+2)][1:]))
+            if recalibrator=="HistogramFlat":
+                self.calibrationPerClass = {n:HistogramFlatRecalibrator(n,ranges,device) for n in range(n_classes)}
+            elif recalibrator=="HistogramLinear":
+                self.calibrationPerClass = {n:HistogramLinearRecalibrator(n,ranges,device) for n in range(n_classes)}
+            elif "Polynomial" in recalibrator:
+                degree = int(recalibrator.split("_")[-1])
+                self.calibrationPerClass = {n:PolynomialRecalibrator(n,ranges,degree,device) for n in range(n_classes)}
+            elif "Isotonic" in recalibrator:
+                self.calibrationPerClass = {n:IsotonicRecalibrator(n,device) for n in range(n_classes)}
+            elif "Platt" in recalibrator:
+                self.calibrationPerClass = {n:PlattRecalibrator(n,device) for n in range(n_classes)}
+            else:
+                print("Recalibrator: Not Supported")
+                exit()
 
-        self.calibrationPerClass = {n:Recalibrator(n,ranges,device) for n in range(n_classes)}
 
         if not self.fixed_mcdo:
             self.layers = {
@@ -247,7 +242,7 @@ class segnet_mcdo(nn.Module):
             # Recalibrate MCDO
             if not self.calibrationPerClass is None:
                 for c in range(self.n_classes):
-                    x[:,c,:,:,:] = calibrationPerClass[c].predict(x[:,c,:,:,:].reshape(-1)).reshape(x[:,c,:,:,:].shape)
+                    x[:,c,:,:,:] = self.calibrationPerClass[c].predict(x[:,c,:,:,:].reshape(-1)).reshape(x[:,c,:,:,:].shape)
 
                 mean = torch.nn.Softmax(1)(x).mean(-1)
                 variance = torch.nn.Softmax(1)(x).pow(2).mean(-1)-mean.pow(2)
@@ -257,7 +252,7 @@ class segnet_mcdo(nn.Module):
             # Recalibrate MCDO
             if not self.calibrationPerClass is None:
                 for c in range(self.n_classes):
-                    mean[:,c,:,:] = calibrationPerClass[c].predict(uncal_mean[:,c,:,:].reshape(-1)).reshape(uncal_mean[:,c,:,:].shape)            
+                    mean[:,c,:,:] = self.calibrationPerClass[c].predict(uncal_mean[:,c,:,:].reshape(-1)).reshape(uncal_mean[:,c,:,:].shape)            
 
 
 

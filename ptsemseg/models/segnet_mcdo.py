@@ -16,11 +16,12 @@ class segnet_mcdo(nn.Module):
                  fixed_mcdo=False,
                  dropoutP=0.1,
                  learned_uncertainty="none",
-                 # in_channels=3,
                  start_layer="down1",
                  end_layer="up1",
                  reduction=1.0,
                  device="cpu",
+                 recalibrator="HistogramFlat",
+                 bins=20
                 ):
         super(segnet_mcdo, self).__init__()
 
@@ -32,6 +33,32 @@ class segnet_mcdo(nn.Module):
         self.dropoutP = dropoutP
         self.fixed_mcdo = fixed_mcdo
         self.device = device
+
+
+        # Select Recalibrator
+        ranges = list(zip([1.*a/bins for a in range(bins+2)][:-2],
+                          [1.*a/bins for a in range(bins+2)][1:]))
+        if recalibrator=="HistogramFlat":
+            Recalibrator = HistogramFlatRecalibrator
+            print("Recalibrator: Histogram")
+        elif recalibrator=="HistogramLinear":
+            Recalibrator = HistogramLinearRecalibrator
+            print("Recalibrator: Histogram")        
+        elif "Polynomial" in recalibrator:
+            degree = int(recalibrator.split("_")[-1])
+            Recalibrator = partial(PolynomialRecalibrator,degree)
+            print("Recalibrator: Polynomial ({})".format(degree))
+        elif "Isotonic" in recalibrator:
+            Recalibrator = IsotonicRecalibrator
+            print("Recalibrator: Isotonic")
+        elif "Platt" in recalibrator:
+            Recalibrator = PlattRecalibrator
+            print("Recalibrator: Platt")
+        else:
+            print("Recalibrator: Not Supported")
+            exit()
+
+        self.calibrationPerClass = {n:Recalibrator(n,ranges,device) for n in range(n_classes)}
 
         if not self.fixed_mcdo:
             self.layers = {
@@ -200,7 +227,7 @@ class segnet_mcdo(nn.Module):
 
         return up1
 
-    def forwardMultiple(self, inputs, calibrationPerClass, recalType):
+    def forwardMultiple(self, inputs, recalType):
         # First pass has backpropagation; others do not
         for i in range(self.mcdo_passes):
             if i == 0:
@@ -218,22 +245,19 @@ class segnet_mcdo(nn.Module):
 
         if recalType=="beforeMCDO":
             # Recalibrate MCDO
-            if not calibrationPerClass is None:
+            if not self.calibrationPerClass is None:
                 for c in range(self.n_classes):
-                    if calibrationPerClass[c]['fit'] == True:
-                        x[:,c,:,:,:] = calibrationPerClass[c]['model'].predict(x[:,c,:,:,:].reshape(-1)).reshape(x[:,c,:,:,:].shape)
+                    x[:,c,:,:,:] = calibrationPerClass[c].predict(x[:,c,:,:,:].reshape(-1)).reshape(x[:,c,:,:,:].shape)
 
-                if calibrationPerClass[c]['fit'] == True:
-                    mean = torch.nn.Softmax(1)(x).mean(-1)
-                    variance = torch.nn.Softmax(1)(x).pow(2).mean(-1)-mean.pow(2)
+                mean = torch.nn.Softmax(1)(x).mean(-1)
+                variance = torch.nn.Softmax(1)(x).pow(2).mean(-1)-mean.pow(2)
 
 
         if recalType=="afterMCDO":
             # Recalibrate MCDO
-            if not calibrationPerClass is None:
+            if not self.calibrationPerClass is None:
                 for c in range(self.n_classes):
-                    if calibrationPerClass[c]['fit'] == True:
-                        mean[:,c,:,:] = calibrationPerClass[c]['model'].predict(uncal_mean[:,c,:,:].reshape(-1)).reshape(uncal_mean[:,c,:,:].shape)            
+                    mean[:,c,:,:] = calibrationPerClass[c].predict(uncal_mean[:,c,:,:].reshape(-1)).reshape(uncal_mean[:,c,:,:].shape)            
 
 
 
@@ -255,11 +279,11 @@ class segnet_mcdo(nn.Module):
                     self.dropouts[k].eval()
 
 
-    def forward(self, inputs, calibrationPerClass=None, recalType="None"):
+    def forward(self, inputs, recalType="None"):
 
         # self.configureDropout()
 
-        output_bp, mean, variance, uncal_mean, uncal_variance = self.forwardMultiple(inputs, calibrationPerClass, recalType)
+        output_bp, mean, variance, uncal_mean, uncal_variance = self.forwardMultiple(inputs, recalType)
 
         return output_bp, mean, variance, uncal_mean, uncal_variance
 

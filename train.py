@@ -113,34 +113,6 @@ def train(cfg, writer, logger, logdir):
     val_REG_loss_meter = {env:averageMeter() for env in valloaders.keys()}
     time_meter = averageMeter()
 
-    # Select Recalibrator
-    if cfg["recalibrator"]=="HistogramFlat":
-        Recalibrator = HistogramFlatRecalibrator
-        print("Recalibrator: Histogram")
-    elif cfg["recalibrator"]=="HistogramLinear":
-        Recalibrator = HistogramLinearRecalibrator
-        print("Recalibrator: Histogram")        
-    elif "Polynomial" in cfg["recalibrator"]:
-        degree = int(cfg["recalibrator"].split("_")[-1])
-        Recalibrator = partial(PolynomialRecalibrator,degree)
-        print("Recalibrator: Polynomial ({})".format(degree))
-    elif "Isotonic" in cfg["recalibrator"]:
-        Recalibrator = IsotonicRecalibrator
-        print("Recalibrator: Isotonic")
-    elif "Platt" in cfg["recalibrator"]:
-        Recalibrator = PlattRecalibrator
-        print("Recalibrator: Platt")
-    else:
-        print("Recalibrator: Not Supported")
-        exit()
-
-
-    # Load Recalibration Model
-    print("Loading Recalibration Model...",)
-    calibration = {m:{'model':Recalibrator(device),'fit':False} for m in cfg["models"].keys()}
-    calibrationPerClass = {m:{n:{'model':Recalibrator(device),'fit':False} for n in range(n_classes)} for m in cfg["models"].keys()}
-    print("DONE")
-
     start_iter = 0
     models = {}
     optimizers = {}
@@ -159,9 +131,10 @@ def train(cfg, writer, logger, logdir):
                                   mcdo_passes=attr['mcdo_passes'], 
                                   fixed_mcdo=(attr['fixed_mcdo']=="Yes"),
                                   dropoutP=attr['dropoutP'],
-                                  learned_uncertainty=attr['learned_uncertainty'],
                                   reduction=attr['reduction'],
-                                  device=device).to(device)
+                                  device=device,
+                                  recalibrator=cfg["recalibrator"],
+                                  bins=cfg["bins"]).to(device)
 
 
 
@@ -312,25 +285,18 @@ def train(cfg, writer, logger, logdir):
                 #################################################################################
                 # Recalibration
                 #################################################################################
-                print("="*10,"RECALIBRATING","="*10)
                 if cfg["recal"]!="None":
+                    print("="*10,"RECALIBRATING","="*10)
+
                     steps = cfg["bins"] #50
 
                     ranges = list(zip([1.*a/steps for a in range(steps+2)][:-2],
                                       [1.*a/steps for a in range(steps+2)][1:]))
-                                      
-                    val = ['sumval_pred_in_range',
-                           'num_obs_in_range',
-                           'num_in_range',
-                           'sumval_pred_below_range',
-                           'num_obs_below_range',
-                           'num_below_range',
-                           'num_correct']   
-
-                    overall_match_var = {m:{r:{v:0 for v in val} for r in ranges} for m in cfg['models'].keys()}
-                    per_class_match_var = {m:{r:{c:{v:0 for v in val} for c in range(n_classes)} for r in ranges} for m in cfg['models'].keys()}
 
                     # TODO collect outputs/labels to be used for isotonic/platt scaling
+                    outputs_all = {m:[] for m in cfg['models'].keys()}
+                    labels_all = []
+
                 	# collect statistics
                     with torch.no_grad():
                         for i_recal, (images_list, labels_list, aux_list) in tqdm(enumerate(recalloader)):
@@ -349,35 +315,21 @@ def train(cfg, writer, logger, logdir):
                                 # m = list(cfg["models"].keys())[0]
                                 output_bp[m], mean[m], variance[m], uncal_mean[m], uncal_variance[m] = models[m](images_recal[m],calibrationPerClass[m],cfg["recal"])
                                 outputs_recal[m] = output_bp[m]
+                                outputs_all[m] += output_bp[m]
 
-                                # USING SINGLE SAMPLE MCDO FOR RECALIBRATION
-                                # ???
-                                # Should we use average of samples for recalibration?  Nah
-                                if cfg["recal"]=="beforeMCDO":
-                                    overall_match_var,per_class_match_var = accumulateEmpirical(overall_match_var,per_class_match_var,ranges,n_classes,m,labels_recal,output_bp,variance)
-                                elif cfg["recal"]=="afterMCDO":
-                                    overall_match_var,per_class_match_var = accumulateEmpirical(overall_match_var,per_class_match_var,ranges,n_classes,m,labels_recal,mean,variance)
-                                else:
-                                    print("Recalibration Type Not Supported")
+                            labels_all += labels
 
+                    logger.info(str(outputs_all))
+                    logger.info(str(labels_all))
+                    print(outputs_all)
+                    print(labels_all)
+                    exit()
                     # fit calibration models
                     for m in cfg["models"].keys():
+                        for c in range(n_classes):
+                            calibrationPerClass[m][c].fit(outputs_all[m],labels_all,c,device)
 
-                        calculateCalibrationStats(calibration,calibrationPerClass,overall_match_var,per_class_match_var,ranges,n_classes,m,device)
-                        calibration, calibrationPerClass = fitCalibration(calibration,calibrationPerClass,overall_match_var,per_class_match_var,ranges,n_classes,m,device)
-
-
-                        for k,v in overall_match_var[m].items():
-                            print(k,v["num_in_range"],v["pred"],v["obs"])
-
-                            for c in range(n_classes):
-                                print("   ",c,per_class_match_var[m][k][c]["num_in_range"],
-                                              per_class_match_var[m][k][c]["pred"],
-                                              per_class_match_var[m][k][c]["obs"])
-
-                        showCalibration(calibration,calibrationPerClass,overall_match_var,per_class_match_var,ranges,m,logdir,cfg,n_classes,i,i_recal,device)
-
-                        # predictCalibration(calibration,calibrationPerClass,overall_match_var,per_class_match_var):
+                        showCalibration(outputs_all,calibrationPerClass,ranges,m,logdir,cfg,n_classes,device)
 
                     # plot mean/variances of predictions
                     with torch.no_grad():

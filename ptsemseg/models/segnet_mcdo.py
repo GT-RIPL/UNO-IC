@@ -2,7 +2,7 @@ import torch.nn as nn
 from torch.autograd import Variable
 
 from ptsemseg.models.utils import *
-
+from ptsemseg.models.recalibrator import *
 
 class segnet_mcdo(nn.Module):
     def __init__(self, 
@@ -20,7 +20,7 @@ class segnet_mcdo(nn.Module):
                  end_layer="up1",
                  reduction=1.0,
                  device="cpu",
-                 recalibrator=None,
+                 recalibrator="None",
                  bins=0
                 ):
         super(segnet_mcdo, self).__init__()
@@ -36,24 +36,25 @@ class segnet_mcdo(nn.Module):
 
 
         # Select Recalibrator
-        if recalibrator is not None and bins > 0:
-            ranges = list(zip([1.*a/bins for a in range(bins+2)][:-2],
+        self.recalibrator = recalibrator
+
+        if recalibrator != "None" and bins > 0:
+            self.ranges = list(zip([1.*a/bins for a in range(bins+2)][:-2],
                               [1.*a/bins for a in range(bins+2)][1:]))
             if recalibrator=="HistogramFlat":
-                self.calibrationPerClass = {n:HistogramFlatRecalibrator(n,ranges,device) for n in range(n_classes)}
+                self.calibrationPerClass = [HistogramFlatRecalibrator(n,self.ranges,device) for n in range(self.n_classes)]
             elif recalibrator=="HistogramLinear":
-                self.calibrationPerClass = {n:HistogramLinearRecalibrator(n,ranges,device) for n in range(n_classes)}
+                self.calibrationPerClass = [HistogramLinearRecalibrator(n,self.ranges,device) for n in range(self.n_classes)]
             elif "Polynomial" in recalibrator:
                 degree = int(recalibrator.split("_")[-1])
-                self.calibrationPerClass = {n:PolynomialRecalibrator(n,ranges,degree,device) for n in range(n_classes)}
+                self.calibrationPerClass = [PolynomialRecalibrator(n,self.ranges,degree,device) for n in range(self.n_classes)]
             elif "Isotonic" in recalibrator:
-                self.calibrationPerClass = {n:IsotonicRecalibrator(n,device) for n in range(n_classes)}
+                self.calibrationPerClass = [IsotonicRecalibrator(n,device) for n in range(self.n_classes)]
             elif "Platt" in recalibrator:
-                self.calibrationPerClass = {n:PlattRecalibrator(n,device) for n in range(n_classes)}
+                self.calibrationPerClass = [PlattRecalibrator(n,device) for n in range(self.n_classes)]
             else:
                 print("Recalibrator: Not Supported")
                 exit()
-
 
         if not self.fixed_mcdo:
             self.layers = {
@@ -101,6 +102,9 @@ class segnet_mcdo(nn.Module):
         # up3 torch.Size([2, 128, 128, 128])
         # up4 torch.Size([2, 256, 64, 64])
         # up5 torch.Size([2, 512, 32, 32])
+
+
+        self.temperature = torch.nn.Parameter(torch.ones(1))
 
         self.dropout_masks = {p:
         {
@@ -220,44 +224,10 @@ class segnet_mcdo(nn.Module):
         # print("up5",up5.shape)
         # exit()
 
-        return up1
-
-    def forwardMultiple(self, inputs, recalType):
-        # First pass has backpropagation; others do not
-        for i in range(self.mcdo_passes):
-            if i == 0:
-                x_bp = self.forwardOnce(inputs,i)
-                x = x_bp.unsqueeze(-1)
-            else:
-                with torch.no_grad():
-                    x = torch.cat((x,self.forwardOnce(inputs,i).unsqueeze(-1)),-1)
-
-        # Uncalibrated Softmax Mean and Variance
-        uncal_mean = torch.nn.Softmax(1)(x).mean(-1)
-        uncal_variance = torch.nn.Softmax(1)(x).pow(2).mean(-1)-uncal_mean.pow(2)
-        mean = uncal_mean
-        variance = uncal_variance
-
-        if recalType=="beforeMCDO":
-            # Recalibrate MCDO
-            if not self.calibrationPerClass is None:
-                for c in range(self.n_classes):
-                    x[:,c,:,:,:] = self.calibrationPerClass[c].predict(x[:,c,:,:,:].reshape(-1)).reshape(x[:,c,:,:,:].shape)
-
-                mean = torch.nn.Softmax(1)(x).mean(-1)
-                variance = torch.nn.Softmax(1)(x).pow(2).mean(-1)-mean.pow(2)
-
-
-        if recalType=="afterMCDO":
-            # Recalibrate MCDO
-            if not self.calibrationPerClass is None:
-                for c in range(self.n_classes):
-                    mean[:,c,:,:] = self.calibrationPerClass[c].predict(uncal_mean[:,c,:,:].reshape(-1)).reshape(uncal_mean[:,c,:,:].shape)            
-
-
-
-
-        return x_bp, mean, variance, uncal_mean, uncal_variance
+        if self.recalibrator == "temperature_scaling":
+            return up1 / self.temperature
+        else:
+            return up1
 
     def configureDropout(self):
 
@@ -272,15 +242,6 @@ class segnet_mcdo(nn.Module):
             else:
                 for k in self.dropouts.keys():
                     self.dropouts[k].eval()
-
-
-    def forward(self, inputs, recalType="None"):
-
-        # self.configureDropout()
-
-        output_bp, mean, variance, uncal_mean, uncal_variance = self.forwardMultiple(inputs, recalType)
-
-        return output_bp, mean, variance, uncal_mean, uncal_variance
 
     def init_vgg16_params(self, vgg16):
         blocks = [self.down1, self.down2, self.down3, self.down4, self.down5]
@@ -326,3 +287,134 @@ class segnet_mcdo(nn.Module):
                         l2.weight.data[:,i*num_orig:(i+1)*num_orig,:,:] = l1.weight.data
                     l2.bias.data = l1.bias.data
 
+
+
+    def forward(self, inputs, recalType="None"):
+        # First pass has backpropagation; others do not
+        for i in range(self.mcdo_passes):
+            if i == 0:
+                x_bp = self.forwardOnce(inputs, i)
+                x = x_bp.unsqueeze(-1)
+            else:
+                with torch.no_grad():
+                    x = torch.cat((x,self.forwardOnce(inputs,i).unsqueeze(-1)),-1)
+
+        # Uncalibrated Softmax Mean and Variance
+        mean = torch.nn.Softmax(1)(x).mean(-1)
+        variance = torch.nn.Softmax(1)(x).pow(2).mean(-1)-mean.pow(2)
+        if self.recalibrator != "None":
+            if recalType=="beforeMCDO":
+                for c in range(self.n_classes):
+                    x[:,c,:,:,:] = self.calibrationPerClass[c].predict(x[:,c,:,:,:].reshape(-1)).reshape(x[:,c,:,:,:].shape)
+
+                mean = torch.nn.Softmax(1)(x).mean(-1)
+                variance = torch.nn.Softmax(1)(x).pow(2).mean(-1)-mean.pow(2)
+
+            elif recalType=="afterMCDO":
+                for c in range(self.n_classes):
+                    mean[:,c,:,:] = self.calibrationPerClass[c].predict(mean[:,c,:,:].reshape(-1)).reshape(mean[:,c,:,:].shape)
+
+
+        return x_bp, mean, variance
+
+    def applyCalibration(self, output):
+
+        for c in range(self.n_classes):
+            output[:,c,:,:] = self.calibrationPerClass[c].predict(output[:,c,:,:].reshape(-1)).reshape(output[:,c,:,:].shape)
+
+        return output
+
+    def showCalibration(self, output, label, logdir, model, iteration):
+
+
+        recal_output = self.applyCalibration(output.clone())
+
+        ###########
+        # Overall #
+        ###########
+        fig, axes = plt.subplots(1, 3)
+        plt.tight_layout()
+
+        # Plot Predicted Variance Against Observed/Empirical Variance
+        x, y = calcStatistics(output, label, self.ranges)
+
+        # TODO fix plotting with invalid probilities and graph wrapping
+        axes[0].plot(x, y, '.')
+        axes[0].set_title("Uncalibrated")
+        axes[1].set_xlabel("uncalibrated confidence")
+        axes[1].set_ylabel("emperical probability")
+
+        # Convert Predicted Variances to Calibrated Variances
+        x, y = calcStatistics(recal_output, label, self.ranges)
+
+        axes[1].plot(x, y)
+        axes[1].set_title("Recalibrated")
+        axes[1].set_xlabel("calibrated confidence")
+        axes[1].set_ylabel("emperical probability")
+
+        """
+        # Recalibration Curve
+        x = np.arange(0, 1, 0.001)
+        x = torch.from_numpy(x).float()
+
+        # TODO figure out why we are calibrating the already recalibrated class scores?
+        # probably don't, double recalibration probably ruins generalization => should test though
+
+        y = self.applyCalibration(x)
+
+        x = x.cpu().numpy()
+        y = y.cpu().numpy()
+
+        # y = calibration[m].predict(x)
+        # y = calibration[m].predict(x[:,np.newaxis])
+        axes[2].plot(x, y)
+        axes[2].set_title("Recalibration Curve")
+        axes[2].set_xlabel("softmax probability")
+        axes[2].set_ylabel("calibrated confidence")
+        """
+
+        # calculating expected calibration error
+        # ECE = np.sum(np.absolute(y - y_pred))
+        # fig.suptitle('Expected Calibration Error: {}'.format(ECE), fontsize=16)
+
+        path = "{}/{}/{}".format(logdir, 'calibration', model)
+        if not os.path.exists(path):
+            os.makedirs(path)
+        plt.savefig("{}/calibratedOverall{}.png".format(path, iteration))
+
+        plt.close(fig)
+
+        ############################
+        # All Classes Uncalibrated #
+        ############################
+        fig, axes = plt.subplots(3, self.n_classes // 3 + 1)
+
+        for c in range(self.n_classes):
+            x, y = calcClassStatistics(output, label, self.ranges, c)
+            axes[(c + 1) // (self.n_classes // 3 + 1), (c + 1) % (self.n_classes // 3 + 1)].plot(x, y)
+            axes[(c + 1) // (self.n_classes // 3 + 1), (c + 1) % (self.n_classes // 3 + 1)].set_title("Class: {}".format(c))
+
+        path = "{}/{}/{}".format(logdir, 'calibration', model)
+        if not os.path.exists(path):
+            os.makedirs(path)
+        plt.savefig("{}/uncalibratedPerClass{}.png".format(path, iteration))
+        plt.close(fig)
+
+        ##########################
+        # All Classes Calibrated #
+        ##########################
+        fig, axes = plt.subplots(3, self.n_classes // 3 + 1)
+
+        for c in range(self.n_classes):
+            x, y = calcClassStatistics(recal_output, label, self.ranges, c)
+
+            axes[(c + 1) // (self.n_classes // 3 + 1), (c + 1) % (self.n_classes // 3 + 1)].plot(x, y)
+            axes[(c + 1) // (self.n_classes // 3 + 1), (c + 1) % (self.n_classes // 3 + 1)].set_title("Class: {}".format(c))
+
+        path = "{}/{}/{}".format(logdir, 'calibration', model)
+        if not os.path.exists(path):
+            os.makedirs(path)
+        plt.savefig("{}/calibratedPerClass{}.png".format(path, iteration))
+        plt.close(fig)
+
+        del recal_output

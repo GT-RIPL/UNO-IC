@@ -1,4 +1,4 @@
-id: rgb_BayesianSegnet_0.5
+id: testing
 model:
     arch: segnet_mcdo
 models:
@@ -12,7 +12,7 @@ models:
         masks: [0,1,2,3,4,5] # Number Mask Indices Should Equal Number of MCDO Passes
         fixed_mcdo: Yes # Yes: Fixed Masks per Pass; No: Randomized Masks per Pass
         dropoutP: 0.5 # Dropout Probability
-        resume: None #models/BayesianSegnet/rgb_BayesianSegnet_0.5_T000/rgb_segnet_mcdo_airsim_best_model.pkl
+        resume: models/BayesianSegnet/rgb_BayesianSegnet_0.5_T000/rgb_segnet_mcdo_airsim_best_model.pkl
     #d:
     #    in_channels: 3
     #    start_layer: down1
@@ -26,8 +26,8 @@ models:
     #    resume: models/BayesianSegnet/d_BayesianSegnet_0.5_T000/d_segnet_mcdo_airsim_best_model.pkl
 fusion: None #{None,SoftmaxMultiply}
 recal: None #{None,afterMCDO,beforeMCDO}
-recalibrator: None #{Histogram,Polynomial_X}
-bins: 0
+recalibrator: HistogramFlat #{Histogram,Polynomial_X}
+bins: 20
 data:
     dataset: airsim
     train_split: train
@@ -35,7 +35,7 @@ data:
     train_reduction: 1.0    
     recal_split: recal
     recal_subsplit: ['async_fog_000_clear']
-    recal_reduction: 0.2
+    recal_reduction: 0.1
     val_split: val
     val_subsplit: [
                    'async_fog_000_clear',
@@ -52,7 +52,7 @@ data:
     noisy_type: None 
 training:
     train_iters: 100000
-    batch_size: 4
+    batch_size: 2
     val_interval: 5000 #5000
     n_workers: 8
     print_interval: 50

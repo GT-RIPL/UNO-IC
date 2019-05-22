@@ -16,7 +16,6 @@ from tqdm import tqdm
 import cv2
 
 # from ptsemseg.process_img import generate_noise
-from ptsemseg.models.recalibrator import *
 from ptsemseg.models import get_model
 from ptsemseg.loss import get_loss_function
 from ptsemseg.loader import get_loader
@@ -227,18 +226,13 @@ def train(cfg, writer, logger, logdir):
             [optimizers[m].zero_grad() for m in optimizers.keys()]
 
             # Run Models
-            output_bp = {};
             mean = {};
             variance = {};
-            uncal_mean = {};
-            uncal_variance = {}
             outputs = {};
             loss = {}
             for m in cfg["models"].keys():
                 # m = list(cfg["models"].keys())[0]
-                output_bp[m], mean[m], variance[m], uncal_mean[m], uncal_variance[m] = \
-                    models[m](images[m], calibrationPerClass[m], cfg["recal"])
-                outputs[m] = output_bp[m]
+                outputs[m], mean[m], variance[m] = models[m](images[m], cfg["recal"])
 
                 # pred = outputs[m].data.max(1)[1].cpu().numpy()
                 # gt = labels.data.cpu().numpy()
@@ -273,8 +267,7 @@ def train(cfg, writer, logger, logdir):
             #################################################################################
 
             ###  Validation
-            if (i + 1) % cfg["training"]["val_interval"] == 0 or \
-                    (i + 1) == cfg["training"]["train_iters"]:
+            if (i + 1) % cfg["training"]["val_interval"] == 0 or (i + 1) >= cfg["training"]["train_iters"]:
 
                 [models[m].eval() for m in models.keys()]
 
@@ -289,8 +282,9 @@ def train(cfg, writer, logger, logdir):
                     ranges = list(zip([1. * a / steps for a in range(steps + 2)][:-2],
                                       [1. * a / steps for a in range(steps + 2)][1:]))
 
-                    # TODO collect outputs/labels to be used for isotonic/platt scaling
-                    outputs_all = {m: [] for m in cfg['models'].keys()}
+                    output_all = {m: [] for m in cfg['models'].keys()}
+                    calibrated_all = {m: [] for m in cfg['models'].keys()}
+                    uncalibrated_all = {m: [] for m in cfg['models'].keys()}
                     labels_all = []
 
                     # collect statistics
@@ -305,32 +299,30 @@ def train(cfg, writer, logger, logdir):
                             labels_recal = labels[:bs, :, :]
 
                             # Run Models
-                            output_bp = {};
-                            mean = {};
-                            variance = {};
-                            uncal_mean = {};
+                            mean = {}
+                            variance = {}
+                            uncal_mean = {}
                             uncal_variance = {}
-                            outputs_recal = {};
                             for m in cfg["models"].keys():
-                                # m = list(cfg["models"].keys())[0]
-                                output_bp[m], mean[m], variance[m], uncal_mean[m], uncal_variance[m] = models[m](
-                                    images_recal[m], cfg["recal"])
-                                outputs_recal[m] = output_bp[m]
-                                outputs_all[m] += output_bp[m]
+                                outputs[m], mean[m], variance[m] = models[m](images_recal[m])
+                                output_all[m].append(mean[m])
 
-                            labels_all += labels
+                            labels_all.append(labels_recal)
 
-                    logger.info(str(outputs_all))
-                    logger.info(str(labels_all))
-                    print(outputs_all)
-                    print(labels_all)
-                    exit()
+                            #break
+
+
+                    for m in cfg["models"].keys():
+                        output_all[m] = torch.cat(output_all[m])
+                    labels_all = torch.cat(labels_all)
+
                     # fit calibration models
                     for m in cfg["models"].keys():
                         for c in range(n_classes):
-                            models[m].calibrationPerClass[c].fit(outputs_all[m], labels_all)
+                            models[m].module.calibrationPerClass[c].fit(output_all[m], labels_all)
 
-                        showCalibration(outputs_all, calibrationPerClass, ranges, m, logdir, cfg, n_classes, device)
+                        torch.cuda.empty_cache()
+                        models[m].module.showCalibration(output_all[m], labels_all, logdir, m, i)
 
                     # plot mean/variances of predictions
                     with torch.no_grad():
@@ -342,44 +334,24 @@ def train(cfg, writer, logger, logdir):
                             bs = cfg['training']['batch_size']
                             images_recal = {m: inputs[m][:bs, :, :, :] for m in cfg["models"].keys()}
                             labels_recal = labels[:bs, :, :]
+                            gt = labels_recal.data.cpu().numpy()
 
                             # Run Models
-                            output_bp = {}
-                            mean = {}
-                            variance = {}
-                            uncal_mean = {}
-                            uncal_variance = {}
-                            outputs_recal = {}
-                            pre_recal = {}
-                            post_recal = {}
                             for m in cfg["models"].keys():
-                                # m = list(cfg["models"].keys())[0]
-                                output_bp[m], mean[m], variance[m], uncal_mean[m], uncal_variance[m] = models[m](
-                                    images_recal[m], cfg["recal"])
-                                outputs_recal[m] = output_bp[m]
+                                outputs, mean, variance = models[m](images_recal[m])
 
-                                pre_recal[m] = uncal_mean[m]
-                                post_recal[m] = mean[m]
-
-                                outputs = mean[m]
-
+                                # plot preditions without calibration
                                 pred = outputs.data.max(1)[1].cpu().numpy()
-                                gt = labels_recal.data.cpu().numpy()
+                                plotMeansVariances(logdir, cfg, n_classes, i, i_recal, m, "recal/pre_recal", inputs, pred, gt, mean, variance)
+                                plotPrediction(logdir, cfg, n_classes, i, i_recal, "recal/" + m + "/pre_recal_pred", inputs, pred, gt)
 
-                                # for c in range(n_classes):
-                                #     post_recal[m][:,c,:,:] = calibrationPerClass[m][c]['model'].predict(pre_recal[m][:,c,:,:].reshape(-1)).reshape(pre_recal[m][:,c,:,:].shape)
-
-                                plotMeansVariances(logdir, cfg, n_classes, i, i_recal, m, "recal/pre_recal", inputs,
-                                                   pred, gt, mean, pre_recal)
-                                plotMeansVariances(logdir, cfg, n_classes, i, i_recal, m, "recal/post_recal", inputs,
-                                                   pred, gt, mean, post_recal)
-
-                                pre_pred = pre_recal[m].data.max(1)[1].cpu().numpy()
-                                plotPrediction(logdir, cfg, n_classes, i, i_recal, "recal/" + m + "/pre_recal_pred",
-                                               inputs, pre_pred, gt)
-                                post_pred = post_recal[m].data.max(1)[1].cpu().numpy()
-                                plotPrediction(logdir, cfg, n_classes, i, i_recal, "recal/" + m + "/post_recal_pred",
-                                               inputs, post_pred, gt)
+                                # plot predictions with calibration
+                                # TODO calibrate outputs instead of rereunning model with calibration
+                                #outputs, mean, variance = models[m].module.calibrateOutput(output)
+                                outputs, mean, variance = models[m](images_recal[m], cfg["recal"])
+                                post_pred = outputs.data.max(1)[1].cpu().numpy()
+                                plotMeansVariances(logdir, cfg, n_classes, i, i_recal, m, "recal/post_recal", inputs, pred, gt, mean, variance)
+                                plotPrediction(logdir, cfg, n_classes, i, i_recal, "recal/" + m + "/post_recal_pred", inputs, pred, gt)
 
                 #################################################################################
 
@@ -408,83 +380,33 @@ def train(cfg, writer, logger, logdir):
                                 continue
 
                             # Run Models
-                            output_bp = {};
-                            mean = {};
-                            variance = {};
-                            uncal_mean = {};
-                            uncal_variance = {}
-                            outputs_val = {};
+                            output_bp = {}
+                            mean = {}
+                            variance = {}
                             val_loss = {}
-                            pre_recal = {};
-                            post_recal = {}
-                            pre_recal_var = {};
-                            post_recal_var = {}
+
                             for m in cfg["models"].keys():
-                                # m = list(cfg["models"].keys())[0]
-                                output_bp[m], mean[m], variance[m], uncal_mean[m], uncal_variance[m] = models[m](
-                                    images_val[m], cfg["recal"])
-                                outputs_val[m] = mean[m]
-                                # outputs_val[m] = output_bp[m]
+                                output_bp[m], mean[m], variance[m] = models[m](images_val[m], cfg["recal"])
 
-                                val_loss[m] = loss_fn(input=outputs_val[m], target=labels_val)
-
-                                pre_recal[m] = uncal_mean[m]
-                                post_recal[m] = mean[m]
-
-                                pre_recal_var[m] = uncal_variance[m]
-                                post_recal_var[m] = variance[m]
-
-                                # pre_cat = torch.cat((post_recal["rgb"].unsqueeze(0),post_recal["d"].unsqueeze(0)),0)
-                                # post_cat = torch.cat((post_recal["rgb"].unsqueeze(0),post_recal["d"].unsqueeze(0)),0)
-                                # fused_i = torch.argmax(post_cat,dim=0)
-                                # fused = post_cat.gather(0,fused_i.clone().unsqueeze(0)).squeeze(0)
+                                val_loss[m] = loss_fn(input=mean[m], target=labels_val)
 
                             # Fusion Type
                             if cfg["fusion"] == "None":
-                                outputs = outputs_val[list(cfg["models"].keys())[0]]
+                                outputs = mean[list(cfg["models"].keys())[0]]
                             elif cfg["fusion"] == "SoftmaxMultiply":
-                                if cfg["recal"] == "beforeMCDO" or cfg["recal"] == "afterMCDO":
-                                    outputs = post_recal["rgb"] * post_recal["d"]
-                                else:
-                                    outputs = pre_recal["rgb"] * pre_recal["d"]
+                                    outputs = mean["rgb"] * mean["d"]
                             elif cfg["fusion"] == "WeightedVariance":
-                                if cfg["recal"] == "beforeMCDO" or cfg["recal"] == "afterMCDO":
-                                    outputs = ((post_recal["rgb"] * post_recal_var["rgb"]) + (
-                                            post_recal["d"] * post_recal_var["d"])) / (
-                                                      post_recal_var["rgb"] + post_recal_var["d"])
-                                else:
-                                    outputs = ((pre_recal["rgb"] * pre_recal_var["rgb"]) + (
-                                            pre_recal["d"] * pre_recal_var["d"])) / (
-                                                      pre_recal_var["rgb"] + pre_recal_var["d"])
+                                    outputs = ((mean["rgb"] / variance["rgb"]) + (mean["d"] / variance["d"])) 
                             else:
                                 print("Fusion Type Not Supported")
 
                             # plot ground truth vs mean/variance of outputs
-                            pred = outputs.data.max(1)[1].cpu().numpy()
                             gt = labels_val.data.cpu().numpy()
 
                             if i_val % cfg["training"]["png_frames"] == 0:
 
+                                pred = outputs.data.argmax(1).cpu().numpy()
                                 plotPrediction(logdir, cfg, n_classes, i, i_val, k, inputs, pred, gt)
-                                plotMeansVariances(logdir, cfg, n_classes, i, i_val, m, k + "/meanvar", inputs, pred,
-                                                   gt, mean, variance)
-
-                                if cfg["recal"] != "None":
-                                    for m in cfg["models"]:
-                                        # plot precal predictions/variance
-                                        pre_pred = pre_recal[m].data.max(1)[1].cpu().numpy()
-                                        plotPrediction(logdir, cfg, n_classes, i, i_val,
-                                                       k + "/" + m + "/pre_recal_pred", inputs, pre_pred, gt)
-                                        plotMeansVariances(logdir, cfg, n_classes, i, i_val, m,
-                                                           k + "/pre_recal_meanvar", inputs, pred, gt, mean, pre_recal)
-
-                                        # plot postcal predictions/variance
-                                        post_pred = post_recal[m].data.max(1)[1].cpu().numpy()
-                                        plotPrediction(logdir, cfg, n_classes, i, i_val,
-                                                       k + "/" + m + "/post_recal_pred", inputs, post_pred, gt)
-                                        plotMeansVariances(logdir, cfg, n_classes, i, i_val, m,
-                                                           k + "/post_recal_meanvar", inputs, pred, gt, mean,
-                                                           post_recal)
 
                             running_metrics_val[k].update(gt, pred)
 
@@ -640,8 +562,8 @@ def plotMeansVariances(logdir, cfg, n_classes, i, i_val, m, k, inputs, pred, gt,
     [axi.set_axis_off() for axi in axes.ravel()]
 
     for c in range(n_classes):
-        mean_c = mean[m][0, c, :, :].cpu().numpy()
-        variance_c = variance[m][0, c, :, :].cpu().numpy()
+        mean_c = mean[0, c, :, :].cpu().numpy()
+        variance_c = variance[0, c, :, :].cpu().numpy()
 
         # Normarlize Image
         mean_c[0, 0] = 0.0
@@ -655,7 +577,7 @@ def plotMeansVariances(logdir, cfg, n_classes, i, i_val, m, k, inputs, pred, gt,
         axes[2 * (c % 2) + 1, c // 2].imshow(variance_c)
         axes[2 * (c % 2) + 1, c // 2].set_title(str(c) + " Var")
 
-    axes[-1, -1].imshow(variance[m][0, :, :, :].mean(0).cpu().numpy())
+    axes[-1, -1].imshow(variance[0, :, :, :].mean(0).cpu().numpy())
     axes[-1, -1].set_title("Average Variance")
 
     path = "{}/{}/{}/{}".format(logdir, "meanvar", m, k)
@@ -666,7 +588,6 @@ def plotMeansVariances(logdir, cfg, n_classes, i, i_val, m, k, inputs, pred, gt,
 
 
 if __name__ == "__main__":
-    # 
     parser = argparse.ArgumentParser(description="config")
     parser.add_argument(
         "--config",

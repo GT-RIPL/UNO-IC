@@ -23,6 +23,8 @@ def get_model(model_dict,
               learned_uncertainty="none",
               version=None, 
               reduction=1.0,
+              recalibrator=None,
+              bins=0,
               device="cpu"):
     name = model_dict['arch']
     model = _get_model_instance(name)
@@ -56,6 +58,8 @@ def get_model(model_dict,
                       start_layer=start_layer,
                       end_layer=end_layer,
                       device=device,
+                      recalibrator=recalibrator,
+                      bins=bins,
                       **param_dict)
         vgg16 = models.vgg16(pretrained=True)
         model.init_vgg16_params(vgg16)

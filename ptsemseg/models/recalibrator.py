@@ -20,8 +20,7 @@ class HistogramLinearRecalibrator():
         self.b = torch.zeros(1, device=device)
 
     def fit(self, output, label):
-        confidence, accuracy = calcStatistics(self, output, label, self.c, self.ranges)
-
+        confidence, accuracy = calcClassStatistics(output, label, self.ranges, self.c)
         self.W = torch.ones(len(confidence), device=self.device)
         self.b = torch.zeros(len(confidence), device=self.device)
 
@@ -64,7 +63,7 @@ class HistogramFlatRecalibrator():
         self.b = torch.zeros(1, device=device)
 
     def fit(self, output, label):
-        confidence, accuracy = calcStatistics(self, output, label)
+        confidence, accuracy = calcClassStatistics(output, label, self.ranges, self.c)
 
         self.b = torch.zeros(len(confidence), device=self.device)
 
@@ -82,6 +81,8 @@ class HistogramFlatRecalibrator():
 
             self.b[i] = 0.5 * (y1 + y2)
 
+
+        print(self.b)
         self.b.to(self.device)
 
     def predict(self, x):
@@ -106,7 +107,7 @@ class PolynomialRecalibrator():
         self.device = device
 
     def fit(self, output, label):
-        confidence, accuracy = calcStatistics(self, output, label)
+        confidence, accuracy = calcClassStatistics(output, label, self.ranges, self.c)
         for epoch in range(self.epochs):
             self.optimiser.zero_grad()
             y_pred = self.model.forward(confidence)
@@ -155,9 +156,6 @@ class PlattRecalibrator():  # i.e. logistic regression
 
         return torch.tensor(self.lr.predict_proba(x.reshape(-1, 1))[:, 1])
 
-
-# TODO Temperature scaling recalibration : https://arxiv.org/pdf/1706.04599.pdf
-
 class LinearRegressionModel(nn.Module):
     def __init__(self):
         super(LinearRegressionModel, self).__init__()
@@ -195,25 +193,19 @@ class PolynomialRegressionModel(torch.nn.Module):
 #         return x
 
 
-def calcStatistics(output, label, ranges, c):
-    softmax_mu = output  # torch.nn.Softmax(1)(mean[m])
-    variance = softmax_mu
+def calcClassStatistics(output, label, ranges, c):
 
-    max_mu_i = torch.argmax(output, dim=1)
-    max_mu = output.gather(1, max_mu_i.clone().unsqueeze(1)).squeeze(1)
-    max_sigma = softmax_mu.gather(1, max_mu_i.clone().unsqueeze(1)).squeeze(1)
+    confidences = []
+    accuracies = []
 
-    # Define Ground Truth, Prediction, and Associated Prediction Probability
-    pred = max_mu_i
+    pred = c
     gt = label
-    pred_var = max_sigma  # softmax_mu
+    pred_var = output[:, c, :, :]
 
     for r in ranges:
-        pred = c
-        pred_var = softmax_mu[:, c, :, :]
 
         low, high = r
-        idx_pred_gt_match = (pred == gt)  # &(pred==c) # everywhere correctly labeled to correct class
+        idx_pred_gt_match = (pred == gt)  # everywhere correctly labeled to correct class
         idx_pred_var_in_range = (low <= pred_var) & (pred_var < high)  # everywhere with specified confidence level
 
         sumval_pred_var_in_range = torch.sum(pred_var[idx_pred_var_in_range])
@@ -223,127 +215,55 @@ def calcStatistics(output, label, ranges, c):
         num_correct = torch.sum(idx_pred_gt_match)
 
         total = num_in_range if num_in_range > 0 else 1
-        confidence = 1. * sumval_pred_var_in_range / total
-        accuracy = 1. * num_obs_var_in_range / total
+        confidence = sumval_pred_var_in_range.data.cpu().numpy() / total
+        accuracy =num_obs_var_in_range.data.cpu().numpy() / total
+
+        del idx_pred_gt_match
+        del idx_pred_var_in_range
+        del sumval_pred_var_in_range
+        del num_obs_var_in_range
 
         if num_in_range == 0:
             confidence = (low + high) / 2.0
 
-        return confidence, accuracy
+        confidences.append(confidence)
+        accuracies.append(accuracy)
+
+    return confidences, accuracies
 
 
-def showCalibration(calibrationPerClass, ranges, m, logdir, n_classes, device):
-    ###########
-    # Overall #
-    ###########
-    fig, axes = plt.subplots(1, 3)
-    plt.tight_layout()
+def calcStatistics(output, label, ranges):
 
-    # Plot Predicted Variance Against Observed/Empirical Variance
-    x = np.array([overall_match_var[m][r]['pred'] for r in ranges])
-    y = np.array([overall_match_var[m][r]['obs'] for r in ranges])
+    pred_var, pred = torch.max(output, dim=1)
+    gt = label
 
-    xp = np.arange(0, 1, 0.001)
-    yp = np.interp(xp, x, y)
+    confidences = []
+    accuracies = []
 
-    # TODO fix plotting with invalid probilities and graph wrapping
-    axes[0].plot(x, y, '.')
-    axes[0].set_title("Uncalibrated")
-    axes[1].set_xlabel("softmax score")
-    axes[1].set_ylabel("emperical probability")
+    for r in ranges:
+        low, high = r
+        idx_pred_gt_match = (pred == gt)  # everywhere correctly labeled to correct class
+        idx_pred_var_in_range = (low <= pred_var) & (pred_var < high)  # everywhere with specified confidence level
 
-    # Convert Predicted Variances to Calibrated Variances
-    x = np.array([overall_match_var[m][r]['pred'] for r in ranges])
-    y = np.array([overall_match_var[m][r]['obs'] for r in ranges])
+        sumval_pred_var_in_range = torch.sum(pred_var[idx_pred_var_in_range])
+        num_obs_var_in_range = torch.sum((idx_pred_gt_match & idx_pred_var_in_range))
 
-    # x = torch.from_numpy(x.reshape(-1,1)).float()
-    x = torch.from_numpy(x).float()
+        num_in_range = torch.sum(idx_pred_var_in_range)
+        num_correct = torch.sum(idx_pred_gt_match)
 
-    y_pred = calibration[m]["model"].predict(x.to(device))
-    y_pred = y_pred.cpu().numpy()
+        total = num_in_range if num_in_range > 0 else 1
+        confidence = sumval_pred_var_in_range.data.cpu().numpy() / total
+        accuracy = num_obs_var_in_range.data.cpu().numpy() / total
 
-    print(y, y_pred)
+        del idx_pred_gt_match
+        del idx_pred_var_in_range
+        del sumval_pred_var_in_range
+        del num_obs_var_in_range
+        
+        if num_in_range == 0:
+            confidence = (low + high) / 2.0
 
-    # y_pred = calibration[m].predict(x)
-    # y_pred = calibration[m].predict(x[:,np.newaxis])
-    axes[1].plot(y_pred, y)
-    axes[1].set_title("Recalibrated")
-    axes[1].set_xlabel("calibrated confidence")
-    axes[1].set_ylabel("emperical probability")
+        confidences.append(confidence)
+        accuracies.append(accuracy)
 
-    # Recalibration Curve
-    x = np.arange(0, 1, 0.001)
-    x = torch.from_numpy(x).float()
-
-    # TODO figure out why we are calibrating the already recalibrated class scores?
-    y = calibration[m]["model"].predict(x.to(device))
-
-    x = x.cpu().numpy()
-    y = y.cpu().numpy()
-
-    # y = calibration[m].predict(x)
-    # y = calibration[m].predict(x[:,np.newaxis])
-    axes[2].plot(x, y)
-    axes[2].set_title("Recalibration Curve")
-    axes[2].set_xlabel("softmax probability")
-    axes[2].set_ylabel("calibrated confidence")
-
-    # calculating expected calibration error
-    # ECE = np.sum(np.absolute(y - y_pred))
-    # fig.suptitle('Expected Calibration Error: {}'.format(ECE), fontsize=16)
-
-    path = "{}/{}/{}".format(logdir, 'calibration', m)
-    if not os.path.exists(path):
-        os.makedirs(path)
-    plt.savefig("{}/calibratedOverall{}.png".format(path, i))
-
-    plt.close(fig)
-
-    ############################
-    # All Classes Uncalibrated #
-    ############################
-    fig, axes = plt.subplots(3, n_classes // 3 + 1)
-    # [axi.set_axis_off() for axi in axes.ravel()]
-
-    for c in range(n_classes):
-        # x = [per_class_match_var[m][r][c]['pred_below'] for r in ranges]
-        # y = [per_class_match_var[m][r][c]['obs_below'] for r in ranges]                        
-        x = [per_class_match_var[m][r][c]['pred'] for r in ranges]
-        y = [per_class_match_var[m][r][c]['obs'] for r in ranges]
-        axes[(c + 1) // (n_classes // 3 + 1), (c + 1) % (n_classes // 3 + 1)].plot(x, y)
-        axes[(c + 1) // (n_classes // 3 + 1), (c + 1) % (n_classes // 3 + 1)].set_title("Class: {}".format(c))
-
-    path = "{}/{}/{}".format(logdir, 'calibration', m)
-    if not os.path.exists(path):
-        os.makedirs(path)
-    plt.savefig("{}/uncalibratedPerClass{}.png".format(path, i))
-    plt.close(fig)
-
-    ##########################
-    # All Classes Calibrated #
-    ##########################
-    fig, axes = plt.subplots(3, n_classes // 3 + 1)
-    # [axi.set_axis_off() for axi in axes.ravel()]
-
-    for c in range(n_classes):
-        # x = [per_class_match_var[m][r][c]['pred_below'] for r in ranges]
-        # y = [per_class_match_var[m][r][c]['obs_below'] for r in ranges]                        
-        x = np.array([per_class_match_var[m][r][c]['pred'] for r in ranges])
-        y = np.array([per_class_match_var[m][r][c]['obs'] for r in ranges])
-
-        # x = torch.from_numpy(x.reshape(-1,1)).float()
-        x = torch.from_numpy(x).float()
-
-        y_pred = calibrationPerClass[m][c]["model"].predict(x.to(device))
-        y_pred = y_pred.cpu().numpy()
-
-        axes[(c + 1) // (n_classes // 3 + 1), (c + 1) % (n_classes // 3 + 1)].plot(y, y_pred)
-        axes[(c + 1) // (n_classes // 3 + 1), (c + 1) % (n_classes // 3 + 1)].set_title("Class: {}".format(c))
-
-    path = "{}/{}/{}".format(logdir, 'calibration', m)
-    if not os.path.exists(path):
-        os.makedirs(path)
-    plt.savefig("{}/calibratedPerClass{}.png".format(path, i))
-    plt.close(fig)
-
-    # print(overall_match_var[m])
+    return confidences, accuracies

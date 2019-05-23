@@ -81,7 +81,6 @@ class HistogramFlatRecalibrator():
 
             self.b[i] = 0.5 * (y1 + y2)
 
-
         print(self.b)
         self.b.to(self.device)
 
@@ -128,15 +127,14 @@ class IsotonicRecalibrator():
         self.ir = IsotonicRegression()
 
     def fit(self, output, label):
-        # TODO preprocess label to match class
         x = output.data.cpu().numpy()
-        y = label.data.cpu().numpy()
+        y = (label == self.c).data.cpu().numpy()
         self.ir.fit(x, y)
 
     def predict(self, x):
         x = x.data.cpu().numpy()
 
-        return torch.tensor(self.ir.predict(x))
+        return torch.Tensor(self.ir.predict(x))
 
 
 class PlattRecalibrator():  # i.e. logistic regression
@@ -145,16 +143,15 @@ class PlattRecalibrator():  # i.e. logistic regression
         self.lr = LogisticRegression()
 
     def fit(self, output, label):
-        # TODO preprocess label to match class
         x = output.data.cpu().numpy()
-        y = label.data.cpu().numpy()
+        y = (label == self.c).data.cpu().numpy()
 
         self.lr.fit(x, y)
 
     def predict(self, x):
         x = x.data.cpu().numpy()
+        return torch.Tensor(self.lr.predict_proba(x.reshape(-1, 1))[:, 1])
 
-        return torch.tensor(self.lr.predict_proba(x.reshape(-1, 1))[:, 1])
 
 class LinearRegressionModel(nn.Module):
     def __init__(self):
@@ -194,7 +191,6 @@ class PolynomialRegressionModel(torch.nn.Module):
 
 
 def calcClassStatistics(output, label, ranges, c):
-
     confidences = []
     accuracies = []
 
@@ -212,11 +208,10 @@ def calcClassStatistics(output, label, ranges, c):
         num_obs_var_in_range = torch.sum((idx_pred_gt_match & idx_pred_var_in_range))
 
         num_in_range = torch.sum(idx_pred_var_in_range)
-        num_correct = torch.sum(idx_pred_gt_match)
 
         total = num_in_range if num_in_range > 0 else 1
         confidence = sumval_pred_var_in_range.data.cpu().numpy() / total
-        accuracy =num_obs_var_in_range.data.cpu().numpy() / total
+        accuracy = num_obs_var_in_range.data.cpu().numpy() / total
 
         del idx_pred_gt_match
         del idx_pred_var_in_range
@@ -233,7 +228,6 @@ def calcClassStatistics(output, label, ranges, c):
 
 
 def calcStatistics(output, label, ranges):
-
     pred_var, pred = torch.max(output, dim=1)
     gt = label
 
@@ -249,7 +243,6 @@ def calcStatistics(output, label, ranges):
         num_obs_var_in_range = torch.sum((idx_pred_gt_match & idx_pred_var_in_range))
 
         num_in_range = torch.sum(idx_pred_var_in_range)
-        num_correct = torch.sum(idx_pred_gt_match)
 
         total = num_in_range if num_in_range > 0 else 1
         confidence = sumval_pred_var_in_range.data.cpu().numpy() / total
@@ -259,9 +252,9 @@ def calcStatistics(output, label, ranges):
         del idx_pred_var_in_range
         del sumval_pred_var_in_range
         del num_obs_var_in_range
-        
+
         if num_in_range == 0:
-            confidence = (low + high) / 2.0
+            confidence = accuracy = (low + high) / 2.0
 
         confidences.append(confidence)
         accuracies.append(accuracy)

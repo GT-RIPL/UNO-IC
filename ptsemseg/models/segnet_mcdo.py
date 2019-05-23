@@ -4,11 +4,12 @@ from torch.autograd import Variable
 from ptsemseg.models.utils import *
 from ptsemseg.models.recalibrator import *
 
+
 class segnet_mcdo(nn.Module):
-    def __init__(self, 
-                 n_classes=21, 
-                 in_channels=3, 
-                 is_unpooling=True, 
+    def __init__(self,
+                 n_classes=21,
+                 in_channels=3,
+                 is_unpooling=True,
                  input_size=(473, 473),
                  batch_size=2,
                  version=None,
@@ -22,7 +23,7 @@ class segnet_mcdo(nn.Module):
                  device="cpu",
                  recalibrator="None",
                  bins=0
-                ):
+                 ):
         super(segnet_mcdo, self).__init__()
 
         self.in_channels = in_channels
@@ -34,24 +35,26 @@ class segnet_mcdo(nn.Module):
         self.fixed_mcdo = fixed_mcdo
         self.device = device
 
-
         # Select Recalibrator
         self.recalibrator = recalibrator
 
         if recalibrator != "None" and bins > 0:
-            self.ranges = list(zip([1.*a/bins for a in range(bins+2)][:-2],
-                              [1.*a/bins for a in range(bins+2)][1:]))
-            if recalibrator=="HistogramFlat":
-                self.calibrationPerClass = [HistogramFlatRecalibrator(n,self.ranges,device) for n in range(self.n_classes)]
-            elif recalibrator=="HistogramLinear":
-                self.calibrationPerClass = [HistogramLinearRecalibrator(n,self.ranges,device) for n in range(self.n_classes)]
+            self.ranges = list(zip([1. * a / bins for a in range(bins + 2)][:-2],
+                                   [1. * a / bins for a in range(bins + 2)][1:]))
+            if recalibrator == "HistogramFlat":
+                self.calibrationPerClass = [HistogramFlatRecalibrator(n, self.ranges, device) for n in
+                                            range(self.n_classes)]
+            elif recalibrator == "HistogramLinear":
+                self.calibrationPerClass = [HistogramLinearRecalibrator(n, self.ranges, device) for n in
+                                            range(self.n_classes)]
             elif "Polynomial" in recalibrator:
                 degree = int(recalibrator.split("_")[-1])
-                self.calibrationPerClass = [PolynomialRecalibrator(n,self.ranges,degree,device) for n in range(self.n_classes)]
+                self.calibrationPerClass = [PolynomialRecalibrator(n, self.ranges, degree, device) for n in
+                                            range(self.n_classes)]
             elif "Isotonic" in recalibrator:
-                self.calibrationPerClass = [IsotonicRecalibrator(n,device) for n in range(self.n_classes)]
+                self.calibrationPerClass = [IsotonicRecalibrator(n, device) for n in range(self.n_classes)]
             elif "Platt" in recalibrator:
-                self.calibrationPerClass = [PlattRecalibrator(n,device) for n in range(self.n_classes)]
+                self.calibrationPerClass = [PlattRecalibrator(n, device) for n in range(self.n_classes)]
             else:
                 print("Recalibrator: Not Supported")
                 exit()
@@ -60,12 +63,12 @@ class segnet_mcdo(nn.Module):
             self.layers = {
                 "down1": segnetDown2(self.in_channels, 64),
                 "down2": segnetDown2(64, 128),
-                "down3": segnetDown3MCDO(128, 256,  pMCDO=dropoutP),
-                "down4": segnetDown3MCDO(256, 512,  pMCDO=dropoutP),
-                "down5": segnetDown3MCDO(512, 512,  pMCDO=dropoutP),
-                "up5": segnetUp3MCDO(512, 512,      pMCDO=dropoutP),
-                "up4": segnetUp3MCDO(512, 256,      pMCDO=dropoutP),
-                "up3": segnetUp3MCDO(256, 128,      pMCDO=dropoutP),
+                "down3": segnetDown3MCDO(128, 256, pMCDO=dropoutP),
+                "down4": segnetDown3MCDO(256, 512, pMCDO=dropoutP),
+                "down5": segnetDown3MCDO(512, 512, pMCDO=dropoutP),
+                "up5": segnetUp3MCDO(512, 512, pMCDO=dropoutP),
+                "up4": segnetUp3MCDO(512, 256, pMCDO=dropoutP),
+                "up3": segnetUp3MCDO(256, 128, pMCDO=dropoutP),
                 "up2": segnetUp2(128, 64),
                 "up1": segnetUp2(64, n_classes),
             }
@@ -83,8 +86,8 @@ class segnet_mcdo(nn.Module):
                 "up1": segnetUp2(64, n_classes),
             }
 
-        self.dropouts = {k:nn.Dropout2d(p=dropoutP, inplace=False) for k in self.layers.keys()}
-              
+        self.dropouts = {k: nn.Dropout2d(p=dropoutP, inplace=False) for k in self.layers.keys()}
+
         # self.dropout_layers = ["down3","down4","down5","up5","up4","up3"]
 
         # inp = torch.Tensor(512,512,3)
@@ -103,18 +106,23 @@ class segnet_mcdo(nn.Module):
         # up4 torch.Size([2, 256, 64, 64])
         # up5 torch.Size([2, 512, 32, 32])
 
-
         self.temperature = torch.nn.Parameter(torch.ones(1))
 
         self.dropout_masks = {p:
-        {
-            "down3": Variable((1./(1-self.dropoutP))*torch.bernoulli((1-self.dropoutP)*torch.ones(self.batch_size,256,64,64))).to(device),
-            "down4": Variable((1./(1-self.dropoutP))*torch.bernoulli((1-self.dropoutP)*torch.ones(self.batch_size,512,32,32))).to(device),
-            "down5": Variable((1./(1-self.dropoutP))*torch.bernoulli((1-self.dropoutP)*torch.ones(self.batch_size,512,16,16))).to(device),
-            "up5":   Variable((1./(1-self.dropoutP))*torch.bernoulli((1-self.dropoutP)*torch.ones(self.batch_size,512,32,32))).to(device),
-            "up4":   Variable((1./(1-self.dropoutP))*torch.bernoulli((1-self.dropoutP)*torch.ones(self.batch_size,256,64,64))).to(device),
-            "up3":   Variable((1./(1-self.dropoutP))*torch.bernoulli((1-self.dropoutP)*torch.ones(self.batch_size,128,128,128))).to(device),
-        } for p in range(self.mcdo_passes)}
+            {
+                "down3": Variable((1. / (1 - self.dropoutP)) * torch.bernoulli(
+                    (1 - self.dropoutP) * torch.ones(self.batch_size, 256, 64, 64))).to(device),
+                "down4": Variable((1. / (1 - self.dropoutP)) * torch.bernoulli(
+                    (1 - self.dropoutP) * torch.ones(self.batch_size, 512, 32, 32))).to(device),
+                "down5": Variable((1. / (1 - self.dropoutP)) * torch.bernoulli(
+                    (1 - self.dropoutP) * torch.ones(self.batch_size, 512, 16, 16))).to(device),
+                "up5": Variable((1. / (1 - self.dropoutP)) * torch.bernoulli(
+                    (1 - self.dropoutP) * torch.ones(self.batch_size, 512, 32, 32))).to(device),
+                "up4": Variable((1. / (1 - self.dropoutP)) * torch.bernoulli(
+                    (1 - self.dropoutP) * torch.ones(self.batch_size, 256, 64, 64))).to(device),
+                "up3": Variable((1. / (1 - self.dropoutP)) * torch.bernoulli(
+                    (1 - self.dropoutP) * torch.ones(self.batch_size, 128, 128, 128))).to(device),
+            } for p in range(self.mcdo_passes)}
 
         # print(torch.bernoulli(0.5*torch.ones(10)))
         # print(Variable(torch.bernoulli(0.5*torch.ones(10))))
@@ -138,32 +146,37 @@ class segnet_mcdo(nn.Module):
         self.start_layer = start_layer
         self.end_layer = end_layer
 
-        self.reduced_layers = self.ordered_layers[ self.ordered_layers.index(self.start_layer):(self.ordered_layers.index(self.end_layer)+1) ]
+        self.reduced_layers = self.ordered_layers[self.ordered_layers.index(self.start_layer):(
+                    self.ordered_layers.index(self.end_layer) + 1)]
 
-        for k,v in self.layers.items():
-            setattr(self,k,v)
-
-
+        for k, v in self.layers.items():
+            setattr(self, k, v)
 
     def forwardOnce(self, inputs, pass_no):
 
         if not self.fixed_mcdo:
             self.dropout_masks = {pass_no:
-            {
-                "down3": Variable((1./(1-self.dropoutP))*torch.bernoulli((1-self.dropoutP)*torch.ones(self.batch_size,256,64,64))).to(self.device),
-                "down4": Variable((1./(1-self.dropoutP))*torch.bernoulli((1-self.dropoutP)*torch.ones(self.batch_size,512,32,32))).to(self.device),
-                "down5": Variable((1./(1-self.dropoutP))*torch.bernoulli((1-self.dropoutP)*torch.ones(self.batch_size,512,16,16))).to(self.device),
-                "up5":   Variable((1./(1-self.dropoutP))*torch.bernoulli((1-self.dropoutP)*torch.ones(self.batch_size,512,32,32))).to(self.device),
-                "up4":   Variable((1./(1-self.dropoutP))*torch.bernoulli((1-self.dropoutP)*torch.ones(self.batch_size,256,64,64))).to(self.device),
-                "up3":   Variable((1./(1-self.dropoutP))*torch.bernoulli((1-self.dropoutP)*torch.ones(self.batch_size,128,128,128))).to(self.device),
-            }}            
+                {
+                    "down3": Variable((1. / (1 - self.dropoutP)) * torch.bernoulli(
+                        (1 - self.dropoutP) * torch.ones(self.batch_size, 256, 64, 64))).to(self.device),
+                    "down4": Variable((1. / (1 - self.dropoutP)) * torch.bernoulli(
+                        (1 - self.dropoutP) * torch.ones(self.batch_size, 512, 32, 32))).to(self.device),
+                    "down5": Variable((1. / (1 - self.dropoutP)) * torch.bernoulli(
+                        (1 - self.dropoutP) * torch.ones(self.batch_size, 512, 16, 16))).to(self.device),
+                    "up5": Variable((1. / (1 - self.dropoutP)) * torch.bernoulli(
+                        (1 - self.dropoutP) * torch.ones(self.batch_size, 512, 32, 32))).to(self.device),
+                    "up4": Variable((1. / (1 - self.dropoutP)) * torch.bernoulli(
+                        (1 - self.dropoutP) * torch.ones(self.batch_size, 256, 64, 64))).to(self.device),
+                    "up3": Variable((1. / (1 - self.dropoutP)) * torch.bernoulli(
+                        (1 - self.dropoutP) * torch.ones(self.batch_size, 128, 128, 128))).to(self.device),
+                }}
 
-        # Use MCDO if Multiple Passes
-        mcdo = (self.mcdo_passes>1)
+            # Use MCDO if Multiple Passes
+        mcdo = (self.mcdo_passes > 1)
 
         if "down1" in self.reduced_layers:
             down1, indices_1, unpool_shape1 = self.layers["down1"](inputs)
-        
+
         if "down2" in self.reduced_layers:
             down2, indices_2, unpool_shape2 = self.layers["down2"](down1)
 
@@ -171,37 +184,37 @@ class segnet_mcdo(nn.Module):
             # down3, indices_3, unpool_shape3 = self.layers["down3"](down2, MCDO=mcdo)
             down3, indices_3, unpool_shape3 = self.layers["down3"](down2)
             if self.training or mcdo:
-                down3 = self.dropout_masks[pass_no]["down3"]*down3
+                down3 = self.dropout_masks[pass_no]["down3"] * down3
 
         if "down4" in self.reduced_layers:
             # down4, indices_4, unpool_shape4 = self.layers["down4"](down3, MCDO=mcdo)
             down4, indices_4, unpool_shape4 = self.layers["down4"](down3)
             if self.training or mcdo:
-                down4 = self.dropout_masks[pass_no]["down4"]*(down4)
+                down4 = self.dropout_masks[pass_no]["down4"] * (down4)
 
         if "down5" in self.reduced_layers:
             # down5, indices_5, unpool_shape5 = self.layers["down5"](down4, MCDO=mcdo)
             down5, indices_5, unpool_shape5 = self.layers["down5"](down4)
             if self.training or mcdo:
-                down5 = self.dropout_masks[pass_no]["down5"]*(down5)
+                down5 = self.dropout_masks[pass_no]["down5"] * (down5)
 
         if "up5" in self.reduced_layers:
             # up5 = self.layers["up5"](down5, indices_5, unpool_shape5, MCDO=mcdo)
             up5 = self.layers["up5"](down5, indices_5, unpool_shape5)
-            if self.training or mcdo:            
-                up5 = self.dropout_masks[pass_no]["up5"]*(up5)
+            if self.training or mcdo:
+                up5 = self.dropout_masks[pass_no]["up5"] * (up5)
 
         if "up4" in self.reduced_layers:
             # up4 = self.layers["up4"](up5, indices_4, unpool_shape4, MCDO=mcdo)
             up4 = self.layers["up4"](up5, indices_4, unpool_shape4)
             if self.training or mcdo:
-                up4 = self.dropout_masks[pass_no]["up4"]*(up4)
+                up4 = self.dropout_masks[pass_no]["up4"] * (up4)
 
         if "up3" in self.reduced_layers:
             # up3 = self.layers["up3"](up4, indices_3, unpool_shape3, MCDO=mcdo)
             up3 = self.layers["up3"](up4, indices_3, unpool_shape3)
-            if self.training or mcdo:           
-                up3 = self.dropout_masks[pass_no]["up3"]*(up3)
+            if self.training or mcdo:
+                up3 = self.dropout_masks[pass_no]["up3"] * (up3)
 
         if "up2" in self.reduced_layers:
             up2 = self.layers["up2"](up3, indices_2, unpool_shape2)
@@ -281,13 +294,11 @@ class segnet_mcdo(nn.Module):
                 else:
 
                     num_orig = int(l1.weight.size()[1])
-                    num_tiles = int(l2.weight.size()[1])//int(l1.weight.size()[1])
+                    num_tiles = int(l2.weight.size()[1]) // int(l1.weight.size()[1])
 
                     for i in range(num_tiles):
-                        l2.weight.data[:,i*num_orig:(i+1)*num_orig,:,:] = l1.weight.data
+                        l2.weight.data[:, i * num_orig:(i + 1) * num_orig, :, :] = l1.weight.data
                     l2.bias.data = l1.bias.data
-
-
 
     def forward(self, inputs, recalType="None"):
         # First pass has backpropagation; others do not
@@ -297,35 +308,36 @@ class segnet_mcdo(nn.Module):
                 x = x_bp.unsqueeze(-1)
             else:
                 with torch.no_grad():
-                    x = torch.cat((x,self.forwardOnce(inputs,i).unsqueeze(-1)),-1)
+                    x = torch.cat((x, self.forwardOnce(inputs, i).unsqueeze(-1)), -1)
 
         # Uncalibrated Softmax Mean and Variance
         mean = torch.nn.Softmax(1)(x).mean(-1)
-        variance = torch.nn.Softmax(1)(x).pow(2).mean(-1)-mean.pow(2)
+        variance = torch.nn.Softmax(1)(x).pow(2).mean(-1) - mean.pow(2)
         if self.recalibrator != "None":
-            if recalType=="beforeMCDO":
+            if recalType == "beforeMCDO":
                 for c in range(self.n_classes):
-                    x[:,c,:,:,:] = self.calibrationPerClass[c].predict(x[:,c,:,:,:].reshape(-1)).reshape(x[:,c,:,:,:].shape)
+                    x[:, c, :, :, :] = self.calibrationPerClass[c].predict(x[:, c, :, :, :].reshape(-1)).reshape(
+                        x[:, c, :, :, :].shape)
 
                 mean = torch.nn.Softmax(1)(x).mean(-1)
-                variance = torch.nn.Softmax(1)(x).pow(2).mean(-1)-mean.pow(2)
+                variance = torch.nn.Softmax(1)(x).pow(2).mean(-1) - mean.pow(2)
 
-            elif recalType=="afterMCDO":
+            elif recalType == "afterMCDO":
                 for c in range(self.n_classes):
-                    mean[:,c,:,:] = self.calibrationPerClass[c].predict(mean[:,c,:,:].reshape(-1)).reshape(mean[:,c,:,:].shape)
-
+                    mean[:, c, :, :] = self.calibrationPerClass[c].predict(mean[:, c, :, :].reshape(-1)).reshape(
+                        mean[:, c, :, :].shape)
 
         return x_bp, mean, variance
 
     def applyCalibration(self, output):
 
         for c in range(self.n_classes):
-            output[:,c,:,:] = self.calibrationPerClass[c].predict(output[:,c,:,:].reshape(-1)).reshape(output[:,c,:,:].shape)
+            output[:, c, :, :] = self.calibrationPerClass[c].predict(output[:, c, :, :].reshape(-1)).reshape(
+                output[:, c, :, :].shape)
 
         return output
 
     def showCalibration(self, output, label, logdir, model, iteration):
-
 
         recal_output = self.applyCalibration(output.clone())
 
@@ -338,7 +350,7 @@ class segnet_mcdo(nn.Module):
         # Plot Predicted Variance Against Observed/Empirical Variance
         x, y = calcStatistics(output, label, self.ranges)
 
-        # TODO fix plotting with invalid probilities and graph wrapping
+        # TODO fix plotting with invalid probabilities and graph wrapping
         axes[0].plot(x, y, '.')
         axes[0].set_title("Uncalibrated")
         axes[1].set_xlabel("uncalibrated confidence")
@@ -392,7 +404,8 @@ class segnet_mcdo(nn.Module):
         for c in range(self.n_classes):
             x, y = calcClassStatistics(output, label, self.ranges, c)
             axes[(c + 1) // (self.n_classes // 3 + 1), (c + 1) % (self.n_classes // 3 + 1)].plot(x, y)
-            axes[(c + 1) // (self.n_classes // 3 + 1), (c + 1) % (self.n_classes // 3 + 1)].set_title("Class: {}".format(c))
+            axes[(c + 1) // (self.n_classes // 3 + 1), (c + 1) % (self.n_classes // 3 + 1)].set_title(
+                "Class: {}".format(c))
 
         path = "{}/{}/{}".format(logdir, 'calibration', model)
         if not os.path.exists(path):
@@ -409,7 +422,8 @@ class segnet_mcdo(nn.Module):
             x, y = calcClassStatistics(recal_output, label, self.ranges, c)
 
             axes[(c + 1) // (self.n_classes // 3 + 1), (c + 1) % (self.n_classes // 3 + 1)].plot(x, y)
-            axes[(c + 1) // (self.n_classes // 3 + 1), (c + 1) % (self.n_classes // 3 + 1)].set_title("Class: {}".format(c))
+            axes[(c + 1) // (self.n_classes // 3 + 1), (c + 1) % (self.n_classes // 3 + 1)].set_title(
+                "Class: {}".format(c))
 
         path = "{}/{}/{}".format(logdir, 'calibration', model)
         if not os.path.exists(path):

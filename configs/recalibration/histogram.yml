@@ -1,4 +1,4 @@
-id: rgb_BayesianSegnet_0.5_Masks0-5_T000_RNone_PLOT
+id: rgb_BayesianSegnet_histogramLinear
 model:
     arch: segnet_mcdo
 models:
@@ -26,7 +26,7 @@ models:
         resume: models/d_BayesianSegnet_0.5_T000/d_segnet_mcdo_airsim_best_model.pkl
 fusion: SoftmaxMultiply #{None,SoftmaxMultiply}
 recal: afterMCDO #{None,afterMCDO,beforeMCDO}
-recalibrator: Isotonic #{Histogram,Polynomial_X}
+recalibrator: HistogramLinear #{Histogram,Polynomial_X}
 bins: 10
 data:
     dataset: airsim
@@ -35,7 +35,7 @@ data:
     train_reduction: 1.0    
     recal_split: recal
     recal_subsplit: ['async_fog_000_clear']
-    recal_reduction: 0.05
+    recal_reduction: 0.2
     val_split: val
     val_subsplit: [
                    'async_fog_000_clear',
@@ -45,7 +45,7 @@ data:
                    "async_fog_100_clear__{'channel':'d','type':'blackoutNoise','value':'20'}",
                    "async_fog_100_clear__{'channel':'rgbd','type':'blackoutNoise','value':'20'}",                   
                   ]    
-    val_reduction: 0.05
+    val_reduction: 1.0
     img_rows: 512
     img_cols: 512
     path: datasets/airsim_data_async #../../ros/data/airsim_03-30-2019/airsim_data_async
@@ -65,3 +65,4 @@ training:
         size_average: False
     lr_schedule:
     resume: None
+

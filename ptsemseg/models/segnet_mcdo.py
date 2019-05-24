@@ -52,9 +52,9 @@ class segnet_mcdo(nn.Module):
                 self.calibrationPerClass = [PolynomialRecalibrator(n, self.ranges, degree, device) for n in
                                             range(self.n_classes)]
             elif "Isotonic" in recalibrator:
-                self.calibrationPerClass = [IsotonicRecalibrator(n, device) for n in range(self.n_classes)]
+                self.calibrationPerClass = [IsotonicRecalibrator(n) for n in range(self.n_classes)]
             elif "Platt" in recalibrator:
-                self.calibrationPerClass = [PlattRecalibrator(n, device) for n in range(self.n_classes)]
+                self.calibrationPerClass = [PlattRecalibrator(n) for n in range(self.n_classes)]
             else:
                 print("Recalibrator: Not Supported")
                 exit()
@@ -106,7 +106,7 @@ class segnet_mcdo(nn.Module):
         # up4 torch.Size([2, 256, 64, 64])
         # up5 torch.Size([2, 512, 32, 32])
 
-        self.temperature = torch.nn.Parameter(torch.ones(1))
+        #self.temperature = torch.nn.Parameter(torch.ones(1))
 
         self.dropout_masks = {p:
             {
@@ -237,10 +237,7 @@ class segnet_mcdo(nn.Module):
         # print("up5",up5.shape)
         # exit()
 
-        if self.recalibrator == "temperature_scaling":
-            return up1 / self.temperature
-        else:
-            return up1
+        return up1
 
     def configureDropout(self):
 
@@ -305,10 +302,26 @@ class segnet_mcdo(nn.Module):
         for i in range(self.mcdo_passes):
             if i == 0:
                 x_bp = self.forwardOnce(inputs, i)
+
                 x = x_bp.unsqueeze(-1)
             else:
                 with torch.no_grad():
                     x = torch.cat((x, self.forwardOnce(inputs, i).unsqueeze(-1)), -1)
+
+        if recalType == "temperature_scaling":
+            x_bp /= self.temperature
+            x /= self.temperature
+
+        # plot the distribution of passes
+        fig, axes = plt.subplots(3, self.n_classes // 3 + 1)
+        for c in range(self.n_classes):
+            xx = x[0, c, 0, 0, :]
+            axes[(c + 1) // (self.n_classes // 3 + 1), (c + 1) % (self.n_classes // 3 + 1)].hist(xx)
+            axes[(c + 1) // (self.n_classes // 3 + 1), (c + 1) % (self.n_classes // 3 + 1)].set_title("Class: {}".format(c))
+            del xx
+
+        plt.savefig("./{}.png".format(c))
+        plt.close(fig)
 
         # Uncalibrated Softmax Mean and Variance
         mean = torch.nn.Softmax(1)(x).mean(-1)
@@ -316,24 +329,21 @@ class segnet_mcdo(nn.Module):
         if self.recalibrator != "None":
             if recalType == "beforeMCDO":
                 for c in range(self.n_classes):
-                    x[:, c, :, :, :] = self.calibrationPerClass[c].predict(x[:, c, :, :, :].reshape(-1)).reshape(
-                        x[:, c, :, :, :].shape)
+                    x[:, c, :, :, :] = self.calibrationPerClass[c].predict(x[:, c, :, :, :].reshape(-1)).reshape(x[:, c, :, :, :].shape)
 
                 mean = torch.nn.Softmax(1)(x).mean(-1)
                 variance = torch.nn.Softmax(1)(x).pow(2).mean(-1) - mean.pow(2)
 
             elif recalType == "afterMCDO":
                 for c in range(self.n_classes):
-                    mean[:, c, :, :] = self.calibrationPerClass[c].predict(mean[:, c, :, :].reshape(-1)).reshape(
-                        mean[:, c, :, :].shape)
+                    mean[:, c, :, :] = self.calibrationPerClass[c].predict(mean[:, c, :, :].reshape(-1)).reshape(mean[:, c, :, :].shape)
 
         return x_bp, mean, variance
 
     def applyCalibration(self, output):
 
         for c in range(self.n_classes):
-            output[:, c, :, :] = self.calibrationPerClass[c].predict(output[:, c, :, :].reshape(-1)).reshape(
-                output[:, c, :, :].shape)
+            output[:, c, :, :] = self.calibrationPerClass[c].predict(output[:, c, :, :].reshape(-1)).reshape(output[:, c, :, :].shape)
 
         return output
 
@@ -344,7 +354,7 @@ class segnet_mcdo(nn.Module):
         ###########
         # Overall #
         ###########
-        fig, axes = plt.subplots(1, 3)
+        fig, axes = plt.subplots(1, 2)
         plt.tight_layout()
 
         # Plot Predicted Variance Against Observed/Empirical Variance
@@ -353,8 +363,8 @@ class segnet_mcdo(nn.Module):
         # TODO fix plotting with invalid probabilities and graph wrapping
         axes[0].plot(x, y, '.')
         axes[0].set_title("Uncalibrated")
-        axes[1].set_xlabel("uncalibrated confidence")
-        axes[1].set_ylabel("emperical probability")
+        axes[0].set_xlabel("uncalibrated confidence")
+        axes[0].set_ylabel("emperical probability")
 
         # Convert Predicted Variances to Calibrated Variances
         x, y = calcStatistics(recal_output, label, self.ranges)
@@ -370,7 +380,6 @@ class segnet_mcdo(nn.Module):
         x = torch.from_numpy(x).float()
 
         # TODO figure out why we are calibrating the already recalibrated class scores?
-        # probably don't, double recalibration probably ruins generalization => should test though
 
         y = self.applyCalibration(x)
 
@@ -386,8 +395,8 @@ class segnet_mcdo(nn.Module):
         """
 
         # calculating expected calibration error
-        # ECE = np.sum(np.absolute(y - y_pred))
-        # fig.suptitle('Expected Calibration Error: {}'.format(ECE), fontsize=16)
+        ECE = avg([abs(i - j) for i,j, in zip(x,y)])
+        fig.suptitle('Expected Calibration Error: {}'.format(ECE), fontsize=16)
 
         path = "{}/{}/{}".format(logdir, 'calibration', model)
         if not os.path.exists(path):
@@ -404,8 +413,7 @@ class segnet_mcdo(nn.Module):
         for c in range(self.n_classes):
             x, y = calcClassStatistics(output, label, self.ranges, c)
             axes[(c + 1) // (self.n_classes // 3 + 1), (c + 1) % (self.n_classes // 3 + 1)].plot(x, y)
-            axes[(c + 1) // (self.n_classes // 3 + 1), (c + 1) % (self.n_classes // 3 + 1)].set_title(
-                "Class: {}".format(c))
+            axes[(c + 1) // (self.n_classes // 3 + 1), (c + 1) % (self.n_classes // 3 + 1)].set_title("Class: {}".format(c))
 
         path = "{}/{}/{}".format(logdir, 'calibration', model)
         if not os.path.exists(path):
@@ -422,12 +430,12 @@ class segnet_mcdo(nn.Module):
             x, y = calcClassStatistics(recal_output, label, self.ranges, c)
 
             axes[(c + 1) // (self.n_classes // 3 + 1), (c + 1) % (self.n_classes // 3 + 1)].plot(x, y)
-            axes[(c + 1) // (self.n_classes // 3 + 1), (c + 1) % (self.n_classes // 3 + 1)].set_title(
-                "Class: {}".format(c))
+            axes[(c + 1) // (self.n_classes // 3 + 1), (c + 1) % (self.n_classes // 3 + 1)].set_title("Class: {}".format(c))
 
         path = "{}/{}/{}".format(logdir, 'calibration', model)
         if not os.path.exists(path):
             os.makedirs(path)
+
         plt.savefig("{}/calibratedPerClass{}.png".format(path, iteration))
         plt.close(fig)
 

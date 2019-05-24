@@ -10,7 +10,7 @@ models:
         mcdo_passes: 6 # Number of Passes
         mask_dir: models/DropoutMasks/Random # Directory of Indexed Masks
         masks: [0,1,2,3,4,5] # Number Mask Indices Should Equal Number of MCDO Passes
-        fixed_mcdo: Yes # Yes: Fixed Masks per Pass; No: Randomized Masks per Pass
+        fixed_mcdo: No # Yes: Fixed Masks per Pass; No: Randomized Masks per Pass
         dropoutP: 0.5 # Dropout Probability
         resume: None #models/BayesianSegnet/rgb_BayesianSegnet_0.5_T000/rgb_segnet_mcdo_airsim_best_model.pkl
     #d:

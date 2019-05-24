@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 import yaml
 import os
-
+"""
 include = [
            'run1',
            'run2',
@@ -21,7 +21,7 @@ run_comments = {
             ("rgb_BayesianSegnet_0.1","RGB Only (Bayesian Segnet, p = 0.1)"),
         ],
         "text":
-            """following architecture from BayesSegnet paper, dropout p = 0.1""",
+            "following architecture from BayesSegnet paper, dropout p = 0.1",
     },
     "run2": {
         "names": [
@@ -29,11 +29,24 @@ run_comments = {
             ("rgb_BayesianSegnet_0.5","RGB Only (Bayesian Segnet, p = 0.5)"),
         ],
         "text":
-            """following architecture from BayesSegnet paper, dropout p = 0.5""",
+            "following architecture from BayesSegnet paper, dropout p = 0.5",
     },    
 }
+"""
 
+include = [
+           'graphing'
+           ]
 
+run_comments = {
+    "graphing": {
+        "names": [
+            ("rgb_BayesianSegnet_0.5_Masks0-5_T000_RNone_PLOT","asdf")
+        ],
+        "text":
+            "following architecture from BayesSegnet paper, dropout p = 0.1",
+    }  
+}
 
 runs = {}
 for i,file in enumerate(glob.glob("./**/*tfevents*",recursive=True)):
@@ -124,9 +137,9 @@ for k,v in runs.items():
     # v['std_config']['start_layers'] = c['start_layers']
     v['std_config']['mcdo_passes'] = c['models'][model]['mcdo_passes']
     v['std_config']['fuse_mech'] = "ModeSummed" if "fuse" in c['models'].keys() and c['models']['fuse']['in_channels']==-1 else "ModeStacked"
-    v['std_config']['mcdo_start_iter'] = c['models'][model]['mcdo_start_iter']
-    v['std_config']['multipass_backprop'] = c['models'][model]['mcdo_backprop']
-    v['std_config']['learned_uncertainty'] = True if c['models'][model]['learned_uncertainty']=='yes' else False
+    #v['std_config']['mcdo_start_iter'] = c['models'][model]['mcdo_start_iter']
+    #v['std_config']['multipass_backprop'] = c['models'][model]['mcdo_backprop']
+    #v['std_config']['learned_uncertainty'] = True if c['models'][model]['learned_uncertainty']=='yes' else False
     v['std_config']['dropoutP'] = c['models'][model]['dropoutP']
     v['std_config']['pretrained'] = str(c['models'][model]['resume']) != "None"
 

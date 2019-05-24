@@ -6,8 +6,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 
-from sklearn.isotonic import IsotonicRegression
-from sklearn.linear_model import LogisticRegression
+from sklearn.isotonic import IsotonicRegression as IR
+from sklearn.linear_model import LogisticRegression as LR
 
 
 class HistogramLinearRecalibrator():
@@ -124,33 +124,35 @@ class PolynomialRecalibrator():
 class IsotonicRecalibrator():
     def __init__(self, c):
         self.c = c
-        self.ir = IsotonicRegression()
+        self.ir = IR(out_of_bounds = 'clip')
 
     def fit(self, output, label):
-        x = output.data.cpu().numpy()
-        y = (label == self.c).data.cpu().numpy()
+        x = output.reshape(-1).data.cpu().numpy()
+        y = (label == self.c).reshape(-1).data.cpu().numpy()
         self.ir.fit(x, y)
 
     def predict(self, x):
-        x = x.data.cpu().numpy()
+        shape = label.shape
+        x = x.reshape(-1).data.cpu().numpy()
 
-        return torch.Tensor(self.ir.predict(x))
+        return torch.Tensor(self.ir.transform(x)).reshape(shape)
 
 
-class PlattRecalibrator():  # i.e. logistic regression
+class PlattRecalibrator():  # logistic regression
     def __init__(self, c):
         self.c = c
-        self.lr = LogisticRegression()
+        self.lr = LR()
 
     def fit(self, output, label):
-        x = output.data.cpu().numpy()
-        y = (label == self.c).data.cpu().numpy()
+        x = output.reshape(-1).data.cpu().numpy()
+        y = (label == self.c).reshape(-1).data.cpu().numpy()
 
         self.lr.fit(x, y)
 
     def predict(self, x):
-        x = x.data.cpu().numpy()
-        return torch.Tensor(self.lr.predict_proba(x.reshape(-1, 1))[:, 1])
+        shape = label.shape
+        x = x.reshape(-1).data.cpu().numpy()
+        return torch.Tensor(self.lr.predict_proba(x.reshape(-1, 1))[:, 1]).reshape(shape)
 
 
 class LinearRegressionModel(nn.Module):
@@ -219,7 +221,7 @@ def calcClassStatistics(output, label, ranges, c):
         del num_obs_var_in_range
 
         if num_in_range == 0:
-            confidence = (low + high) / 2.0
+            confidence = accuracy = (low + high) / 2.0
 
         confidences.append(confidence)
         accuracies.append(accuracy)
@@ -233,6 +235,8 @@ def calcStatistics(output, label, ranges):
 
     confidences = []
     accuracies = []
+
+    counts = []
 
     for r in ranges:
         low, high = r
@@ -258,5 +262,12 @@ def calcStatistics(output, label, ranges):
 
         confidences.append(confidence)
         accuracies.append(accuracy)
+        counts.append(num_in_range)
 
+    fig, ax = plt.subplots()
+    ax.hist(counts)
+
+    plt.savefig("stats.png")
+    plt.close(fig)
+    
     return confidences, accuracies

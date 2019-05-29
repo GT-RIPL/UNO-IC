@@ -608,3 +608,5 @@ if __name__ == "__main__":
 
     # baseline train (concatenation, warping baselines)
     train(cfg, writer, logger, logdir)
+    print('done')
+    writer.close()

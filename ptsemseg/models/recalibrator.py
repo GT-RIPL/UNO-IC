@@ -135,7 +135,7 @@ class IsotonicRecalibrator():
 class PlattRecalibrator():  # logistic regression
     def __init__(self, c, device):
         self.c = c
-        self.lr = LR(penalty="lbfgs")
+        self.lr = LR(solver="lbfgs")
         self.device = device
 
     def fit(self, output, label):

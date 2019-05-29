@@ -52,9 +52,9 @@ class segnet_mcdo(nn.Module):
                 self.calibrationPerClass = [PolynomialRecalibrator(n, self.ranges, degree, device) for n in
                                             range(self.n_classes)]
             elif "Isotonic" in recalibrator:
-                self.calibrationPerClass = [IsotonicRecalibrator(n) for n in range(self.n_classes)]
+                self.calibrationPerClass = [IsotonicRecalibrator(n, device) for n in range(self.n_classes)]
             elif "Platt" in recalibrator:
-                self.calibrationPerClass = [PlattRecalibrator(n) for n in range(self.n_classes)]
+                self.calibrationPerClass = [PlattRecalibrator(n, device) for n in range(self.n_classes)]
             else:
                 print("Recalibrator: Not Supported")
                 exit()
@@ -308,21 +308,24 @@ class segnet_mcdo(nn.Module):
                 with torch.no_grad():
                     x = torch.cat((x, self.forwardOnce(inputs, i).unsqueeze(-1)), -1)
 
-        if recalType == "temperature_scaling":
+        if recalType == "temperatureScaling":
             x_bp /= self.temperature
             x /= self.temperature
-
+        """
+        points = ((0,50,50), (0,100,100))
         # plot the distribution of passes
-        fig, axes = plt.subplots(3, self.n_classes // 3 + 1)
-        for c in range(self.n_classes):
-            xx = x[0, c, 0, 0, :]
-            axes[(c + 1) // (self.n_classes // 3 + 1), (c + 1) % (self.n_classes // 3 + 1)].hist(xx)
-            axes[(c + 1) // (self.n_classes // 3 + 1), (c + 1) % (self.n_classes // 3 + 1)].set_title("Class: {}".format(c))
-            del xx
+        for n, i, j in points:
+            fig, axes = plt.subplots(3, self.n_classes // 3 + 1)
+            for c in range(self.n_classes):
+                xx = x[n, c, i, j, :]
+                axes[(c + 1) // (self.n_classes // 3 + 1), (c + 1) % (self.n_classes // 3 + 1)].hist(xx)
+                axes[(c + 1) // (self.n_classes // 3 + 1), (c + 1) % (self.n_classes // 3 + 1)].set_title("Class: {}".format(c))
+                del xx
 
-        plt.savefig("./{}.png".format(c))
-        plt.close(fig)
-
+            plt.tight_layout()
+            plt.savefig("./{}_{}x{}.png".format(n, i, j))
+            plt.close(fig)
+        """
         # Uncalibrated Softmax Mean and Variance
         mean = torch.nn.Softmax(1)(x).mean(-1)
         variance = torch.nn.Softmax(1)(x).pow(2).mean(-1) - mean.pow(2)
@@ -355,10 +358,12 @@ class segnet_mcdo(nn.Module):
         # Overall #
         ###########
         fig, axes = plt.subplots(1, 2)
-        plt.tight_layout()
 
         # Plot Predicted Variance Against Observed/Empirical Variance
         x, y = calcStatistics(output, label, self.ranges)
+
+        x = list(x)
+        y = list(y)
 
         # TODO fix plotting with invalid probabilities and graph wrapping
         axes[0].plot(x, y, '.')
@@ -368,6 +373,8 @@ class segnet_mcdo(nn.Module):
 
         # Convert Predicted Variances to Calibrated Variances
         x, y = calcStatistics(recal_output, label, self.ranges)
+        x = list(x)
+        y = list(y)
 
         axes[1].plot(x, y)
         axes[1].set_title("Recalibrated")
@@ -395,12 +402,13 @@ class segnet_mcdo(nn.Module):
         """
 
         # calculating expected calibration error
-        ECE = avg([abs(i - j) for i,j, in zip(x,y)])
+        ECE = sum([abs(i - j) for i,j, in zip(x,y)])/len(x)
         fig.suptitle('Expected Calibration Error: {}'.format(ECE), fontsize=16)
 
         path = "{}/{}/{}".format(logdir, 'calibration', model)
         if not os.path.exists(path):
             os.makedirs(path)
+        plt.tight_layout()
         plt.savefig("{}/calibratedOverall{}.png".format(path, iteration))
 
         plt.close(fig)
@@ -412,6 +420,8 @@ class segnet_mcdo(nn.Module):
 
         for c in range(self.n_classes):
             x, y = calcClassStatistics(output, label, self.ranges, c)
+            x = list(x)
+            y = list(y)
             axes[(c + 1) // (self.n_classes // 3 + 1), (c + 1) % (self.n_classes // 3 + 1)].plot(x, y)
             axes[(c + 1) // (self.n_classes // 3 + 1), (c + 1) % (self.n_classes // 3 + 1)].set_title("Class: {}".format(c))
 
@@ -428,6 +438,8 @@ class segnet_mcdo(nn.Module):
 
         for c in range(self.n_classes):
             x, y = calcClassStatistics(recal_output, label, self.ranges, c)
+            x = list(x)
+            y = list(y)
 
             axes[(c + 1) // (self.n_classes // 3 + 1), (c + 1) % (self.n_classes // 3 + 1)].plot(x, y)
             axes[(c + 1) // (self.n_classes // 3 + 1), (c + 1) % (self.n_classes // 3 + 1)].set_title("Class: {}".format(c))
@@ -436,7 +448,8 @@ class segnet_mcdo(nn.Module):
         if not os.path.exists(path):
             os.makedirs(path)
 
+        plt.tight_layout()
         plt.savefig("{}/calibratedPerClass{}.png".format(path, iteration))
         plt.close(fig)
 
-        del recal_output
+        torch.cuda.empty_cache()

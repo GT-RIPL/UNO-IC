@@ -1,4 +1,4 @@
-id: rgb_BayesianSegnet_0.5_Masks0-5_T000_RNone_PLOT
+id: rgb_BayesianSegnet_distribution
 model:
     arch: segnet_mcdo
 models:
@@ -7,7 +7,7 @@ models:
         start_layer: down1
         end_layer: up1
         reduction: 1.0
-        mcdo_passes: 6 # Number of Passes
+        mcdo_passes: 10 # Number of Passes
         mask_dir: models/DropoutMasks/Random # Directory of Indexed Masks
         masks: [0,1,2,3,4,5] # Number Mask Indices Should Equal Number of MCDO Passes
         fixed_mcdo: No # Yes: Fixed Masks per Pass; No: Randomized Masks per Pass
@@ -18,7 +18,7 @@ models:
         start_layer: down1
         end_layer: up1
         reduction: 1.0
-        mcdo_passes: 6
+        mcdo_passes: 10
         mask_dir: models/DropoutMasks/Random 
         masks: [0,1,2,3,4,5] 
         fixed_mcdo: No
@@ -26,7 +26,7 @@ models:
         resume: models/d_BayesianSegnet_0.5_T000/d_segnet_mcdo_airsim_best_model.pkl
 fusion: SoftmaxMultiply #{None,SoftmaxMultiply}
 recal: None #{None,afterMCDO,beforeMCDO}
-recalibrator: HistogramFlat #{Histogram,Polynomial_X}
+recalibrator: None #{Histogram,Polynomial_X}
 bins: 10
 data:
     dataset: airsim
@@ -45,7 +45,7 @@ data:
                    "async_fog_100_clear__{'channel':'d','type':'blackoutNoise','value':'20'}",
                    "async_fog_100_clear__{'channel':'rgbd','type':'blackoutNoise','value':'20'}",                   
                   ]    
-    val_reduction: 0.1
+    val_reduction: 0.2
     img_rows: 512
     img_cols: 512
     path: datasets/airsim_data_async #../../ros/data/airsim_03-30-2019/airsim_data_async

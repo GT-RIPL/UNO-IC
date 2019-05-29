@@ -274,48 +274,41 @@ def train(cfg, writer, logger, logdir):
                 #################################################################################
                 # Recalibration
                 #################################################################################
+
                 if cfg["recal"] != "None":
                     print("=" * 10, "RECALIBRATING", "=" * 10)
 
-                    output_all = {m: [] for m in cfg['models'].keys()}
-                    labels_all = []
-
-
-                    # collect data for calibration
-                    with torch.no_grad():
-                        for i_recal, (images_list, labels_list, aux_list) in tqdm(enumerate(recalloader)):
-
-                            inputs, labels = parseEightCameras(images_list, labels_list, aux_list, device)
-
-                            # Read batch from only one camera
-                            bs = cfg['training']['batch_size']
-                            images_recal = {m: inputs[m][:bs, :, :, :] for m in cfg["models"].keys()}
-                            labels_recal = labels[:bs, :, :]
-
-                            # Run Models
-                            for m in cfg["models"].keys():
-                                outputs, mean, variance = models[m](images_recal[m])
-                                output_all[m].append(mean.detach())
-                                del outputs
-                                del variance
-                                del mean
-
-                            labels_all.append(labels_recal.detach())
-
-                            # break
-
                     for m in cfg["models"].keys():
-                        output_all[m] = torch.cat(output_all[m])
-                    labels_all = torch.cat(labels_all)
+                        output_all = []
+                        labels_all = []
 
-                    # fit calibration models
-                    for m in cfg["models"].keys():
+                        with torch.no_grad():
+                            for i_recal, (images_list, labels_list, aux_list) in tqdm(enumerate(recalloader)):
+
+                                inputs, labels = parseEightCameras(images_list, labels_list, aux_list, device)
+
+                                # Read batch from only one camera
+                                bs = cfg['training']['batch_size']
+                                images_recal = inputs[m][:bs, :, :, :]
+                                labels_recal = labels[:bs, :, :]
+
+                                # Run Models
+                                outputs, mean, variance = models[m](images_recal)
+                                output_all.append(mean.detach())
+                                labels_all.append(labels_recal.detach())
+
+                                break
+
+                        output_all = torch.cat(output_all)
+                        labels_all = torch.cat(labels_all)
+
+                        # fit calibration models
                         for c in range(n_classes):
-                            models[m].module.calibrationPerClass[c].fit(output_all[m][:,c,:,:], labels_all)
+                            models[m].module.calibrationPerClass[c].fit(output_all, labels_all)
 
-                        torch.cuda.empty_cache()
-                        models[m].module.showCalibration(output_all[m], labels_all, logdir, m, i)
-
+                        models[m].module.showCalibration(output_all, labels_all, logdir, m, i)
+                
+                    """
                     # plot mean/variances of predictions of (un)calibrated models
                     with torch.no_grad():
                         for i_recal, (images_list, labels_list, aux_list) in tqdm(enumerate(recalloader)):
@@ -339,10 +332,6 @@ def train(cfg, writer, logger, logdir):
                                 plotPrediction(logdir, cfg, n_classes, i, i_recal, "recal/" + m + "/pre_recal_pred",
                                                inputs, pred, gt)
 
-                                del outputs
-                                del mean
-                                del variance
-
                                 # plot predictions with calibration
                                 # TODO calibrate outputs instead of rereunning model with calibration
                                 # outputs = models[m].module.calibrateOutput(output)
@@ -353,10 +342,8 @@ def train(cfg, writer, logger, logdir):
                                 plotPrediction(logdir, cfg, n_classes, i, i_recal, "recal/" + m + "/post_recal_pred",
                                                inputs, post_pred, gt)
 
-                                del outputs
-                                del mean
-                                del variance
-
+                                torch.cuda.empty_cache()
+                    """
                 #################################################################################
 
                 [models[m].eval() for m in models.keys()]
@@ -389,10 +376,10 @@ def train(cfg, writer, logger, logdir):
 
                             for m in cfg["models"].keys():
                                 output_bp[m], mean[m], variance[m] = models[m](images_val[m], cfg["recal"])
-
                                 val_loss[m] = loss_fn(input=mean[m], target=labels_val)
 
                             # Fusion Type
+
                             if cfg["fusion"] == "None":
                                 outputs = mean[list(cfg["models"].keys())[0]]
                             elif cfg["fusion"] == "SoftmaxMultiply":
@@ -405,11 +392,14 @@ def train(cfg, writer, logger, logdir):
                                 print("Fusion Type Not Supported")
 
                             # plot ground truth vs mean/variance of outputs
+
                             pred = outputs.data.argmax(1).cpu().numpy()
                             gt = labels_val.data.cpu().numpy()
 
+
                             if i_val % cfg["training"]["png_frames"] == 0:
                                 plotPrediction(logdir, cfg, n_classes, i, i_val, k, inputs, pred, gt)
+
 
                             running_metrics_val[k].update(gt, pred)
 
@@ -463,8 +453,8 @@ def train(cfg, writer, logger, logdir):
                         torch.save(state, save_path)
 
 
-#                if cfg["recal"]!="None":
-#                    exit()
+                #if cfg["recal"]!="None":
+                #   exit()
             if (i + 1) >= cfg["training"]["train_iters"]:
                 flag = False
                 break

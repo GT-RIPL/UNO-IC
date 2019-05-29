@@ -21,11 +21,8 @@ class HistogramLinearRecalibrator():
 
     def fit(self, output, label):
         confidence, accuracy = calcClassStatistics(output, label, self.ranges, self.c)
-        self.W = torch.ones(len(confidence), device=self.device)
-        self.b = torch.zeros(len(confidence), device=self.device)
-
-        W = [0] * len(confidence)
-        b = [0] * len(confidence)
+        self.W = torch.ones(len(confidence), dtype=torch.float, device=self.device)
+        self.b = torch.zeros(len(confidence), dtype=torch.float, device=self.device)
 
         confidence, accuracy = zip(*sorted(zip(confidence, accuracy)))
         confidence = list(confidence)
@@ -42,12 +39,9 @@ class HistogramLinearRecalibrator():
             self.W[i] = 1. * (y2 - y1) / (x2 - x1)
             self.b[i] = y2 - self.W[i] * x2
 
-        self.W.to(self.device)
-        self.b.to(self.device)
-
     def predict(self, x):
-        self.W.to(x.device)
-        self.b.to(x.device)
+        self.W = self.W.to(x.device)
+        self.b = self.b.to(x.device)
 
         i = (1. * len(self.W) * torch.clamp(x, min=0, max=1)).floor().long() - 1
 
@@ -64,8 +58,10 @@ class HistogramFlatRecalibrator():
 
     def fit(self, output, label):
         confidence, accuracy = calcClassStatistics(output, label, self.ranges, self.c)
+        self.b = torch.zeros(len(confidence), device=self.device, dtype=torch.float)
 
-        self.b = torch.zeros(len(confidence), device=self.device)
+        confidence = confidence.to(self.device)
+        accuracy = accuracy.to(self.device)
 
         confidence, accuracy = zip(*sorted(zip(confidence, accuracy)))
         confidence = list(confidence)
@@ -80,9 +76,6 @@ class HistogramFlatRecalibrator():
             y1, y2 = Y
 
             self.b[i] = 0.5 * (y1 + y2)
-
-        print(self.b)
-        self.b.to(self.device)
 
     def predict(self, x):
         self.b.to(x.device)
@@ -122,37 +115,39 @@ class PolynomialRecalibrator():
 
 
 class IsotonicRecalibrator():
-    def __init__(self, c):
+    def __init__(self, c, device):
         self.c = c
         self.ir = IR(out_of_bounds = 'clip')
+        self.device = device
 
     def fit(self, output, label):
-        x = output.reshape(-1).data.cpu().numpy()
-        y = (label == self.c).reshape(-1).data.cpu().numpy()
+        x = output.reshape(-1).data.cpu().numpy().astype(np.float)
+        y = (label == self.c).reshape(-1).data.cpu().numpy().astype(np.float)
         self.ir.fit(x, y)
 
     def predict(self, x):
-        shape = label.shape
-        x = x.reshape(-1).data.cpu().numpy()
+        shape = x.shape
+        x = x.reshape(-1).data.cpu().numpy().astype(np.float)
 
-        return torch.Tensor(self.ir.transform(x)).reshape(shape)
+        return torch.Tensor(self.ir.transform(x), device=self.device, dtype=torch.float).reshape(shape)
 
 
 class PlattRecalibrator():  # logistic regression
-    def __init__(self, c):
+    def __init__(self, c, device):
         self.c = c
-        self.lr = LR()
+        self.lr = LR(penalty="lbfgs")
+        self.device = device
 
     def fit(self, output, label):
-        x = output.reshape(-1).data.cpu().numpy()
-        y = (label == self.c).reshape(-1).data.cpu().numpy()
+        x = output.reshape(-1, 1).data.cpu().numpy().astype(np.float)
+        y = (label == self.c).reshape(-1).data.cpu().numpy().astype(np.float)
 
         self.lr.fit(x, y)
 
     def predict(self, x):
-        shape = label.shape
-        x = x.reshape(-1).data.cpu().numpy()
-        return torch.Tensor(self.lr.predict_proba(x.reshape(-1, 1))[:, 1]).reshape(shape)
+        shape = x.shape
+        x = x.reshape(-1).data.cpu().numpy().astype(np.float)
+        return torch.Tensor(self.lr.predict_proba(x.reshape(-1, 1))[:, 1], device=self.device, dtype=torch.float).reshape(shape)
 
 
 class LinearRegressionModel(nn.Module):
@@ -193,12 +188,13 @@ class PolynomialRegressionModel(torch.nn.Module):
 
 
 def calcClassStatistics(output, label, ranges, c):
-    confidences = []
-    accuracies = []
 
     pred = c
     gt = label
-    pred_var = output[:, c, :, :]
+    pred_var = output[:,c,:,:]
+
+    confidences = []
+    accuracies = []
 
     for r in ranges:
 
@@ -206,68 +202,58 @@ def calcClassStatistics(output, label, ranges, c):
         idx_pred_gt_match = (pred == gt)  # everywhere correctly labeled to correct class
         idx_pred_var_in_range = (low <= pred_var) & (pred_var < high)  # everywhere with specified confidence level
 
-        sumval_pred_var_in_range = torch.sum(pred_var[idx_pred_var_in_range])
-        num_obs_var_in_range = torch.sum((idx_pred_gt_match & idx_pred_var_in_range))
+        sumval_pred_var_in_range = torch.sum(pred_var[idx_pred_var_in_range], dtype=torch.float)
+        num_obs_var_in_range = torch.sum((idx_pred_gt_match & idx_pred_var_in_range), dtype=torch.float)
 
-        num_in_range = torch.sum(idx_pred_var_in_range)
+        num_in_range = torch.sum(idx_pred_var_in_range, dtype=torch.float)
 
-        total = num_in_range if num_in_range > 0 else 1
-        confidence = sumval_pred_var_in_range.data.cpu().numpy() / total
-        accuracy = num_obs_var_in_range.data.cpu().numpy() / total
-
-        del idx_pred_gt_match
-        del idx_pred_var_in_range
-        del sumval_pred_var_in_range
-        del num_obs_var_in_range
+        total = num_in_range if num_in_range > 0 else 1.0
+        confidence = sumval_pred_var_in_range / total
+        accuracy = num_obs_var_in_range / total
 
         if num_in_range == 0:
-            confidence = accuracy = (low + high) / 2.0
-
+            confidence = torch.tensor((low + high) / 2.0, device=output.device, dtype=torch.float)
+            
         confidences.append(confidence)
         accuracies.append(accuracy)
+
+    confidences = torch.stack(confidences)
+    accuracies = torch.stack(accuracies)
+    torch.cuda.empty_cache()
 
     return confidences, accuracies
 
 
 def calcStatistics(output, label, ranges):
+
     pred_var, pred = torch.max(output, dim=1)
     gt = label
 
     confidences = []
     accuracies = []
 
-    counts = []
-
     for r in ranges:
         low, high = r
         idx_pred_gt_match = (pred == gt)  # everywhere correctly labeled to correct class
         idx_pred_var_in_range = (low <= pred_var) & (pred_var < high)  # everywhere with specified confidence level
 
-        sumval_pred_var_in_range = torch.sum(pred_var[idx_pred_var_in_range])
-        num_obs_var_in_range = torch.sum((idx_pred_gt_match & idx_pred_var_in_range))
+        sumval_pred_var_in_range = torch.sum(pred_var[idx_pred_var_in_range], dtype=torch.float)
+        num_obs_var_in_range = torch.sum((idx_pred_gt_match & idx_pred_var_in_range), dtype=torch.float)
 
-        num_in_range = torch.sum(idx_pred_var_in_range)
+        num_in_range = torch.sum(idx_pred_var_in_range, dtype=torch.float)
 
-        total = num_in_range if num_in_range > 0 else 1
-        confidence = sumval_pred_var_in_range.data.cpu().numpy() / total
-        accuracy = num_obs_var_in_range.data.cpu().numpy() / total
-
-        del idx_pred_gt_match
-        del idx_pred_var_in_range
-        del sumval_pred_var_in_range
-        del num_obs_var_in_range
+        total = num_in_range if num_in_range > 0 else 1.0
+        confidence = sumval_pred_var_in_range/(total)
+        accuracy = num_obs_var_in_range/(total)
 
         if num_in_range == 0:
-            confidence = accuracy = (low + high) / 2.0
+            confidence = torch.tensor((low + high) / 2.0, device=output.device, dtype=torch.float)
 
         confidences.append(confidence)
         accuracies.append(accuracy)
-        counts.append(num_in_range)
 
-    fig, ax = plt.subplots()
-    ax.hist(counts)
+    confidences = torch.stack(confidences)
+    accuracies = torch.stack(accuracies)
+    torch.cuda.empty_cache()
 
-    plt.savefig("stats.png")
-    plt.close(fig)
-    
     return confidences, accuracies

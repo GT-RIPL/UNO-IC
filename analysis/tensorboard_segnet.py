@@ -32,8 +32,8 @@ run_comments = {
             "following architecture from BayesSegnet paper, dropout p = 0.5",
     },    
 }
-"""
 
+"""
 include = [
            'graphing'
            ]
@@ -41,7 +41,7 @@ include = [
 run_comments = {
     "graphing": {
         "names": [
-            ("rgb_BayesianSegnet_0.5_Masks0-5_T000_RNone_PLOT","asdf")
+            ("rgb_BayesianSegnet_isotonic","asdf")
         ],
         "text":
             "following architecture from BayesSegnet paper, dropout p = 0.1",
@@ -62,7 +62,7 @@ for i,file in enumerate(glob.glob("./**/*tfevents*",recursive=True)):
         continue
 
     with open(yaml_file,"r") as f:
-        configs = yaml.load(f)
+        configs = yaml.load(f, Loader=yaml.FullLoader)
 
     if any([file.split("/")[-2] in [vvv for vvv,_ in vv['names']] and not kk in include for kk,vv in run_comments.items()]):
         continue

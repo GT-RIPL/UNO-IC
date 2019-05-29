@@ -279,8 +279,10 @@ def train(cfg, writer, logger, logdir):
                     print("=" * 10, "RECALIBRATING", "=" * 10)
 
                     for m in cfg["models"].keys():
-                        output_all = []
-                        labels_all = []
+
+                        bs = cfg['training']['batch_size']
+                        output_all = torch.zeros((len(recalloader) * bs, n_classes, cfg['data']['img_rows'], cfg['data']['img_cols']))
+                        labels_all = torch.zeros((len(recalloader) * bs, cfg['data']['img_rows'], cfg['data']['img_cols']), dtype=torch.long)
 
                         with torch.no_grad():
                             for i_recal, (images_list, labels_list, aux_list) in tqdm(enumerate(recalloader)):
@@ -288,19 +290,17 @@ def train(cfg, writer, logger, logdir):
                                 inputs, labels = parseEightCameras(images_list, labels_list, aux_list, device)
 
                                 # Read batch from only one camera
-                                bs = cfg['training']['batch_size']
                                 images_recal = inputs[m][:bs, :, :, :]
                                 labels_recal = labels[:bs, :, :]
 
                                 # Run Models
                                 outputs, mean, variance = models[m](images_recal)
-                                output_all.append(mean.detach())
-                                labels_all.append(labels_recal.detach())
 
-                                break
+                                # concat results
+                                output_all[bs*i_recal:bs*(i_recal+1),:,:,:] = mean
+                                labels_all[bs*i_recal:bs*(i_recal+1),:,:] = labels_recal
+                                
 
-                        output_all = torch.cat(output_all)
-                        labels_all = torch.cat(labels_all)
 
                         # fit calibration models
                         for c in range(n_classes):

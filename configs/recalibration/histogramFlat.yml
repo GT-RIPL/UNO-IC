@@ -27,7 +27,7 @@ models:
 fusion: SoftmaxMultiply #{None,SoftmaxMultiply}
 recal: afterMCDO #{None,afterMCDO,beforeMCDO}
 recalibrator: HistogramFlat #{Histogram,Polynomial_X}
-bins: 10
+bins: 20
 data:
     dataset: airsim
     train_split: train

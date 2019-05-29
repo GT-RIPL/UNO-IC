@@ -121,7 +121,7 @@ class IsotonicRecalibrator():
         self.device = device
 
     def fit(self, output, label):
-        x = output.reshape(-1).data.cpu().numpy().astype(np.float)
+        x = output[:,self.c,:,:].reshape(-1).data.cpu().numpy().astype(np.float)
         y = (label == self.c).reshape(-1).data.cpu().numpy().astype(np.float)
         self.ir.fit(x, y)
 
@@ -129,7 +129,7 @@ class IsotonicRecalibrator():
         shape = x.shape
         x = x.reshape(-1).data.cpu().numpy().astype(np.float)
 
-        return torch.Tensor(self.ir.transform(x), device=self.device, dtype=torch.float).reshape(shape)
+        return torch.tensor(self.ir.transform(x), device=self.device, dtype=torch.float).reshape(shape)
 
 
 class PlattRecalibrator():  # logistic regression
@@ -139,7 +139,7 @@ class PlattRecalibrator():  # logistic regression
         self.device = device
 
     def fit(self, output, label):
-        x = output.reshape(-1, 1).data.cpu().numpy().astype(np.float)
+        x = output[:,self.c,:,:].reshape(-1, 1).data.cpu().numpy().astype(np.float)
         y = (label == self.c).reshape(-1).data.cpu().numpy().astype(np.float)
 
         self.lr.fit(x, y)
@@ -147,7 +147,7 @@ class PlattRecalibrator():  # logistic regression
     def predict(self, x):
         shape = x.shape
         x = x.reshape(-1).data.cpu().numpy().astype(np.float)
-        return torch.Tensor(self.lr.predict_proba(x.reshape(-1, 1))[:, 1], device=self.device, dtype=torch.float).reshape(shape)
+        return torch.tensor(self.lr.predict_proba(x.reshape(-1, 1))[:, 1], device=self.device, dtype=torch.float).reshape(shape)
 
 
 class LinearRegressionModel(nn.Module):
@@ -213,7 +213,7 @@ def calcClassStatistics(output, label, ranges, c):
 
         if num_in_range == 0:
             confidence = torch.tensor((low + high) / 2.0, device=output.device, dtype=torch.float)
-            
+
         confidences.append(confidence)
         accuracies.append(accuracy)
 
@@ -234,6 +234,7 @@ def calcStatistics(output, label, ranges):
 
     for r in ranges:
         low, high = r
+
         idx_pred_gt_match = (pred == gt)  # everywhere correctly labeled to correct class
         idx_pred_var_in_range = (low <= pred_var) & (pred_var < high)  # everywhere with specified confidence level
 

@@ -55,6 +55,8 @@ class segnet_mcdo(nn.Module):
                 self.calibrationPerClass = [IsotonicRecalibrator(n, device) for n in range(self.n_classes)]
             elif "Platt" in recalibrator:
                 self.calibrationPerClass = [PlattRecalibrator(n, device) for n in range(self.n_classes)]
+            elif "TemperatureScaling" in recalibrator:
+                self.temperature = torch.nn.Parameter(torch.ones(1))
             else:
                 print("Recalibrator: Not Supported")
                 exit()
@@ -106,7 +108,6 @@ class segnet_mcdo(nn.Module):
         # up4 torch.Size([2, 256, 64, 64])
         # up5 torch.Size([2, 512, 32, 32])
 
-        #self.temperature = torch.nn.Parameter(torch.ones(1))
 
         if self.fixed_mcdo:
             self.dropout_masks = {p:
@@ -300,15 +301,14 @@ class segnet_mcdo(nn.Module):
         for i in range(self.mcdo_passes):
             if i == 0:
                 x_bp = self.forwardOnce(inputs, i)
-
                 x = x_bp.unsqueeze(-1)
             else:
                 with torch.no_grad():
                     x = torch.cat((x, self.forwardOnce(inputs, i).unsqueeze(-1)), -1)
 
-        if recalType == "temperatureScaling":
-            x_bp /= self.temperature
-            x /= self.temperature
+        if self.recalibrator == "TemperatureScaling":
+            x_bp = x_bp / self.temperature
+            x = x / self.temperature
         """
         points = ((0,50,50), (0,100,100))
         # plot the distribution of passes
@@ -326,15 +326,13 @@ class segnet_mcdo(nn.Module):
         """
         # Uncalibrated Softmax Mean and Variance
         mean = torch.nn.Softmax(1)(x).mean(-1)
-        variance = torch.nn.Softmax(1)(x).pow(2).mean(-1) - mean.pow(2)
-        if self.recalibrator != "None":
+        variance = torch.nn.Softmax(1)(x).std(-1)
+        if self.recalibrator != "None" and self.recalibrator != "TemperatureScaling":
             if recalType == "beforeMCDO":
                 for c in range(self.n_classes):
                     x[:, c, :, :, :] = self.calibrationPerClass[c].predict(x[:, c, :, :, :].reshape(-1)).reshape(x[:, c, :, :, :].shape)
-
                 mean = torch.nn.Softmax(1)(x).mean(-1)
-                variance = torch.nn.Softmax(1)(x).pow(2).mean(-1) - mean.pow(2)
-
+                variance = torch.nn.Softmax(1)(x).std(-1)
             elif recalType == "afterMCDO":
                 for c in range(self.n_classes):
                     mean[:, c, :, :] = self.calibrationPerClass[c].predict(mean[:, c, :, :].reshape(-1)).reshape(mean[:, c, :, :].shape)

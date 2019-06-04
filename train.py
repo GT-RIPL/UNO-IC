@@ -275,7 +275,7 @@ def train(cfg, writer, logger, logdir):
                 # Recalibration
                 #################################################################################
 
-                if cfg["recal"] != "None":
+                if cfg["recal"] != "None" or cfg["recalibrator"] == "TemperatureScaling":
                     print("=" * 10, "RECALIBRATING", "=" * 10)
 
                     for m in cfg["models"].keys():
@@ -384,16 +384,30 @@ def train(cfg, writer, logger, logdir):
                                 outputs = mean[list(cfg["models"].keys())[0]]
                             elif cfg["fusion"] == "SoftmaxMultiply":
                                 outputs = mean["rgb"] * mean["d"]
-                            elif cfg["fusion"] == "WeightedAverage":
-                                rgb_var = 1 / variance["rgb"]
-                                d_var = 1 / variance["d"]
+                            elif cfg["fusion"] == "SoftmaxAverage":
+                                outputs = torch.nn.functional.normalize(mean["rgb"]) + torch.nn.functional.normalize(mean["d"])
+                            elif cfg["fusion"] == "WeightedVariance":
+                                rgb_var = 1 / (variance["rgb"] + 1e-5)
+                                d_var = 1 / (variance["d"] + 1e-5)
+                                plt.figure()
+                                plt.title("rgb output variance (w/ blackoutNoise)")
+                                plt.hist(variance["rgb"].reshape(-1).data.cpu(), bins=50)
+                                plt.savefig("rgb.png")
+                                
+                                
+                                plt.figure()
+                                plt.hist(variance["d"].reshape(-1).data.cpu(), bins=50)
+                                plt.savefig("d.png")
+                                exit()
+                                
+                                print(variance["d"])
                                 outputs = (mean["rgb"] * rgb_var) / (rgb_var + d_var) + (mean["d"] * d_var) / (rgb_var + d_var) 
                             else:
                                 print("Fusion Type Not Supported")
 
                             # plot ground truth vs mean/variance of outputs
 
-                            pred = outputs.data.argmax(1).cpu().numpy()
+                            pred = outputs.argmax(1).cpu().numpy()
                             gt = labels_val.data.cpu().numpy()
 
 
@@ -609,4 +623,5 @@ if __name__ == "__main__":
     # baseline train (concatenation, warping baselines)
     train(cfg, writer, logger, logdir)
     print('done')
+    time.sleep(10)
     writer.close()

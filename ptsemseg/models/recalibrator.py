@@ -16,11 +16,10 @@ class HistogramLinearRecalibrator():
         self.ranges = ranges
         self.device = device
 
-        self.W = torch.ones(1, device=device)
-        self.b = torch.zeros(1, device=device)
-
     def fit(self, output, label):
         confidence, accuracy = calcClassStatistics(output, label, self.ranges, self.c)
+        confidence = confidence.to(self.device)
+        accuracy = accuracy.to(self.device)
         self.W = torch.ones(len(confidence), dtype=torch.float, device=self.device)
         self.b = torch.zeros(len(confidence), dtype=torch.float, device=self.device)
 
@@ -38,6 +37,7 @@ class HistogramLinearRecalibrator():
 
             self.W[i] = 1. * (y2 - y1) / (x2 - x1)
             self.b[i] = y2 - self.W[i] * x2
+        torch.cuda.empty_cache()
 
     def predict(self, x):
         self.W = self.W.to(x.device)
@@ -53,8 +53,6 @@ class HistogramFlatRecalibrator():
         self.c = c
         self.ranges = ranges
         self.device = device
-
-        self.b = torch.zeros(1, device=device)
 
     def fit(self, output, label):
         confidence, accuracy = calcClassStatistics(output, label, self.ranges, self.c)
@@ -195,7 +193,6 @@ def calcClassStatistics(output, label, ranges, c):
 
     confidences = []
     accuracies = []
-
     for r in ranges:
 
         low, high = r
@@ -228,6 +225,7 @@ def calcStatistics(output, label, ranges):
 
     pred_var, pred = torch.max(output, dim=1)
     gt = label
+
 
     confidences = []
     accuracies = []

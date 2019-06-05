@@ -26,7 +26,8 @@ models:
         resume: None
 fusion: None #{None,SoftmaxMultiply}
 recal: None #{None,afterMCDO,beforeMCDO}
-recalibrator: TemperatureScaling #{Histogram,Polynomial_X}
+recalibrator: None #{Histogram,Polynomial_X}
+temperatureScaling: True
 bins: 20
 data:
     dataset: airsim

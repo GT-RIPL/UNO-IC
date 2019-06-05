@@ -24,6 +24,7 @@ def get_model(model_dict,
               version=None, 
               reduction=1.0,
               recalibrator=None,
+              temperatureScaling=False,
               bins=0,
               device="cpu"):
     name = model_dict['arch']
@@ -59,6 +60,7 @@ def get_model(model_dict,
                       end_layer=end_layer,
                       device=device,
                       recalibrator=recalibrator,
+                      temperatureScaling=temperatureScaling
                       bins=bins,
                       **param_dict)
         vgg16 = models.vgg16(pretrained=True)

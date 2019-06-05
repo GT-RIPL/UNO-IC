@@ -133,7 +133,8 @@ def train(cfg, writer, logger, logdir):
                                   dropoutP=attr['dropoutP'],
                                   reduction=attr['reduction'],
                                   device=device,
-                                  recalibrator=cfg["recalibrator"],
+                                  recalibrator=cfg['recalibrator'],
+                                  temperatureScaling=cfg['temperatureScaling'],
                                   bins=cfg["bins"]).to(device)
 
         if "caffemodel" in attr['resume']:
@@ -275,7 +276,7 @@ def train(cfg, writer, logger, logdir):
                 # Recalibration
                 #################################################################################
 
-                if cfg["recal"] != "None" or cfg["recalibrator"] == "TemperatureScaling":
+                if cfg["recal"] != "None":
                     print("=" * 10, "RECALIBRATING", "=" * 10)
 
                     for m in cfg["models"].keys():

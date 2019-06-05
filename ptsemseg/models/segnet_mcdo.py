@@ -22,6 +22,7 @@ class segnet_mcdo(nn.Module):
                  reduction=1.0,
                  device="cpu",
                  recalibrator="None",
+                 temperatureScaling="False",
                  bins=0
                  ):
         super(segnet_mcdo, self).__init__()
@@ -55,11 +56,13 @@ class segnet_mcdo(nn.Module):
                 self.calibrationPerClass = [IsotonicRecalibrator(n, device) for n in range(self.n_classes)]
             elif "Platt" in recalibrator:
                 self.calibrationPerClass = [PlattRecalibrator(n, device) for n in range(self.n_classes)]
-            elif "TemperatureScaling" in recalibrator:
-                self.temperature = torch.nn.Parameter(torch.ones(1))
             else:
                 print("Recalibrator: Not Supported")
                 exit()
+
+        if self.temperatureScaling:
+
+            self.temperature = torch.nn.Parameter(torch.ones(1))
 
         if not self.fixed_mcdo:
             self.layers = {
@@ -306,7 +309,7 @@ class segnet_mcdo(nn.Module):
                 with torch.no_grad():
                     x = torch.cat((x, self.forwardOnce(inputs, i).unsqueeze(-1)), -1)
 
-        if self.recalibrator == "TemperatureScaling":
+        if self.temperatureScaling:
             x_bp = x_bp / self.temperature
             x = x / self.temperature
         """
@@ -327,7 +330,7 @@ class segnet_mcdo(nn.Module):
         # Uncalibrated Softmax Mean and Variance
         mean = torch.nn.Softmax(1)(x).mean(-1)
         variance = torch.nn.Softmax(1)(x).std(-1)
-        if self.recalibrator != "None" and self.recalibrator != "TemperatureScaling":
+        if self.recalibrator != "None":
             if recalType == "beforeMCDO":
                 for c in range(self.n_classes):
                     x[:, c, :, :, :] = self.calibrationPerClass[c].predict(x[:, c, :, :, :].reshape(-1)).reshape(x[:, c, :, :, :].shape)

@@ -1022,46 +1022,39 @@ def get_upsampling_weight(in_channels, out_channels, kernel_size):
     weight[range(in_channels), range(out_channels), :, :] = filt
     return torch.from_numpy(weight).float()
 
+class GatedFusion(nn.Module):
+    def __init__(
+        self, n_classes, in_channels, out_channels, is_batchnorm=True
+    ):
+        super(GatedFusion, self).__init__()
 
-import torch
-import torch.nn as nn
-import torch.utils as utils
-import torch.nn.init as init
-import torch.utils.data as data
-import torchvision.utils as v_utils
-import torchvision.datasets as dset
-import torchvision.transforms as transforms
-from torch.autograd import Variable
+        self.conv = nn.conv2D
+        (
+            2 * n_classes,
+            n_classes,
+            1,
+            stride=1,
+            padding=0,
+            bias=False,
+            dilation=0,
+            is_batchnorm=is_batchnorm,
+        )
+        self.sigmoid = nn.Sigmoid()
+        
 
+    def forward(self, rgb, d):
 
-def conv_block(in_dim,out_dim,act_fn):
-    model = nn.Sequential(
-        nn.Conv2d(in_dim,out_dim, kernel_size=3, stride=1, padding=1),
-        nn.BatchNorm2d(out_dim),
-        act_fn,
-    )
-    return model
+        fusion = torch.cat([P_rgb, P_d], dim=0)
+        G = self.conv(fusion)
+        G = self.sigmoid(G)
 
+        G_rgb = G
+        G_d = torch.ones(G.shape) - G
 
-def conv_trans_block(in_dim,out_dim,act_fn):
-    model = nn.Sequential(
-        nn.ConvTranspose2d(in_dim,out_dim, kernel_size=3, stride=2, padding=1,output_padding=1),
-        nn.BatchNorm2d(out_dim),
-        act_fn,
-    )
-    return model
+        P_rgb = rgb * G_rgb
+        P_d = d * G_d
 
+        P_fusion = P_rgb + P_d
 
-def maxpool():
-    pool = nn.MaxPool2d(kernel_size=2, stride=2, padding=0)
-    return pool
+        return fused_scores
 
-
-def conv_block_3(in_dim,out_dim,act_fn):
-    model = nn.Sequential(
-        conv_block(in_dim,out_dim,act_fn),
-        conv_block(out_dim,out_dim,act_fn),
-        nn.Conv2d(out_dim,out_dim, kernel_size=3, stride=1, padding=1),
-        nn.BatchNorm2d(out_dim),
-    )
-    return model

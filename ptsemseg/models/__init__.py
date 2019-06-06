@@ -60,7 +60,7 @@ def get_model(model_dict,
                       end_layer=end_layer,
                       device=device,
                       recalibrator=recalibrator,
-                      temperatureScaling=temperatureScaling
+                      temperatureScaling=temperatureScaling,
                       bins=bins,
                       **param_dict)
         vgg16 = models.vgg16(pretrained=True)

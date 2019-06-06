@@ -37,6 +37,7 @@ class segnet_mcdo(nn.Module):
         self.device = device
 
         # Select Recalibrator
+        self.temperatureScaling = temperatureScaling
         self.recalibrator = recalibrator
 
         if recalibrator != "None" and bins > 0:

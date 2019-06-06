@@ -1,4 +1,4 @@
-id: rgb_BayesianSegnet_0.5_T000
+id: rgb_BayesianSegnet_0.5_NoTScale_T000_BS4_01
 model:
     arch: segnet_mcdo
 models:
@@ -7,12 +7,12 @@ models:
         start_layer: down1
         end_layer: up1
         reduction: 1.0
-        mcdo_passes: 1
-        dropoutP: 0.5
-        mcdo_start_iter: 0
-        mcdo_backprop: False
-        learned_uncertainty: "no"
-        resume: None
+        mcdo_passes: 1 # Number of Passes
+        mask_dir: models/DropoutMasks/Random # Directory of Indexed Masks
+        masks: [0] # Number Mask Indices Should Equal Number of MCDO Passes
+        fixed_mcdo: No # Yes: Fixed Masks per Pass; No: Randomized Masks per Pass
+        dropoutP: 0.5 # Dropout Probability
+        resume: None #models/BayesianSegnet/rgb_BayesianSegnet_0.5_T000/rgb_segnet_mcdo_airsim_best_model.pkl        
     # d:
     #     in_channels: 3
     #     start_layer: down1
@@ -26,6 +26,9 @@ models:
     #     resume: None
 fusion: None #{None,SoftmaxMultiply}
 recal: None #{None,afterMcdo,beforeMcdo}
+recalibrator: None #{Histogram,Polynomial_X}
+temperatureScaling: False
+bins: 1
 data:
     dataset: airsim
     train_split: train
@@ -41,7 +44,7 @@ data:
                    'async_fog_100_clear',
                    "async_fog_100_clear__{'channel':'rgb','type':'blackoutNoise','value':'20'}",
                    "async_fog_100_clear__{'channel':'d','type':'blackoutNoise','value':'20'}",
-                   "async_fog_100_clear__{'channel':'rgbd','type':'blackoutNoise','value':'20'}",                   
+                   "async_fog_100_clear__{'channel':'rgbd','type':'blackoutNoise','value':'20'}",
                   ]    
     val_reduction: 1.0
     img_rows: 512
@@ -49,8 +52,8 @@ data:
     path: datasets/airsim_data_async #../../ros/data/airsim_03-30-2019/airsim_data_async
     noisy_type: None 
 training:
-    train_iters: 100000
-    batch_size: 2
+    train_iters: 300000
+    batch_size: 4
     val_interval: 5000
     n_workers: 8
     print_interval: 50

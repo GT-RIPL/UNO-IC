@@ -62,7 +62,6 @@ class segnet_mcdo(nn.Module):
                 exit()
 
         if self.temperatureScaling:
-
             self.temperature = torch.nn.Parameter(torch.ones(1))
 
         if not self.fixed_mcdo:
@@ -94,25 +93,6 @@ class segnet_mcdo(nn.Module):
 
         self.dropouts = {k: nn.Dropout2d(p=dropoutP, inplace=False) for k in self.layers.keys()}
 
-        # self.dropout_layers = ["down3","down4","down5","up5","up4","up3"]
-
-        # inp = torch.Tensor(512,512,3)
-        # f = mod.forward(autograd.Variable(torch.Tensor(1, *inp.shape)))
-        # print( int(np.prod(f.size()[1:])) )
-
-        # inputs torch.Size([2, 3, 512, 512])
-        # down1 torch.Size([2, 64, 256, 256])
-        # down2 torch.Size([2, 128, 128, 128])
-        # down3 torch.Size([2, 256, 64, 64])
-        # down4 torch.Size([2, 512, 32, 32])
-        # down5 torch.Size([2, 512, 16, 16])
-        # up1 torch.Size([2, 11, 512, 512])
-        # up2 torch.Size([2, 64, 256, 256])
-        # up3 torch.Size([2, 128, 128, 128])
-        # up4 torch.Size([2, 256, 64, 64])
-        # up5 torch.Size([2, 512, 32, 32])
-
-
         if self.fixed_mcdo:
             self.dropout_masks = {p:
                 {
@@ -129,12 +109,6 @@ class segnet_mcdo(nn.Module):
                     "up3": Variable((1. / (1 - self.dropoutP)) * torch.bernoulli(
                         (1 - self.dropoutP) * torch.ones(self.batch_size, 128, 128, 128))).to(device),
                 } for p in range(self.mcdo_passes)}
-
-        # print(torch.bernoulli(0.5*torch.ones(10)))
-        # print(Variable(torch.bernoulli(0.5*torch.ones(10))))
-        # print(self.dropout_masks[0]["down3"][0,0,0,:10])
-        # print(self.dropout_masks[1]["down3"][0,0,0,:10])
-        # exit()
 
         self.ordered_layers = [
             "down1",
@@ -153,10 +127,13 @@ class segnet_mcdo(nn.Module):
         self.end_layer = end_layer
 
         self.reduced_layers = self.ordered_layers[self.ordered_layers.index(self.start_layer):(
-                    self.ordered_layers.index(self.end_layer) + 1)]
+                self.ordered_layers.index(self.end_layer) + 1)]
 
         for k, v in self.layers.items():
             setattr(self, k, v)
+
+        self.softmaxMCDO = torch.nn.Softmax(dim=1)
+        self.softmax = torch.nn.Softmax(dim=0)
 
     def forwardOnce(self, inputs, pass_no):
 
@@ -176,7 +153,6 @@ class segnet_mcdo(nn.Module):
                     down3 = self.dropout_masks[pass_no]["down3"] * down3
             else:
                 down3, indices_3, unpool_shape3 = self.layers["down3"](down2, MCDO=mcdo)
-            
 
         if "down4" in self.reduced_layers:
             if self.fixed_mcdo:
@@ -209,7 +185,6 @@ class segnet_mcdo(nn.Module):
                     up4 = self.dropout_masks[pass_no]["up4"] * (up4)
             else:
                 up4 = self.layers["up4"](up5, indices_4, unpool_shape4, MCDO=mcdo)
-            
 
         if "up3" in self.reduced_layers:
             if self.fixed_mcdo:
@@ -242,76 +217,17 @@ class segnet_mcdo(nn.Module):
 
         return up1
 
-    def configureDropout(self):
-
-        # Determine Type of Dropout
-        if self.training:
-            for k in self.dropouts.keys():
-                self.dropouts[k].train(mode=True)
-        else:
-            if self.mcdo_passes > 1:
-                for k in self.dropouts.keys():
-                    self.dropouts[k].train(mode=True)
-            else:
-                for k in self.dropouts.keys():
-                    self.dropouts[k].eval()
-
-    def init_vgg16_params(self, vgg16):
-        blocks = [self.down1, self.down2, self.down3, self.down4, self.down5]
-
-        ranges = [[0, 4], [5, 9], [10, 16], [17, 23], [24, 29]]
-        features = list(vgg16.features.children())
-
-        vgg_layers = []
-        for _layer in features:
-            if isinstance(_layer, nn.Conv2d):
-                vgg_layers.append(_layer)
-
-        merged_layers = []
-        for idx, conv_block in enumerate(blocks):
-            if idx < 2:
-                units = [conv_block.conv1.cbr_unit, conv_block.conv2.cbr_unit]
-            else:
-                units = [
-                    conv_block.conv1.cbr_unit,
-                    conv_block.conv2.cbr_unit,
-                    conv_block.conv3.cbr_unit,
-                ]
-            for _unit in units:
-                for _layer in _unit:
-                    if isinstance(_layer, nn.Conv2d):
-                        merged_layers.append(_layer)
-
-        assert len(vgg_layers) == len(merged_layers)
-
-        for l1, l2 in zip(vgg_layers, merged_layers):
-            if isinstance(l1, nn.Conv2d) and isinstance(l2, nn.Conv2d):
-                if l1.weight.size() == l2.weight.size() and l1.bias.size() == l2.bias.size():
-                    assert l1.weight.size() == l2.weight.size()
-                    assert l1.bias.size() == l2.bias.size()
-                    l2.weight.data = l1.weight.data
-                    l2.bias.data = l1.bias.data
-                else:
-
-                    num_orig = int(l1.weight.size()[1])
-                    num_tiles = int(l2.weight.size()[1]) // int(l1.weight.size()[1])
-
-                    for i in range(num_tiles):
-                        l2.weight.data[:, i * num_orig:(i + 1) * num_orig, :, :] = l1.weight.data
-                    l2.bias.data = l1.bias.data
-
-    def forward(self, inputs, recalType="None"):
+    def forwardMCDO(self, inputs, recalType="None"):
         # First pass has backpropagation; others do not
-        for i in range(self.mcdo_passes):
-            if i == 0:
-                x_bp = self.forwardOnce(inputs, i)
-                x = x_bp.unsqueeze(-1)
-            else:
-                with torch.no_grad():
+        with torch.no_grad():
+            for i in range(self.mcdo_passes):
+                if i == 0:
+                    x_bp = self.forwardOnce(inputs, i)
+                    x = x_bp.unsqueeze(-1)
+                else:
                     x = torch.cat((x, self.forwardOnce(inputs, i).unsqueeze(-1)), -1)
 
         if self.temperatureScaling:
-            x_bp = x_bp / self.temperature
             x = x / self.temperature
         """
         points = ((0,50,50), (0,100,100))
@@ -329,24 +245,37 @@ class segnet_mcdo(nn.Module):
             plt.close(fig)
         """
         # Uncalibrated Softmax Mean and Variance
-        mean = torch.nn.Softmax(1)(x).mean(-1)
-        variance = torch.nn.Softmax(1)(x).std(-1)
+        mean = self.softmaxMCDO(x).mean(-1)
+        variance = self.softmaxMCDO(x).std(-1)
+
         if self.recalibrator != "None":
             if recalType == "beforeMCDO":
                 for c in range(self.n_classes):
-                    x[:, c, :, :, :] = self.calibrationPerClass[c].predict(x[:, c, :, :, :].reshape(-1)).reshape(x[:, c, :, :, :].shape)
+                    x[:, c, :, :, :] = self.calibrationPerClass[c].predict(x[:, c, :, :, :].reshape(-1)).reshape(
+                        x[:, c, :, :, :].shape)
                 mean = torch.nn.Softmax(1)(x).mean(-1)
                 variance = torch.nn.Softmax(1)(x).std(-1)
             elif recalType == "afterMCDO":
                 for c in range(self.n_classes):
-                    mean[:, c, :, :] = self.calibrationPerClass[c].predict(mean[:, c, :, :].reshape(-1)).reshape(mean[:, c, :, :].shape)
+                    mean[:, c, :, :] = self.calibrationPerClass[c].predict(mean[:, c, :, :].reshape(-1)).reshape(
+                        mean[:, c, :, :].shape)
 
-        return x_bp, mean, variance
+        return mean, variance
+
+    # TODO look into integrating multiple MCDO passes into forward pass to work with back prop
+    def forward(self, inputs):
+        x = self.forwardOnce(inputs, 0)
+        if self.temperatureScaling:
+            x = x / self.temperature
+        output = self.softmax(x)
+
+        return output
 
     def applyCalibration(self, output):
 
         for c in range(self.n_classes):
-            output[:, c, :, :] = self.calibrationPerClass[c].predict(output[:, c, :, :].reshape(-1)).reshape(output[:, c, :, :].shape)
+            output[:, c, :, :] = self.calibrationPerClass[c].predict(output[:, c, :, :].reshape(-1)).reshape(
+                output[:, c, :, :].shape)
 
         return output
 
@@ -365,7 +294,6 @@ class segnet_mcdo(nn.Module):
         x = list(x)
         y = list(y)
 
-        # TODO fix plotting with invalid probabilities and graph wrapping
         axes[0].plot(x, y, '.')
         axes[0].set_title("Uncalibrated")
         axes[0].set_xlabel("uncalibrated confidence")
@@ -402,7 +330,7 @@ class segnet_mcdo(nn.Module):
         """
 
         # calculating expected calibration error
-        ECE = sum([abs(i - j) for i,j, in zip(x,y)])/len(x)
+        ECE = sum([abs(i - j) for i, j, in zip(x, y)]) / len(x)
         fig.suptitle('Expected Calibration Error: {}'.format(ECE), fontsize=16)
 
         path = "{}/{}/{}".format(logdir, 'calibration', model)
@@ -410,7 +338,6 @@ class segnet_mcdo(nn.Module):
             os.makedirs(path)
         plt.tight_layout()
         plt.savefig("{}/calibratedOverall{}.png".format(path, iteration))
-
         plt.close(fig)
 
         ############################
@@ -423,11 +350,13 @@ class segnet_mcdo(nn.Module):
             x = list(x)
             y = list(y)
             axes[(c + 1) // (self.n_classes // 3 + 1), (c + 1) % (self.n_classes // 3 + 1)].plot(x, y)
-            axes[(c + 1) // (self.n_classes // 3 + 1), (c + 1) % (self.n_classes // 3 + 1)].set_title("Class: {}".format(c))
+            axes[(c + 1) // (self.n_classes // 3 + 1), (c + 1) % (self.n_classes // 3 + 1)].set_title(
+                "Class: {}".format(c))
 
         path = "{}/{}/{}".format(logdir, 'calibration', model)
         if not os.path.exists(path):
             os.makedirs(path)
+        plt.tight_layout()
         plt.savefig("{}/uncalibratedPerClass{}.png".format(path, iteration))
         plt.close(fig)
 
@@ -442,7 +371,8 @@ class segnet_mcdo(nn.Module):
             y = list(y)
 
             axes[(c + 1) // (self.n_classes // 3 + 1), (c + 1) % (self.n_classes // 3 + 1)].plot(x, y)
-            axes[(c + 1) // (self.n_classes // 3 + 1), (c + 1) % (self.n_classes // 3 + 1)].set_title("Class: {}".format(c))
+            axes[(c + 1) // (self.n_classes // 3 + 1), (c + 1) % (self.n_classes // 3 + 1)].set_title(
+                "Class: {}".format(c))
 
         path = "{}/{}/{}".format(logdir, 'calibration', model)
         if not os.path.exists(path):

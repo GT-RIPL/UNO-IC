@@ -281,12 +281,13 @@ def train(cfg, writer, logger, logdir):
                     for m in cfg["models"].keys():
 
                         bs = cfg['training']['batch_size']
-                        output_all = torch.zeros((len(recalloader) * bs, n_classes, cfg['data']['img_rows'], cfg['data']['img_cols']))
-                        labels_all = torch.zeros((len(recalloader) * bs, cfg['data']['img_rows'], cfg['data']['img_cols']), dtype=torch.long)
+                        output_all = torch.zeros(
+                            (len(recalloader) * bs, n_classes, cfg['data']['img_rows'], cfg['data']['img_cols']))
+                        labels_all = torch.zeros(
+                            (len(recalloader) * bs, cfg['data']['img_rows'], cfg['data']['img_cols']), dtype=torch.long)
 
                         with torch.no_grad():
                             for i_recal, (images_list, labels_list, aux_list) in tqdm(enumerate(recalloader)):
-
                                 inputs, labels = parseEightCameras(images_list, labels_list, aux_list, device)
 
                                 # Read batch from only one camera
@@ -297,17 +298,15 @@ def train(cfg, writer, logger, logdir):
                                 outputs, mean, variance = models[m](images_recal)
 
                                 # concat results
-                                output_all[bs*i_recal:bs*(i_recal+1),:,:,:] = mean
-                                labels_all[bs*i_recal:bs*(i_recal+1),:,:] = labels_recal
-                                
-
+                                output_all[bs * i_recal:bs * (i_recal + 1), :, :, :] = mean
+                                labels_all[bs * i_recal:bs * (i_recal + 1), :, :] = labels_recal
 
                         # fit calibration models
                         for c in range(n_classes):
                             models[m].module.calibrationPerClass[c].fit(output_all, labels_all)
 
                         models[m].module.showCalibration(output_all, labels_all, logdir, m, i)
-                
+
                     """
                     # plot mean/variances of predictions of (un)calibrated models
                     with torch.no_grad():
@@ -385,7 +384,8 @@ def train(cfg, writer, logger, logdir):
                             elif cfg["fusion"] == "SoftmaxMultiply":
                                 outputs = mean["rgb"] * mean["d"]
                             elif cfg["fusion"] == "SoftmaxAverage":
-                                outputs = torch.nn.functional.normalize(mean["rgb"]) + torch.nn.functional.normalize(mean["d"])
+                                outputs = torch.nn.functional.normalize(mean["rgb"]) + torch.nn.functional.normalize(
+                                    mean["d"])
                             elif cfg["fusion"] == "WeightedVariance":
                                 rgb_var = 1 / (variance["rgb"] + 1e-5)
                                 d_var = 1 / (variance["d"] + 1e-5)
@@ -393,15 +393,15 @@ def train(cfg, writer, logger, logdir):
                                 plt.title("rgb output variance (w/ blackoutNoise)")
                                 plt.hist(variance["rgb"].reshape(-1).data.cpu(), bins=50)
                                 plt.savefig("rgb.png")
-                                
-                                
+
                                 plt.figure()
                                 plt.hist(variance["d"].reshape(-1).data.cpu(), bins=50)
                                 plt.savefig("d.png")
                                 exit()
-                                
+
                                 print(variance["d"])
-                                outputs = (mean["rgb"] * rgb_var) / (rgb_var + d_var) + (mean["d"] * d_var) / (rgb_var + d_var) 
+                                outputs = (mean["rgb"] * rgb_var) / (rgb_var + d_var) + (mean["d"] * d_var) / (
+                                            rgb_var + d_var)
                             else:
                                 print("Fusion Type Not Supported")
 
@@ -410,10 +410,8 @@ def train(cfg, writer, logger, logdir):
                             pred = outputs.argmax(1).cpu().numpy()
                             gt = labels_val.data.cpu().numpy()
 
-
                             if i_val % cfg["training"]["png_frames"] == 0:
                                 plotPrediction(logdir, cfg, n_classes, i, i_val, k, inputs, pred, gt)
-
 
                             running_metrics_val[k].update(gt, pred)
 
@@ -466,12 +464,12 @@ def train(cfg, writer, logger, logdir):
                                                      cfg['data']['dataset']))
                         torch.save(state, save_path)
 
-
-                #if cfg["recal"]!="None":
+                # if cfg["recal"]!="None":
                 #   exit()
             if (i + 1) >= cfg["training"]["train_iters"]:
                 flag = False
                 break
+
 
 def parseEightCameras(images, labels, aux, device):
     # Stack 8 Cameras into 1 for MCDO Dataset Testing
@@ -491,16 +489,16 @@ def parseEightCameras(images, labels, aux, device):
                            aux[:, 1, :, :].unsqueeze(1),
                            aux[:, 2, :, :].unsqueeze(1)), 1)
 
-    #fused = torch.cat((images, aux), 1)
+    # fused = torch.cat((images, aux), 1)
 
     rgb = torch.cat((images[:, 0, :, :].unsqueeze(1),
                      images[:, 1, :, :].unsqueeze(1),
                      images[:, 2, :, :].unsqueeze(1)), 1)
 
     inputs = {"rgb": rgb,
-              "d": depth,}
-              #"rgbd": fused,
-              #"fused": fused}
+              "d": depth, }
+    # "rgbd": fused,
+    # "fused": fused}
 
     return inputs, labels
 

@@ -1,4 +1,4 @@
-id: rgb_BayesianSegnet_0.5_T000
+id: rgb_BayesianSegnet_0.5_T000_test
 model:
     arch: segnet_mcdo
 models:
@@ -26,6 +26,8 @@ models:
     #     resume: None
 fusion: None #{None,SoftmaxMultiply}
 recal: None #{None,afterMcdo,beforeMcdo}
+recalibrator: HistogramLinear #{Histogram,Polynomial_X}
+bins: 10
 data:
     dataset: airsim
     train_split: train

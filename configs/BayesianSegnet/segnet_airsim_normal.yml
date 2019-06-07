@@ -26,7 +26,7 @@ models:
         resume: models/BayesianSegnet/d_BayesianSegnet_0.5_T000/d_segnet_mcdo_airsim_best_model.pkl
 fusion: SoftmaxMultiply #{None,SoftmaxMultiply}
 recal: afterMCDO #{None,afterMCDO,beforeMCDO}
-recalibrator: HistogramFlat #{Histogram,Polynomial_X}
+recalibrator: HistogramLinear #{Histogram,Polynomial_X}
 bins: 10
 data:
     dataset: airsim

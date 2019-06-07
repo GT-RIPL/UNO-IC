@@ -8,32 +8,8 @@ import numpy as np
 import pandas as pd
 import yaml
 import os
-"""
-include = [
-           'run1',
-           'run2',
-           ]
 
-run_comments = {
-    "run1": {
-        "names": [
-            ("d_BayesianSegnet_0.1","Depth Only (Bayesian Segnet, p = 0.1)"),
-            ("rgb_BayesianSegnet_0.1","RGB Only (Bayesian Segnet, p = 0.1)"),
-        ],
-        "text":
-            "following architecture from BayesSegnet paper, dropout p = 0.1",
-    },
-    "run2": {
-        "names": [
-            ("d_BayesianSegnet_0.5","Depth Only (Bayesian Segnet, p = 0.5)"),
-            ("rgb_BayesianSegnet_0.5","RGB Only (Bayesian Segnet, p = 0.5)"),
-        ],
-        "text":
-            "following architecture from BayesSegnet paper, dropout p = 0.5",
-    },    
-}
 
-"""
 include = [
            'tempScal',
            ]

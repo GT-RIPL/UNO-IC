@@ -31,7 +31,7 @@ from scipy.misc import imsave
 from functools import partial
 
 import matplotlib.pyplot as plt
-
+from collections import defaultdict
 
 def train(cfg, writer, logger, logdir):
     # Setup seeds
@@ -153,7 +153,6 @@ def train(cfg, writer, logger, logdir):
         schedulers[model] = get_scheduler(optimizers[model], cfg['training']['lr_schedule'])
 
         loss_fn = get_loss_function(cfg)
-        # loss_sig = # Loss Function for Aleatoric Uncertainty
         logger.info("Using loss {}".format(loss_fn))
 
         # Load pretrained weights
@@ -197,62 +196,59 @@ def train(cfg, writer, logger, logdir):
 
     best_iou = -100.0
     i = start_iter
-    flag = True
+    print(i)
 
-    while i <= cfg["training"]["train_iters"] and flag:
+    while i <= cfg["training"]["train_iters"]:
 
-        #################################################################################
-        # Training
-        #################################################################################
-        print("=" * 10, "TRAINING,RECALIBRATING,VALIDATING", "=" * 10)
+        print("=" * 10, "TRAINING", "=" * 10)
         for (images_list, labels_list, aux_list) in trainloader:
-
-            inputs, labels = parseEightCameras(images_list, labels_list, aux_list, device)
-
-            # Read batch from only one camera
-            bs = cfg['training']['batch_size']
-            images = {m: inputs[m][:bs, :, :, :] for m in cfg["models"].keys()}
-            labels = labels[:bs, :, :]
-
-            if labels.shape[0] <= 1:
-                continue
-
             i += 1
-            start_ts = time.time()
 
-            [schedulers[m].step() for m in schedulers.keys()]
-            [models[m].train() for m in models.keys()]
-            [optimizers[m].zero_grad() for m in optimizers.keys()]
-
-            # Run Models
-            outputs = {}
-            loss = {}
-            for m in cfg["models"].keys():
-                outputs[m] = models[m](images[m])
-
-                print(outputs[m])
-
-                loss[m] = loss_fn(input=outputs[m], target=labels)
-                loss[m].backward()
-                optimizers[m].step()
-
-            time_meter.update(time.time() - start_ts)
-            if (i + 1) % cfg['training']['print_interval'] == 0:
-                for m in cfg["models"].keys():
-                    fmt_str = "Iter [{:d}/{:d}]  Loss {}: {:.4f}  Time/Image: {:.4f}"
-                    print_str = fmt_str.format(i + 1,
-                                               cfg['training']['train_iters'],
-                                               m,
-                                               loss[m].item(),
-                                               time_meter.avg / cfg['training']['batch_size'])
-
-                    print(print_str)
-                    logger.info(print_str)
-                    writer.add_scalar('loss/train_loss/' + m, loss[m].item(), i + 1)
-                time_meter.reset()
             #################################################################################
+            # Training
+            #################################################################################
+            if i < cfg["training"]["train_iters"]:
+                inputs, labels = parseEightCameras(images_list, labels_list, aux_list, device)
 
-            # Validation
+                # Read batch from only one camera
+                bs = cfg['training']['batch_size']
+                images = {m: inputs[m][:bs, :, :, :] for m in cfg["models"].keys()}
+                labels = labels[:bs, :, :]
+
+                if labels.shape[0] <= 1:
+                    continue
+
+                start_ts = time.time()
+
+                [schedulers[m].step() for m in schedulers.keys()]
+                [models[m].train() for m in models.keys()]
+                [optimizers[m].zero_grad() for m in optimizers.keys()]
+
+                # Run Models
+                outputs = {}
+                loss = {}
+                for m in cfg["models"].keys():
+                    outputs[m] = models[m](images[m])
+
+                    loss[m] = loss_fn(input=outputs[m], target=labels)
+                    loss[m].backward()
+                    optimizers[m].step()
+
+                time_meter.update(time.time() - start_ts)
+                if (i + 1) % cfg['training']['print_interval'] == 0:
+                    for m in cfg["models"].keys():
+                        fmt_str = "Iter [{:d}/{:d}]  Loss {}: {:.4f}  Time/Image: {:.4f}"
+                        print_str = fmt_str.format(i + 1,
+                                                   cfg['training']['train_iters'],
+                                                   m,
+                                                   loss[m].item(),
+                                                   time_meter.avg / cfg['training']['batch_size'])
+
+                        print(print_str)
+                        logger.info(print_str)
+                        writer.add_scalar('loss/train_loss/' + m, loss[m].item(), i + 1)
+                    time_meter.reset()
+
             if (i + 1) % cfg["training"]["val_interval"] == 0 or (i + 1) >= cfg["training"]["train_iters"]:
 
                 [models[m].eval() for m in models.keys()]
@@ -260,7 +256,6 @@ def train(cfg, writer, logger, logdir):
                 #################################################################################
                 # Recalibration
                 #################################################################################
-
                 if cfg["recal"] != "None":
                     print("=" * 10, "RECALIBRATING", "=" * 10)
 
@@ -292,7 +287,6 @@ def train(cfg, writer, logger, logdir):
                             models[m].module.calibrationPerClass[c].fit(output_all, labels_all)
                         models[m].module.showCalibration(output_all, labels_all, logdir, m, i)
 
-                    """
                     # plot mean/variances of predictions of (un)calibrated models
                     with torch.no_grad():
                         for i_recal, (images_list, labels_list, aux_list) in tqdm(enumerate(recalloader)):
@@ -327,11 +321,7 @@ def train(cfg, writer, logger, logdir):
                                                inputs, post_pred, gt)
 
                                 torch.cuda.empty_cache()
-                    """
-                #################################################################################
-
-                [models[m].eval() for m in models.keys()]
-
+                    
                 #################################################################################
                 # Validation
                 #################################################################################
@@ -534,7 +524,6 @@ def plotPrediction(logdir, cfg, n_classes, i, i_val, k, inputs, pred, gt):
 
 
 def plotMeansVariances(logdir, cfg, n_classes, i, i_val, m, k, inputs, pred, gt, mean, variance):
-    # n_classes = int(mean.shape[1])
 
     fig, axes = plt.subplots(4, n_classes // 2 + 1)
     [axi.set_axis_off() for axi in axes.ravel()]
@@ -578,9 +567,9 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
+    # cfg is a  with two-level dictionary ['training','data','model']['batch_size']
     with open(args.config) as fp:
-        cfg = yaml.load(fp)
-        # cfg is a  with two-level dictionary ['training','data','model']['batch_size']
+        cfg = defaultdict(lambda: None, yaml.load(fp))
 
     run_id = cfg["id"]
     logdir = os.path.join("runs", os.path.basename(args.config)[:-4], str(run_id))

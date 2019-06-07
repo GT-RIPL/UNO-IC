@@ -1,8 +1,19 @@
-id: rgb_BayesianSegnet_0.5_NoTScale_T000_BS4_01
+id: d_BayesianSegnet_0.5_T000
 model:
     arch: segnet_mcdo
 models:
-    rgb:
+    # rgb:
+    #     in_channels: 3
+    #     start_layer: down1
+    #     end_layer: up1
+    #     reduction: 1.0
+    #     mcdo_passes: 1 # Number of Passes
+    #     mask_dir: models/DropoutMasks/Random # Directory of Indexed Masks
+    #     masks: [0] # Number Mask Indices Should Equal Number of MCDO Passes
+    #     fixed_mcdo: No # Yes: Fixed Masks per Pass; No: Randomized Masks per Pass
+    #     dropoutP: 0.5 # Dropout Probability
+    #     resume: None #models/BayesianSegnet/rgb_BayesianSegnet_0.5_T000/rgb_segnet_mcdo_airsim_best_model.pkl        
+    d:
         in_channels: 3
         start_layer: down1
         end_layer: up1
@@ -12,22 +23,11 @@ models:
         masks: [0] # Number Mask Indices Should Equal Number of MCDO Passes
         fixed_mcdo: No # Yes: Fixed Masks per Pass; No: Randomized Masks per Pass
         dropoutP: 0.5 # Dropout Probability
-        resume: None #models/BayesianSegnet/rgb_BayesianSegnet_0.5_T000/rgb_segnet_mcdo_airsim_best_model.pkl        
-    # d:
-    #     in_channels: 3
-    #     start_layer: down1
-    #     end_layer: up1
-    #     reduction: 1.0
-    #     mcdo_passes: 1
-    #     dropoutP: 0.5
-    #     mcdo_start_iter: 0
-    #     mcdo_backprop: False
-    #     learned_uncertainty: "no"
-    #     resume: None
+        resume: None #models/BayesianSegnet/d_BayesianSegnet_0.5_T000/d_segnet_mcdo_airsim_best_model.pkl        
 fusion: None #{None,SoftmaxMultiply}
 recal: None #{None,afterMcdo,beforeMcdo}
 recalibrator: None #{Histogram,Polynomial_X}
-temperatureScaling: False
+temperatureScaling: True
 bins: 1
 data:
     dataset: airsim

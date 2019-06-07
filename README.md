@@ -16,7 +16,7 @@
 - General command: CUDA_VISIBLE_DEVICES=0 python train.py
 - To train RGB leg: CUDA_VISIBLE_DEVICES=0 python train.py --config configs/BayesianSegnet/rgb_BayesianSegnet_0.5_T000.yml
 - To train D leg: CUDA_VISIBLE_DEVICES=0 python train.py --config configs/BayesianSegnet/d_BayesianSegnet_0.5_T000.yml
-- To train/test SoftmaxFusion: CUDA_VISIBLE_DEVICES=0 python train.py --config configs/BayesianSegnet/outputFusion_FusionSoftmaxMultiply_Train000_Recal{None,000,050,100}.yml
+- To train/test SoftmaxFusion: CUDA_VISIBLE_DEVICES=0 python train.py --config configs/fusion/SoftmaxMult/base.yml
 
 4. Tensorboard progress monitor: run tensorboard from within the "runs" directory
 
@@ -26,21 +26,9 @@
 - Second scrollable page shows accuracies
 - Title of plots describes the validation split (i.e. async_fog_000_clear_...)
 
-5. Compare final results: ./analysis
+5. Compare final results: ./analysis.py
 
-- tensorboard_segnet.py file generates a bar chart comparing the final data points from the training logs
-- In the first level of the analysis folder, create folders of your choice--these will group similar tests together (i.e. run1, run2)
-- In the second level of the analysis folder, copy over relevant runs from the runs directory (these folders themselves should have the tensorboard log files in them)
-- Things to change in tensorboard_segnet.py
-  - include = ... (should have a list of of those first level grouping folders, you can comment out specific groupings here if you don't want their results in the final barchart)
-  - run_comments
-    - keys in dictionary should be the folder names listed in "include"
-      - "names" should have a list of tuples
-        - the left element should be the name of the folder produced by the training code
-        - the right element should be a pretty name that describes the specific test
-      - "text" should be your comments about the grouping of tests
-
-
+-TODO
 
 Notable Things:
 - configuration files are stored in ./configs directory

@@ -1,4 +1,4 @@
-id: rgb_BayesianSegnet_0.5_NoTScale_T000_BS4_01
+id: rgb_BayesianSegnet_0.5_TScale_T000_BS4_02
 model:
     arch: segnet_mcdo
 models:
@@ -27,7 +27,7 @@ models:
 fusion: None #{None,SoftmaxMultiply}
 recal: None #{None,afterMcdo,beforeMcdo}
 recalibrator: None #{Histogram,Polynomial_X}
-temperatureScaling: False
+temperatureScaling: True
 bins: 1
 data:
     dataset: airsim

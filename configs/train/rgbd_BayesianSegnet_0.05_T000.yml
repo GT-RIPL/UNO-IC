@@ -1,4 +1,4 @@
-id: temperatureScaling
+id: rgbd_BayesianSegnet_0.5_T000
 model:
     arch: segnet_mcdo
 models:

@@ -1,5 +1,5 @@
 import matplotlib
-matplotlib.use('TkAgg')
+matplotlib.use('Agg')
 
 import tensorflow as tf
 import glob
@@ -8,50 +8,14 @@ import numpy as np
 import pandas as pd
 import yaml
 import os
-"""
+
+
 include = [
-           'run1',
-           'run2',
+           'tempScal',
            ]
-
-run_comments = {
-    "run1": {
-        "names": [
-            ("d_BayesianSegnet_0.1","Depth Only (Bayesian Segnet, p = 0.1)"),
-            ("rgb_BayesianSegnet_0.1","RGB Only (Bayesian Segnet, p = 0.1)"),
-        ],
-        "text":
-            "following architecture from BayesSegnet paper, dropout p = 0.1",
-    },
-    "run2": {
-        "names": [
-            ("d_BayesianSegnet_0.5","Depth Only (Bayesian Segnet, p = 0.5)"),
-            ("rgb_BayesianSegnet_0.5","RGB Only (Bayesian Segnet, p = 0.5)"),
-        ],
-        "text":
-            "following architecture from BayesSegnet paper, dropout p = 0.5",
-    },    
-}
-
-"""
-include = [
-           'graphing'
-           ]
-
-run_comments = {
-    "graphing": {
-        "names": [
-            ("rgb_BayesianSegnet_isotonic","asdf")
-        ],
-        "text":
-            "following architecture from BayesSegnet paper, dropout p = 0.1",
-    }  
-}
 
 runs = {}
-for i,file in enumerate(glob.glob("./**/*tfevents*",recursive=True)):
-
-    print(file)
+for i,file in enumerate(glob.glob("./runs/**/**/*tfevents*",recursive=True)):
 
     directory = "/".join(file.split("/")[:-1])
     # yaml_file = "{}/pspnet_airsim.yml".format(directory)
@@ -64,14 +28,14 @@ for i,file in enumerate(glob.glob("./**/*tfevents*",recursive=True)):
     with open(yaml_file,"r") as f:
         configs = yaml.load(f, Loader=yaml.FullLoader)
 
-    if any([file.split("/")[-2] in [vvv for vvv,_ in vv['names']] and not kk in include for kk,vv in run_comments.items()]):
+    if not any([i in directory for i in include]):
         continue
         
     name = configs['id']
     # if any([e==name for e in exclude]):
     #     continue
 
-    print("Reading: {}".format(name))
+    #print("Reading: {}".format(name))
 
     for event in tf.train.summary_iterator(file):
         for value in event.summary.value:
@@ -98,29 +62,29 @@ for i,file in enumerate(glob.glob("./**/*tfevents*",recursive=True)):
 
 
 #standardize config
-del_runs = []
-for k,v in runs.items():
-    if not any([v['raw_config']['file_only'] in [vvv for vvv,_ in vv['names']] for kk,vv in run_comments.items()]):
-        del_runs.append(k)
+#del_runs = []
+#for k,v in runs.items():
+#    if not any([v['raw_config']['file_only'] in [vvv for vvv,_ in vv['names']] for kk,vv in run_comments.items()]):
+#        del_runs.append(k)
 
-for k in del_runs:
-    del runs[k]
+#for k in del_runs:
+#    del runs[k]
 
 #standardize config
 for k,v in runs.items():
 
     c = v['raw_config']
+    #print(k,v)
 
     v['std_config'] = {}
     v['std_config']['size'] = "{}x{}".format(c['data']['img_rows'],c['data']['img_cols'])
     v['std_config']['id'] = v['raw_config']['id']
-    v['std_config']['pretty'] = [vvv1 if not vvv1 is None else v['raw_config']['id'] for vvv0,vvv1 in [vv["names"] for kk,vv in run_comments.items() if v['raw_config']['file_only'] in [vvv for vvv,_ in vv['names']]][0] if vvv0==v['raw_config']['file_only']][0]
-
+    v['std_config']['pretty'] = v['raw_config']['id']
     # Extract comments for run
-    v['std_config']['comments'] = [vv["text"] for kk,vv in run_comments.items() if v['raw_config']['file_only'] in [vvv for vvv,_ in vv['names']]][0]
-    v['std_config']['run_group'] = [kk for kk,vv in run_comments.items() if v['raw_config']['file_only'] in [vvv for vvv,_ in vv['names']]][0]
+    v['std_config']['comments'] = "comments"
+    v['std_config']['run_group'] = 'rungroup'
 
-    print(v)
+    #print(v)
 
     # # if c['start_layers'] is None or len(list(c['models']))==1:
     # if len(list(c['models']))==1:
@@ -161,6 +125,7 @@ data = []
 # exit()
 
 for run in runs.keys():
+    #print(run)
 
 
     conditions = runs[run]['std_config']
@@ -171,6 +136,7 @@ for run in runs.keys():
 
 
     for full in [k for k in runs[run].keys() if "config" not in k]:
+        #print(full)
         if 'loss' in full:
             continue
        
@@ -195,9 +161,7 @@ for run in runs.keys():
         # figures[test]
         x = runs[run][full]['step']
         y = runs[run][full]['value']
-        print('------------------------------------')
-        print(y)
-        print('------------------------------------')
+        
         t = runs[run][full]['time']
         a_i = scopes.index(scope) // 4
         a_j = scopes.index(scope) % 4
@@ -215,8 +179,8 @@ for run in runs.keys():
         # RESULTS
         # avg + std of last 50k iterations
         i = -1 #x.index(int(500*(x[-1] // 500))-5000)
-        avg = np.mean(y[i:])
-        std = np.std(y[i:])
+        avg = np.mean(y)
+        std = np.std(y)
 
         test_pretty = filter(None,test.split("_"))
         test_pretty = [s for s in test_pretty if s not in ["8camera","dense"]]
@@ -238,11 +202,12 @@ for run in runs.keys():
 
 df = pd.DataFrame(data)
 
-print(df)
 
 df = df[(df.cls=="Mean_IoU____")]
+
 # df = df[(df.test=="fog_000")]
 
+df.to_csv('test.csv',index=False)
 data_fields = ['test','mean','std','raw','iter']+list(set(runs[list(runs)[0]]['std_config']))
 id_fields = ['test']+list(set(runs[list(runs)[0]]['std_config']))
 
@@ -269,8 +234,7 @@ df['full'] = df['pretty'] #+", "+\
 # sort by id fields
 df = df.sort_values(by=id_fields)
 
-
-# df.to_csv('out.csv',index=False)
+df.to_csv('out.csv',index=False)
 
 
 df = df[ 
@@ -374,18 +338,15 @@ print(df)
 plt.figure()
 ax = plt.subplot2grid((4, 4), (0, 0), colspan=4, rowspan=2)
 # df.plot(kind='bar',ax=ax).legend(bbox_to_anchor=(1.0,0.99))
-df.plot(kind='bar',ax=ax).legend(bbox_to_anchor=(1.0,-0.5)) #,prop={'size':5})
+df.plot(kind='bar', ax=ax, yticks=[0.1*i for i in range(10)], xticks=[0]).legend(bbox_to_anchor=(1.0,-0.5)) #,prop={'size':5})
+ax.yaxis.grid(True)
 plt.xlabel("Test")
 plt.xticks(rotation=00)
 # plt.xticks(rotation=45)
 plt.ylabel("Mean Accuracy")
-plt.show()
-
-print(df)
+plt.savefig("plot.png")
 
 df.to_csv('out.csv',index=False)
-
-
 
 plt.show()
 

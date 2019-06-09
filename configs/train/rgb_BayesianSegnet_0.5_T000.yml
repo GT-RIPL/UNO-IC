@@ -1,4 +1,4 @@
-id: rgb_BayesianSegnet_0.5_T000
+id: rgb_BayesianSegnet_0.5_NoTScale_T000_BS4_03
 model:
     arch: segnet_mcdo
 models:
@@ -24,6 +24,7 @@ models:
     #     mcdo_backprop: False
     #     learned_uncertainty: "no"
     #     resume: None
+full_mcdo: False
 fusion: None #{None,SoftmaxMultiply}
 recal: None #{None,afterMcdo,beforeMcdo}
 recalibrator: None #{Histogram,Polynomial_X}

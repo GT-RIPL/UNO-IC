@@ -26,7 +26,7 @@ models:
         resume: None #models/BayesianSegnet/d_BayesianSegnet_0.5_T000/d_segnet_mcdo_airsim_best_model.pkl
 fusion: None #{None,SoftmaxMultiply}
 recal: None #{None,afterMCDO,beforeMCDO}
-recalibrator: temperatureScaling #{Histogram,Polynomial_X}
+recalibrator: None #{Histogram,Polynomial_X}
 bins: 0
 data:
     dataset: airsim

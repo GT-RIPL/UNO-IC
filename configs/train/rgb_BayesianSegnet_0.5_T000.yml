@@ -28,7 +28,7 @@ full_mcdo: False
 fusion: None #{None,SoftmaxMultiply}
 recal: None #{None,afterMcdo,beforeMcdo}
 recalibrator: None #{Histogram,Polynomial_X}
-temperatureScaling: True
+temperatureScaling: False
 bins: 1
 data:
     dataset: airsim

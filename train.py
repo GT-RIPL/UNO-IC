@@ -203,7 +203,6 @@ def train(cfg, writer, logger, logdir):
         print("=" * 10, "TRAINING", "=" * 10)
         for (images_list, labels_list, aux_list) in trainloader:
             i += 1
-
             #################################################################################
             # Training
             #################################################################################
@@ -249,7 +248,7 @@ def train(cfg, writer, logger, logdir):
                         writer.add_scalar('loss/train_loss/' + m, loss[m].item(), i + 1)
                     time_meter.reset()
 
-            if (i + 1) % cfg["training"]["val_interval"] == 0 or (i + 1) >= cfg["training"]["train_iters"]:
+            if i % cfg["training"]["val_interval"] == 0 or i >= cfg["training"]["train_iters"]:
 
                 [models[m].eval() for m in models.keys()]
 
@@ -419,7 +418,7 @@ def train(cfg, writer, logger, logdir):
                     if score["Mean IoU : \t"] >= best_iou:
                         best_iou = score["Mean IoU : \t"]
                         state = {
-                            "epoch": i + 1,
+                            "epoch": i,
                             "model_state": model.state_dict(),
                             "optimizer_state": optimizer.state_dict(),
                             "scheduler_state": scheduler.state_dict(),
@@ -431,7 +430,9 @@ def train(cfg, writer, logger, logdir):
                                                      cfg['model']['arch'],
                                                      cfg['data']['dataset']))
                         torch.save(state, save_path)
-
+            
+            if i >= cfg["training"]["train_iters"]:
+                break
 
 def parseEightCameras(images, labels, aux, device):
     # Stack 8 Cameras into 1 for MCDO Dataset Testing
@@ -561,7 +562,7 @@ if __name__ == "__main__":
         "--config",
         nargs="?",
         type=str,
-        default="configs/BayesianSegnet/segnet_airsim_normal.yml",
+        default="configs/train/rgbd_BayesianSegnet_0.05_T000.yml.yml",
         help="Configuration file to use",
     )
 

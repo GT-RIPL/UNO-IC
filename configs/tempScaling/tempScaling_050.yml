@@ -12,7 +12,7 @@ models:
         masks: [0,1,2,3,4,5] # Number Mask Indices Should Equal Number of MCDO Passes
         fixed_mcdo: No # Yes: Fixed Masks per Pass; No: Randomized Masks per Pass
         dropoutP: 0.5 # Dropout Probability
-        resume: models/rgb_BayesianSegnet_0.5_T050/rgb_segnet_mcdo_airsim_tempScaling_T050.pkl
+        resume: models/tempScaling/rgb_BayesianSegnet_0.5_T050/rgb_segnet_mcdo_airsim_best_model.pkl
     d:
         in_channels: 3
         start_layer: down1
@@ -23,7 +23,7 @@ models:
         masks: [0,1,2,3,4,5] 
         fixed_mcdo: No
         dropoutP: 0.5
-        resume: models/d_BayesianSegnet_0.5_T050/d_segnet_mcdo_airsim_tempScaling_T050.pkl
+        resume: models/tempScaling/d_BayesianSegnet_0.5_T050/d_segnet_mcdo_airsim_best_model.pkl
 fusion: SoftmaxMultiply #{None,SoftmaxMultiply}
 recal: None #{None,afterMCDO,beforeMCDO}
 recalibrator: None #{Histogram,Polynomial_X}

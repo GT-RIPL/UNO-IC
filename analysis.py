@@ -12,12 +12,15 @@ import os
 
 include = [
            'tempScal',
+           'base/rgbd_BayesianSegnet_SoftmaxMult'
            ]
 
 runs = {}
 for i,file in enumerate(glob.glob("./runs/**/**/*tfevents*",recursive=True)):
 
+
     directory = "/".join(file.split("/")[:-1])
+
     # yaml_file = "{}/pspnet_airsim.yml".format(directory)
     # yaml_file = "{}/segnet_airsim_normal.yml".format(directory)
     yaml_file = glob.glob("{}/*.yml".format(directory))[0]
@@ -28,7 +31,7 @@ for i,file in enumerate(glob.glob("./runs/**/**/*tfevents*",recursive=True)):
     with open(yaml_file,"r") as f:
         configs = yaml.load(f, Loader=yaml.FullLoader)
 
-    if not any([i in directory for i in include]):
+    if not any([i in directory and '(' not in directory for i in include]):
         continue
         
     name = configs['id']
@@ -106,11 +109,6 @@ for k,v in runs.items():
     #v['std_config']['learned_uncertainty'] = True if c['models'][model]['learned_uncertainty']=='yes' else False
     v['std_config']['dropoutP'] = c['models'][model]['dropoutP']
     v['std_config']['pretrained'] = str(c['models'][model]['resume']) != "None"
-
-
-
-
-out_file = open("results.txt","w")
 
 scopes = ["Mean_Acc____"] \
         +["Mean_IoU____"] \
@@ -204,10 +202,6 @@ df = pd.DataFrame(data)
 
 
 df = df[(df.cls=="Mean_IoU____")]
-
-# df = df[(df.test=="fog_000")]
-
-df.to_csv('test.csv',index=False)
 data_fields = ['test','mean','std','raw','iter']+list(set(runs[list(runs)[0]]['std_config']))
 id_fields = ['test']+list(set(runs[list(runs)[0]]['std_config']))
 
@@ -216,114 +210,16 @@ df = df[data_fields]
 
 # uniqe identifier
 df['unique_id'] = (df.groupby(id_fields).cumcount()) 
-
-# full string identifier
- # df['block']+", "+\
-df['full'] = df['pretty'] #+", "+\
-             # df['size']+", "+\
-             # df['mcdo_passes'].map(str)+" mcdo_passes, "+\
-             # df['fuse_mech'].map(str)+" fuse_mech, "+\
-             # df['pretrained'].map(str)+" pretrained, "+\
-             # df['mcdo_start_iter'].map(str)+" burn-in, "+\
-             # df['multipass_backprop'].map(str)+" multipass_backprop, "+\
-             # df['learned_uncertainty'].map(str)+" learned_uncertainty, "+\
-             # df['dropoutP'].map(str)+" dropoutP ("+\
-             # df['unique_id'].map(str)+")"+\
-             # df['id'].map(str)
-
-# sort by id fields
+df['full'] = df['pretty']
 df = df.sort_values(by=id_fields)
-
-df.to_csv('out.csv',index=False)
-
 
 df = df[ 
         (
-            # (df['size'] == "128x128") &
-            # (df['multipass_backprop'] == True)
-            # (df['pretrained'] == True) &
-            # (df['fuse_mech'] == "ModeSummed") &
-            # (df["block"] == "convbnrelu1_1-classification") &    
-
             (df['size'] != "")
-        
-        
-        # ) & (
-        #     (df["block"] == "input_fusion") | 
-        #     (df["block"] == "fused") | 
-        #     (df["block"] == "rgb_only") | 
-        #     (df["block"] == "d_only") |         
-        #     (df['learned_uncertainty'] == True)
-
-        # (
-        #     (df['raw'].str.contains('baseline')) |
-        #     (df['raw'].str.contains('correctedDropoutScalarLayerTest')) |
-        #     (df['raw'].str.contains('layer_test_128x128'))
-        # )
-
-
-
-        ################
-        # Architecture #
-        ################
-        ) | (
-        
-        #     (df["block"] == "input_fusion") | 
-        #     (df["block"] == "fused") | 
-        #     (df["block"] == "rgb_only") | 
-        #     (df["block"] == "d_only") | 
-        #     (df["block"] == "N-o-n-e") | 
-
-        # #     # (df["block"] == "convbnrelu1_1-convbnrelu1_2-convbnrelu1_3") |
-        # #     # (df["block"] == "convbnrelu1_1-convbnrelu1_3-res_block2") |
-        # #     # (df["block"] == "convbnrelu1_1-res_block2-res_block3") |
-        # #     # (df["block"] == "convbnrelu1_1-res_block2-res_block4") |
-        # #     # (df["block"] == "convbnrelu1_1-res_block2-res_block5") 
-
-        # # #     ((df["block"] == "convbnrelu1_1-convbnrelu1_3") & (df['mcdo_passes'] == "1")) |
-        # # #     ((df["block"] == "convbnrelu1_1-res_block2") & (df['mcdo_passes'] == "1")) |
-        # # #     ((df["block"] == "convbnrelu1_1-res_block3") & (df['mcdo_passes'] == "1")) |
-        # # #     ((df["block"] == "convbnrelu1_1-res_block5") & (df['mcdo_passes'] == "1")) |
-        # # #     ((df["block"] == "convbnrelu1_1-pyramid_pooling") & (df['mcdo_passes'] == "1")) |
-        # # #     ((df["block"] == "convbnrelu1_1-cbr_final") & (df['mcdo_passes'] == "1")) |
-        # # #     ((df["block"] == "convbnrelu1_1-classification") & (df['mcdo_passes'] == "1")) |
-        # # #     ((df["block"] == "convbnrelu1_1-convbnrelu1_3") & (df['mcdo_passes'] == "5")) |
-        # # #     ((df["block"] == "convbnrelu1_1-res_block2") & (df['mcdo_passes'] == "5")) |
-        # # #     ((df["block"] == "convbnrelu1_1-res_block3") & (df['mcdo_passes'] == "5")) |
-        # # #     ((df["block"] == "convbnrelu1_1-res_block5") & (df['mcdo_passes'] == "5")) |
-        # # #     ((df["block"] == "convbnrelu1_1-pyramid_pooling") & (df['mcdo_passes'] == "5")) |
-        # # #     ((df["block"] == "convbnrelu1_1-cbr_final") & (df['mcdo_passes'] == "5")) |
-        # # #     ((df["block"] == "convbnrelu1_1-classification") & (df['mcdo_passes'] == "5")) 
-
-        # #     # (df["block"] == "convbnrelu1_1-convbnrelu1_3") | 
-        # #     # (df["block"] == "convbnrelu1_1-res_block2") |
-        #     # (df["block"] == "convbnrelu1_1-res_block3") |
-        # #     # (df["block"] == "convbnrelu1_1-res_block4") |
-        # #     # (df["block"] == "convbnrelu1_1-res_block5") |
-        # #     # (df["block"] == "convbnrelu1_1-pyramid_pooling") |
-        # #     # (df["block"] == "convbnrelu1_1-cbr_final") |
-        #     # (df["block"] == "convbnrelu1_1-classification") |      
+        ) | ( 
             (df['size'] == "")
-        ################
-
-
-        ###################
-        # Test Conditions #
-        ###################
-        # ) & (
-        #     (df['test'] == "train") | 
-        #     (df['test'] == "async\nfog\n000\nclear") | 
-        #     # (df['test'] == "fog_025") | 
-        #     # (df['test'] == "fog_050") | 
-        #     # (df['test'] == "fog_100") |
-        #     # (df['test'] == "fog_100__depth_noise_mag20") |
-        #     # (df['test'] == "fog_100__rgb_noise_mag20") |
-        #     (df['test'] == "combined")
-        ###################
 
         )]
-
-df.to_csv('out.csv',index=False)
 
 
 df = df.set_index(["test"])

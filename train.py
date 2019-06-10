@@ -401,7 +401,7 @@ def train(cfg, writer, logger, logdir):
 
                                 print(variance["d"])
                                 outputs = (mean["rgb"] * rgb_var) / (rgb_var + d_var) + (mean["d"] * d_var) / (
-                                            rgb_var + d_var)
+                                        rgb_var + d_var)
                             else:
                                 print("Fusion Type Not Supported")
 
@@ -489,16 +489,16 @@ def parseEightCameras(images, labels, aux, device):
                            aux[:, 1, :, :].unsqueeze(1),
                            aux[:, 2, :, :].unsqueeze(1)), 1)
 
-    # fused = torch.cat((images, aux), 1)
+    fused = torch.cat((images, aux), 1)
 
     rgb = torch.cat((images[:, 0, :, :].unsqueeze(1),
                      images[:, 1, :, :].unsqueeze(1),
                      images[:, 2, :, :].unsqueeze(1)), 1)
 
     inputs = {"rgb": rgb,
-              "d": depth, }
-    # "rgbd": fused,
-    # "fused": fused}
+              "d": depth,
+              "rgbd": fused,
+              "fused": fused}
 
     return inputs, labels
 
@@ -598,7 +598,7 @@ if __name__ == "__main__":
         "--config",
         nargs="?",
         type=str,
-        default="configs/BayesianSegnet/segnet_airsim_normal.yml",
+        default="configs/train/segnet_airsim_normal.yml",
         help="Configuration file to use",
     )
 

@@ -9,7 +9,7 @@ from ptsemseg.models.pspnet import *
 from ptsemseg.models.icnet import *
 from ptsemseg.models.linknet import *
 from ptsemseg.models.frrn import *
-
+from ptsemseg.models.fused_segnet import *
 def get_model(model_dict, 
               n_classes, 
               input_size=(512,512),
@@ -64,6 +64,26 @@ def get_model(model_dict,
         vgg16 = models.vgg16(pretrained=True)
         model.init_vgg16_params(vgg16)
 
+    elif name == "fused_segnet":
+        model = model(n_classes=n_classes,
+                      input_size=input_size,
+                      batch_size=batch_size,
+                      version=version,
+                      reduction=reduction,
+                      mcdo_passes=mcdo_passes,
+                      fixed_mcdo=fixed_mcdo,
+                      dropoutP=dropoutP,
+                      learned_uncertainty=learned_uncertainty,
+                      in_channels=in_channels,
+                      start_layer=start_layer,
+                      end_layer=end_layer,
+                      device=device,
+                      recalibrator=recalibrator,
+                      bins=bins,
+                      **param_dict)
+        vgg16 = models.vgg16(pretrained=True)
+        model.rgb_segnet.init_vgg16_params(vgg16)
+        model.d_segnet.init_vgg16_params(vgg16)
     elif name == "unet":
         model = model(n_classes=n_classes, **param_dict)
 
@@ -107,6 +127,7 @@ def _get_model_instance(name):
             "linknet": linknet,
             "frrnA": frrn,
             "frrnB": frrn,
+            "fused_segnet": fused_segnet
         }[name]
     except:
         raise("Model {} not available".format(name))

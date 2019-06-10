@@ -568,7 +568,7 @@ if __name__ == "__main__":
         "--config",
         nargs="?",
         type=str,
-        default="configs/train/rgbd_BayesianSegnet_0.5_T000.yml.yml",
+        default="configs/train/rgbd_BayesianSegnet_0.5_T000.yml",
         help="Configuration file to use",
     )
 

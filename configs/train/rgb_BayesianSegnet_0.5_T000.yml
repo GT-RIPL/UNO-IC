@@ -24,10 +24,11 @@ models:
     #     mcdo_backprop: False
     #     learned_uncertainty: "no"
     #     resume: None
+full_mcdo: False
 fusion: None #{None,SoftmaxMultiply}
 recal: None #{None,afterMcdo,beforeMcdo}
 recalibrator: None #{Histogram,Polynomial_X}
-temperatureScaling: False
+temperatureScaling: True
 bins: 1
 data:
     dataset: airsim

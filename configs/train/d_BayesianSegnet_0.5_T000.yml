@@ -24,10 +24,11 @@ models:
         fixed_mcdo: No # Yes: Fixed Masks per Pass; No: Randomized Masks per Pass
         dropoutP: 0.5 # Dropout Probability
         resume: None #models/BayesianSegnet/d_BayesianSegnet_0.5_T000/d_segnet_mcdo_airsim_best_model.pkl        
+full_mcdo: False #{True:AllLayersMCDO,False:BayesianSegnet}
 fusion: None #{None,SoftmaxMultiply}
 recal: None #{None,afterMcdo,beforeMcdo}
 recalibrator: None #{Histogram,Polynomial_X}
-temperatureScaling: True
+temperatureScaling: False
 bins: 1
 data:
     dataset: airsim

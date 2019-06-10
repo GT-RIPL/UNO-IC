@@ -15,6 +15,7 @@ class segnet_mcdo(nn.Module):
                  version=None,
                  mcdo_passes=1,
                  dropoutP=0.1,
+                 full_mcdo=False,
                  start_layer="down1",
                  end_layer="up1",
                  reduction=1.0,
@@ -31,6 +32,7 @@ class segnet_mcdo(nn.Module):
         self.n_classes = n_classes
         self.batch_size = batch_size
         self.dropoutP = dropoutP
+        self.full_mcdo = full_mcdo        
         self.device = device
 
         # Select Recalibrator
@@ -61,18 +63,37 @@ class segnet_mcdo(nn.Module):
         if self.temperatureScaling:
             self.temperature = torch.nn.Parameter(torch.ones(1))
 
-        self.layers = {
-            "down1": segnetDown2(self.in_channels, 64),
-            "down2": segnetDown2(64, 128),
-            "down3": segnetDown3MCDO(128, 256, pMCDO=dropoutP),
-            "down4": segnetDown3MCDO(256, 512, pMCDO=dropoutP),
-            "down5": segnetDown3MCDO(512, 512, pMCDO=dropoutP),
-            "up5": segnetUp3MCDO(512, 512, pMCDO=dropoutP),
-            "up4": segnetUp3MCDO(512, 256, pMCDO=dropoutP),
-            "up3": segnetUp3MCDO(256, 128, pMCDO=dropoutP),
-            "up2": segnetUp2(128, 64),
-            "up1": segnetUp2(64, n_classes),
-        }
+
+        if not self.full_mcdo:
+
+            self.layers = {
+                "down1": segnetDown2(self.in_channels, 64),
+                "down2": segnetDown2(64, 128),
+                "down3": segnetDown3MCDO(128, 256, pMCDO=dropoutP),
+                "down4": segnetDown3MCDO(256, 512, pMCDO=dropoutP),
+                "down5": segnetDown3MCDO(512, 512, pMCDO=dropoutP),
+                "up5": segnetUp3MCDO(512, 512, pMCDO=dropoutP),
+                "up4": segnetUp3MCDO(512, 256, pMCDO=dropoutP),
+                "up3": segnetUp3MCDO(256, 128, pMCDO=dropoutP),
+                "up2": segnetUp2(128, 64),
+                "up1": segnetUp2(64, n_classes),
+            }
+
+        else:
+
+            self.layers = {
+                "down1": segnetDown2MCDO(self.in_channels, 64, pMCDO=dropoutP),
+                "down2": segnetDown2MCDO(64, 128, pMCDO=dropoutP),
+                "down3": segnetDown3MCDO(128, 256, pMCDO=dropoutP),
+                "down4": segnetDown3MCDO(256, 512, pMCDO=dropoutP),
+                "down5": segnetDown3MCDO(512, 512, pMCDO=dropoutP),
+                "up5": segnetUp3MCDO(512, 512, pMCDO=dropoutP),
+                "up4": segnetUp3MCDO(512, 256, pMCDO=dropoutP),
+                "up3": segnetUp3MCDO(256, 128, pMCDO=dropoutP),
+                "up2": segnetUp2MCDO(128, 64, pMCDO=dropoutP),
+                "up1": segnetUp2MCDO(64, n_classes, pMCDO=dropoutP),
+            }
+
 
         self.softmaxMCDO = torch.nn.Softmax(dim=1)
 
@@ -127,8 +148,13 @@ class segnet_mcdo(nn.Module):
 
     def forward(self, inputs, mcdo=True):
 
-        down1, indices_1, unpool_shape1 = self.layers["down1"](inputs)
-        down2, indices_2, unpool_shape2 = self.layers["down2"](down1)
+        if self.full_mcdo:
+            down1, indices_1, unpool_shape1 = self.layers["down1"](inputs, MCDO=mcdo)
+            down2, indices_2, unpool_shape2 = self.layers["down2"](down1, MCDO=mcdo)
+        else:
+            down1, indices_1, unpool_shape1 = self.layers["down1"](inputs)
+            down2, indices_2, unpool_shape2 = self.layers["down2"](down1)
+
         down3, indices_3, unpool_shape3 = self.layers["down3"](down2, MCDO=mcdo)
         down4, indices_4, unpool_shape4 = self.layers["down4"](down3, MCDO=mcdo)
         down5, indices_5, unpool_shape5 = self.layers["down5"](down4, MCDO=mcdo)
@@ -136,8 +162,13 @@ class segnet_mcdo(nn.Module):
         up5 = self.layers["up5"](down5, indices_5, unpool_shape5, MCDO=mcdo)
         up4 = self.layers["up4"](up5, indices_4, unpool_shape4, MCDO=mcdo)
         up3 = self.layers["up3"](up4, indices_3, unpool_shape3, MCDO=mcdo)
-        up2 = self.layers["up2"](up3, indices_2, unpool_shape2)
-        up1 = self.layers["up1"](up2, indices_1, unpool_shape1)
+
+        if self.full_mcdo:
+            up2 = self.layers["up2"](up3, indices_2, unpool_shape2, MCDO=mcdo)
+            up1 = self.layers["up1"](up2, indices_1, unpool_shape1, MCDO=mcdo)
+        else:
+            up2 = self.layers["up2"](up3, indices_2, unpool_shape2)
+            up1 = self.layers["up1"](up2, indices_1, unpool_shape1)            
 
         if self.temperatureScaling:
             up1 = up1 / self.temperature

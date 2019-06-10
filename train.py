@@ -121,6 +121,11 @@ def train(cfg, writer, logger, logdir):
     # Setup Model
     for model, attr in cfg["models"].items():
 
+        if 'full_mcdo' in cfg.keys():
+            full_mcdo = cfg['full_mcdo']
+        else:
+            full_mcdo = False
+
         models[model] = get_model(cfg["model"],
                                   n_classes,
                                   input_size=(cfg['data']['img_rows'], cfg['data']['img_cols']),
@@ -131,6 +136,7 @@ def train(cfg, writer, logger, logdir):
                                   mcdo_passes=attr['mcdo_passes'],
                                   fixed_mcdo=(attr['fixed_mcdo'] == "Yes"),
                                   dropoutP=attr['dropoutP'],
+                                  full_mcdo=full_mcdo,
                                   reduction=attr['reduction'],
                                   device=device,
                                   recalibrator=cfg['recalibrator'],

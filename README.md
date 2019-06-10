@@ -1,6 +1,6 @@
 # pytorch-semseg (RIPL README)
 
-0. Download airsim dataset
+1. Download airsim dataset
 
 - currently stored on ripl-w3 (ripl@143.215.207.42)
   - /home/datasets/airsim_03-30-2019
@@ -9,16 +9,16 @@
 - symbolic link ./datasets/airsim_data_async to dataset (airsim_03-30-2019/airsim_data_async)
 - no trailing backslash in path variable
 - folder should contain subfolders of modalities: (depth, depth_encoded, pose, scene, segmentation)
-1. Install: follow original readme installation instructions
-2. Adjust configuration: configs/XXX.yml file
-3. Train:
+2. Install: follow original readme installation instructions
+3. Adjust configuration: configs/XXX.yml file
+4. Train:
 
 - General command: CUDA_VISIBLE_DEVICES=0 python train.py
 - To train RGB leg: CUDA_VISIBLE_DEVICES=0 python train.py --config configs/BayesianSegnet/rgb_BayesianSegnet_0.5_T000.yml
 - To train D leg: CUDA_VISIBLE_DEVICES=0 python train.py --config configs/BayesianSegnet/d_BayesianSegnet_0.5_T000.yml
 - To train/test SoftmaxFusion: CUDA_VISIBLE_DEVICES=0 python train.py --config configs/fusion/SoftmaxMult/base.yml
 
-4. Tensorboard progress monitor: run tensorboard from within the "runs" directory
+5. Tensorboard progress monitor: run tensorboard from within the "runs" directory
 
 - How to read?
 - Set pagination limit in tensorboard to match number of plots for a given split
@@ -26,14 +26,15 @@
 - Second scrollable page shows accuracies
 - Title of plots describes the validation split (i.e. async_fog_000_clear_...)
 
-5. Compare final results: ./analysis.py
+6. Compare final results: `python analysis.py --include [...] --match [...]`
 
--TODO
+- `--include` will plot results for any directory path with the strings provided
+- `--match` will plot results for directory ID's that exactly match one of the strings provided
 
 Notable Things:
-- configuration files are stored in ./configs directory
-- tensorboard files, checkpoint weights, log files, and corresponding run config files are stored in ./runs directory
-- almost all code is contained in train.py, ./ptsemseg/models/{semseg_mcdo.py,recalibrator.py} files
+- Configuration files are stored in ./configs directory
+- Tensorboard files, checkpoint weights, log files, and corresponding run config files are stored in ./runs directory
+- Almost all code is contained in train.py, ./ptsemseg/models/{semseg_mcdo.py,recalibrator.py} files
 
 
 Fusion Specific Configuration File:
@@ -164,15 +165,20 @@ This repository aims at mirroring popular semantic segmentation architectures in
 
 ### Requirements
 
-* pytorch >=0.4.0
-* torchvision ==0.2.0
+* pytorch >= 0.4.1
+* torchvision == 0.2.0
 * scipy
 * tqdm
 * tensorboardX
 
-#### One-line installation
+#### Two-line installation
     
-`pip install -r requirements.txt`
+`conda install --file requirements.txt`
+
+and
+
+`pip install tensorboardX`
+
 
 ### Data
 

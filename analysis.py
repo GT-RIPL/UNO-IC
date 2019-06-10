@@ -8,13 +8,16 @@ import numpy as np
 import pandas as pd
 import yaml
 import os
+import argparse
 
+parser = argparse.ArgumentParser()
+parser.add_argument('--include', action='append', nargs='+')
+parser.add_argument('--match', action='append', nargs='+')
+args = parser.parse_args()
+include = args.include[0] if args.include else []
+match = args.match[0] if args.match else []
 
-include = [
-           'tempScal',
-           'base/rgbd_BayesianSegnet_SoftmaxMult'
-           ]
-
+print(include, match)
 runs = {}
 for i,file in enumerate(glob.glob("./runs/**/**/*tfevents*",recursive=True)):
 
@@ -31,7 +34,7 @@ for i,file in enumerate(glob.glob("./runs/**/**/*tfevents*",recursive=True)):
     with open(yaml_file,"r") as f:
         configs = yaml.load(f, Loader=yaml.FullLoader)
 
-    if not any([i in directory and '(' not in directory for i in include]):
+    if not any([i in directory for i in include] + [m == directory.split("/")[-1] for m in match]):
         continue
         
     name = configs['id']

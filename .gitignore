@@ -107,4 +107,6 @@ ENV/
 .ropeproject
 
 runs
+*.csv
+*.png
 #models

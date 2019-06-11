@@ -307,7 +307,7 @@ def train(cfg, writer, logger, logdir):
 
                         models[m].module.showCalibration(output_all, labels_all, logdir, m, i)
 
-                    """
+                    
                     # plot mean/variances of predictions of (un)calibrated models
                     with torch.no_grad():
                         for i_recal, (images_list, labels_list, aux_list) in tqdm(enumerate(recalloader)):
@@ -342,7 +342,7 @@ def train(cfg, writer, logger, logdir):
                                                inputs, post_pred, gt)
 
                                 torch.cuda.empty_cache()
-                    """
+                    
                 #################################################################################
 
                 [models[m].eval() for m in models.keys()]
@@ -374,7 +374,10 @@ def train(cfg, writer, logger, logdir):
                             val_loss = {}
 
                             for m in cfg["models"].keys():
-                                output_bp[m], mean[m], variance[m] = models[m](images_val[m], cfg["recal"])
+                                if cfg["recal"] != "None":
+                                    output_bp[m], mean[m], variance[m] = models[m](images_val[m], cfg["recal"])
+                                else:
+                                    output_bp[m], mean[m], variance[m] = models[m](images_val[m])
                                 val_loss[m] = loss_fn(input=mean[m], target=labels_val)
 
                             # Fusion Type

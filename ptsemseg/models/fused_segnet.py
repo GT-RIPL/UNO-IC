@@ -14,10 +14,12 @@ class fused_segnet(nn.Module):
 
         self.gatedFusion = GatedFusion(n_classes)
 
-    def forward(self, inputs_rgb, inputs_d):
+    def forward(self, inputs):
+        inputs_rgb = inputs[:, :3, :, :]
+        inputs_d = inputs[:, 3:, :, :]
         rgb = self.rgb_segnet(inputs_rgb)
         d = self.d_segnet(inputs_d)
 
         x = self.gatedFusion(rgb, d)
 
-        return x
+        return x, x, 0

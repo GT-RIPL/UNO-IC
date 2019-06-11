@@ -6,7 +6,7 @@ from ptsemseg.models.recalibrator import *
 from ptsemseg.models.segnet_mcdo import *
 
 
-class fused_segnet(nn.Module):
+class fused_segnet_mcdo(nn.Module):
     def __init__(self,
                  n_classes=21,
                  in_channels=3,
@@ -39,6 +39,7 @@ class fused_segnet(nn.Module):
     def forward(self, inputs):
         inputs_rgb = inputs[:, :3, :, :]
         inputs_d = inputs[:, 3:, :, :]
+        
         # TODO figure out how to backpropagate the mean of mcdo passes
         rgb_bp, mean_rgb, var_rgb = self.rgb_segnet(inputs_rgb)
         d_bp, mean_d, var_d = self.d_segnet(inputs_d)

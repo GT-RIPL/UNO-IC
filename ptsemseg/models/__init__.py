@@ -63,13 +63,13 @@ def get_model(model_dict,
                       **param_dict)
         vgg16 = models.vgg16(pretrained=True)
         model.init_vgg16_params(vgg16)
-
-    elif name == "fused_segnet":
-        model = model(n_classes=n_classes,
+        
+    elif name == "fused_segnet_mcdo":
+        model = model(n_classes=n_classes, 
                       input_size=input_size,
                       batch_size=batch_size,
-                      version=version,
-                      reduction=reduction,
+                      version=version, 
+                      reduction=reduction, 
                       mcdo_passes=mcdo_passes,
                       fixed_mcdo=fixed_mcdo,
                       dropoutP=dropoutP,
@@ -80,6 +80,13 @@ def get_model(model_dict,
                       device=device,
                       recalibrator=recalibrator,
                       bins=bins,
+                      **param_dict)
+        vgg16 = models.vgg16(pretrained=True)
+        model.rgb_segnet.init_vgg16_params(vgg16)
+        model.d_segnet.init_vgg16_params(vgg16)
+
+    elif name == "fused_segnet":
+        model = model(n_classes=n_classes,
                       **param_dict)
         vgg16 = models.vgg16(pretrained=True)
         model.rgb_segnet.init_vgg16_params(vgg16)

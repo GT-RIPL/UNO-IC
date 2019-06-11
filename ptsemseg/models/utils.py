@@ -1031,17 +1031,19 @@ class GatedFusion(nn.Module):
             stride=1,
             padding=0,
             bias=False,
-            dilation=0
+            dilation=1
         )
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, rgb, d):
-        fusion = torch.cat([rgb, d], dim=0)
+
+        fusion = torch.cat([rgb, d], dim=1)
+
         G = self.conv(fusion)
         G = self.sigmoid(G)
 
         G_rgb = G
-        G_d = torch.ones(G.shape) - G
+        G_d = torch.ones(G.shape, dtype=torch.float, device=G.device) - G
 
         P_rgb = rgb * G_rgb
         P_d = d * G_d

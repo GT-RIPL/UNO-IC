@@ -1,6 +1,6 @@
 id: GatedFusionSegnet_T000
 model:
-    arch: gated_fusion
+    arch: fused_segnet
 models:
     rgbd:
         in_channels: 3
@@ -42,10 +42,10 @@ data:
 training:
     train_iters: 100000
     batch_size: 2
-    val_interval: 50000
+    val_interval: 5000
     n_workers: 8
-    print_interval: 1000
-    png_frames: 5000
+    print_interval: 50
+    png_frames: 50
     optimizer:
         name: 'adam'
         lr: 1.0e-5

@@ -309,21 +309,7 @@ class segnet_mcdo(nn.Module):
         if self.recalibrator == "TemperatureScaling":
             x_bp = x_bp / self.temperature
             x = x / self.temperature
-        """
-        points = ((0,50,50), (0,100,100))
-        # plot the distribution of passes
-        for n, i, j in points:
-            fig, axes = plt.subplots(3, self.n_classes // 3 + 1)
-            for c in range(self.n_classes):
-                xx = x[n, c, i, j, :]
-                axes[(c + 1) // (self.n_classes // 3 + 1), (c + 1) % (self.n_classes // 3 + 1)].hist(xx)
-                axes[(c + 1) // (self.n_classes // 3 + 1), (c + 1) % (self.n_classes // 3 + 1)].set_title("Class: {}".format(c))
-                del xx
-
-            plt.tight_layout()
-            plt.savefig("./{}_{}x{}.png".format(n, i, j))
-            plt.close(fig)
-        """
+            
         # Uncalibrated Softmax Mean and Variance
         mean = torch.nn.Softmax(1)(x).mean(-1)
         variance = torch.nn.Softmax(1)(x).std(-1)

@@ -32,7 +32,7 @@ class segnet_mcdo(nn.Module):
         self.n_classes = n_classes
         self.batch_size = batch_size
         self.dropoutP = dropoutP
-        self.full_mcdo = full_mcdo        
+        self.full_mcdo = full_mcdo
         self.device = device
 
         # Select Recalibrator
@@ -62,7 +62,6 @@ class segnet_mcdo(nn.Module):
 
         if self.temperatureScaling:
             self.temperature = torch.nn.Parameter(torch.ones(1))
-
 
         if not self.full_mcdo:
 
@@ -94,9 +93,7 @@ class segnet_mcdo(nn.Module):
                 "up1": segnetUp2MCDO(64, n_classes, pMCDO=dropoutP),
             }
 
-
         self.softmaxMCDO = torch.nn.Softmax(dim=1)
-
 
         for k, v in self.layers.items():
             setattr(self, k, v)
@@ -168,22 +165,24 @@ class segnet_mcdo(nn.Module):
             up1 = self.layers["up1"](up2, indices_1, unpool_shape1, MCDO=mcdo)
         else:
             up2 = self.layers["up2"](up3, indices_2, unpool_shape2)
-            up1 = self.layers["up1"](up2, indices_1, unpool_shape1)            
+            up1 = self.layers["up1"](up2, indices_1, unpool_shape1)
 
         if self.temperatureScaling:
             up1 = up1 / self.temperature
 
         return up1
 
-    def forwardMCDO(self, inputs, recalType="None"):
-        # First pass has backpropagation; others do not
-        with torch.no_grad():
-            for i in range(self.mcdo_passes):
-                if i == 0:
-                    x_bp = self.forward(inputs)
-                    x = x_bp.unsqueeze(-1)
-                else:
-                    x = torch.cat((x, self.forward(inputs).unsqueeze(-1)), -1)
+    def forwardMCDO(self, inputs, recalType="None", backprop=False):
+        
+        if not backprop:
+            torch.set_grad_enabled(False)
+
+        for i in range(self.mcdo_passes):
+            if i == 0:
+                x_bp = self.forward(inputs)
+                x = x_bp.unsqueeze(-1)
+            else:
+                x = torch.cat((x, self.forward(inputs).unsqueeze(-1)), -1)
 
         """
         points = ((0,50,50), (0,100,100))
@@ -202,10 +201,9 @@ class segnet_mcdo(nn.Module):
         """
 
         # Uncalibrated Softmax Mean and Variance
-        mean = self.softmaxMCDO(x).mean(-1)
-        variance = self.softmaxMCDO(x).std(-1)
-
         if self.recalibrator != "None":
+            mean = self.softmaxMCDO(x).mean(-1)
+            variance = self.softmaxMCDO(x).std(-1)
             if recalType == "beforeMCDO":
                 for c in range(self.n_classes):
                     x[:, c, :, :, :] = self.calibrationPerClass[c].predict(x[:, c, :, :, :].reshape(-1)).reshape(
@@ -216,7 +214,11 @@ class segnet_mcdo(nn.Module):
                 for c in range(self.n_classes):
                     mean[:, c, :, :] = self.calibrationPerClass[c].predict(mean[:, c, :, :].reshape(-1)).reshape(
                         mean[:, c, :, :].shape)
+        else:
+            mean = x.mean(-1)
+            variance = x.std(-1)
 
+        torch.set_grad_enabled(True)
         return mean, variance
 
     def applyCalibration(self, output):

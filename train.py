@@ -31,7 +31,7 @@ from scipy.misc import imsave
 from functools import partial
 
 import matplotlib.pyplot as plt
-
+from collections import defaultdict
 
 def train(cfg, writer, logger, logdir):
     # Setup seeds
@@ -121,6 +121,11 @@ def train(cfg, writer, logger, logdir):
     # Setup Model
     for model, attr in cfg["models"].items():
 
+        if 'full_mcdo' in cfg.keys():
+            full_mcdo = cfg['full_mcdo']
+        else:
+            full_mcdo = False
+
         models[model] = get_model(cfg["model"],
                                   n_classes,
                                   input_size=(cfg['data']['img_rows'], cfg['data']['img_cols']),
@@ -131,9 +136,11 @@ def train(cfg, writer, logger, logdir):
                                   mcdo_passes=attr['mcdo_passes'],
                                   fixed_mcdo=(attr['fixed_mcdo'] == "Yes"),
                                   dropoutP=attr['dropoutP'],
+                                  full_mcdo=full_mcdo,
                                   reduction=attr['reduction'],
                                   device=device,
-                                  recalibrator=cfg["recalibrator"],
+                                  recalibrator=cfg['recalibrator'],
+                                  temperatureScaling=cfg['temperatureScaling'],
                                   bins=cfg["bins"]).to(device)
 
         if "caffemodel" in attr['resume']:
@@ -152,7 +159,6 @@ def train(cfg, writer, logger, logdir):
         schedulers[model] = get_scheduler(optimizers[model], cfg['training']['lr_schedule'])
 
         loss_fn = get_loss_function(cfg)
-        # loss_sig = # Loss Function for Aleatoric Uncertainty
         logger.info("Using loss {}".format(loss_fn))
 
         # Load pretrained weights
@@ -182,12 +188,12 @@ def train(cfg, writer, logger, logdir):
                 models[model].load_state_dict(pretrained_dict)
 
                 if attr['resume'] == 'same_yaml':
-                    # models[model].load_state_dict(checkpoint["model_state"])
+
                     optimizers[model].load_state_dict(checkpoint["optimizer_state"])
                     schedulers[model].load_state_dict(checkpoint["scheduler_state"])
                     start_iter = checkpoint["epoch"]
                 else:
-                    start_iter = checkpoint["epoch"]  # 0
+                    start_iter = checkpoint["epoch"]
 
                 # start_iter = 0
                 logger.info("Loaded checkpoint '{}' (iter {})".format(model_pkl, checkpoint["epoch"]))
@@ -196,86 +202,66 @@ def train(cfg, writer, logger, logdir):
 
     best_iou = -100.0
     i = start_iter
-    flag = True
+    print(i)
 
-    while i <= cfg["training"]["train_iters"] and flag:
+    while i <= cfg["training"]["train_iters"]:
 
-        print(i, cfg["training"]["train_iters"])
-        #################################################################################
-        # Training
-        #################################################################################
-        print("=" * 10, "TRAINING,RECALIBRATING,VALIDATING", "=" * 10)
+        print("=" * 10, "TRAINING", "=" * 10)
         for (images_list, labels_list, aux_list) in trainloader:
-
-            inputs, labels = parseEightCameras(images_list, labels_list, aux_list, device)
-
-            # Read batch from only one camera
-            bs = cfg['training']['batch_size']
-            images = {m: inputs[m][:bs, :, :, :] for m in cfg["models"].keys()}
-            # images = torch.cat((inputs["rgb"][:bs,:,:,:],inputs["d"][:bs,:,:,:]),1)
-            labels = labels[:bs, :, :]
-
-            if labels.shape[0] <= 1:
-                continue
-
             i += 1
-            start_ts = time.time()
-
-            [schedulers[m].step() for m in schedulers.keys()]
-            [models[m].train() for m in models.keys()]
-            [optimizers[m].zero_grad() for m in optimizers.keys()]
-
-            # Run Models
-            mean = {}
-            variance = {}
-            outputs = {}
-            loss = {}
-            for m in cfg["models"].keys():
-                # m = list(cfg["models"].keys())[0]
-                outputs[m], mean[m], variance[m] = models[m](images[m])
-
-                # pred = outputs[m].data.max(1)[1].cpu().numpy()
-                # gt = labels.data.cpu().numpy()
-                # plotPrediction(logdir,cfg,n_classes,i,i,"train",inputs,pred,gt)
-                # exit()
-
-                loss[m] = loss_fn(input=outputs[m], target=labels)
-                loss[m].backward()
-                optimizers[m].step()
-
-            # outputs = models[m](images)
-            # loss = loss_fn(input=outputs, target=labels)
-            # loss.backward()
-            # [optimizers[m].step() for m in optimizers.keys()]
-
-            time_meter.update(time.time() - start_ts)
-            if (i + 1) % cfg['training']['print_interval'] == 0:
-                for m in cfg["models"].keys():
-                    fmt_str = "Iter [{:d}/{:d}]  Loss {}: {:.4f}  Time/Image: {:.4f}"
-                    print_str = fmt_str.format(i + 1,
-                                               cfg['training']['train_iters'],
-                                               m,
-                                               loss[m].item(),
-                                               time_meter.avg / cfg['training']['batch_size'])
-
-                    print(print_str)
-                    logger.info(print_str)
-                    writer.add_scalar('loss/train_loss/' + m, loss[m].item(), i + 1)
-                    # writer.add_scalar('loss/train_CE_loss', CE_loss.item(), i+1)
-                    # writer.add_scalar('loss/train_REG_loss', REG_loss, i+1)
-                time_meter.reset()
             #################################################################################
+            # Training
+            #################################################################################
+            if i < cfg["training"]["train_iters"]:
+                inputs, labels = parseEightCameras(images_list, labels_list, aux_list, device)
 
-            # Validation
-            if (i + 1) % cfg["training"]["val_interval"] == 0 or (i + 1) >= cfg["training"]["train_iters"]:
+                # Read batch from only one camera
+                bs = cfg['training']['batch_size']
+                images = {m: inputs[m][:bs, :, :, :] for m in cfg["models"].keys()}
+                labels = labels[:bs, :, :]
+
+                if labels.shape[0] <= 1:
+                    continue
+
+                start_ts = time.time()
+
+                [schedulers[m].step() for m in schedulers.keys()]
+                [models[m].train() for m in models.keys()]
+                [optimizers[m].zero_grad() for m in optimizers.keys()]
+
+                # Run Models
+                outputs = {}
+                loss = {}
+                for m in cfg["models"].keys():
+                    outputs[m] = models[m](images[m])
+
+                    loss[m] = loss_fn(input=outputs[m], target=labels)
+                    loss[m].backward()
+                    optimizers[m].step()
+
+                time_meter.update(time.time() - start_ts)
+                if (i + 1) % cfg['training']['print_interval'] == 0:
+                    for m in cfg["models"].keys():
+                        fmt_str = "Iter [{:d}/{:d}]  Loss {}: {:.4f}  Time/Image: {:.4f}"
+                        print_str = fmt_str.format(i + 1,
+                                                   cfg['training']['train_iters'],
+                                                   m,
+                                                   loss[m].item(),
+                                                   time_meter.avg / cfg['training']['batch_size'])
+
+                        print(print_str)
+                        logger.info(print_str)
+                        writer.add_scalar('loss/train_loss/' + m, loss[m].item(), i + 1)
+                    time_meter.reset()
+
+            if i % cfg["training"]["val_interval"] == 0 or i >= cfg["training"]["train_iters"]:
 
                 [models[m].eval() for m in models.keys()]
 
                 #################################################################################
                 # Recalibration
                 #################################################################################
-
-                if cfg["recal"] != "None" or cfg["recalibrator"] == "TemperatureScaling":
+                if cfg["recal"] != "None":
                     print("=" * 10, "RECALIBRATING", "=" * 10)
 
                     for m in cfg["models"].keys():
@@ -295,7 +281,7 @@ def train(cfg, writer, logger, logdir):
                                 labels_recal = labels[:bs, :, :]
 
                                 # Run Models
-                                outputs, mean, variance = models[m](images_recal)
+                                mean, variance = models[m].module.forwardMCDO(images_recal)
 
                                 # concat results
                                 output_all[bs * i_recal:bs * (i_recal + 1), :, :, :] = mean
@@ -304,10 +290,8 @@ def train(cfg, writer, logger, logdir):
                         # fit calibration models
                         for c in range(n_classes):
                             models[m].module.calibrationPerClass[c].fit(output_all, labels_all)
-
                         models[m].module.showCalibration(output_all, labels_all, logdir, m, i)
 
-                    
                     # plot mean/variances of predictions of (un)calibrated models
                     with torch.no_grad():
                         for i_recal, (images_list, labels_list, aux_list) in tqdm(enumerate(recalloader)):
@@ -344,10 +328,6 @@ def train(cfg, writer, logger, logdir):
                                 torch.cuda.empty_cache()
                     
                 #################################################################################
-
-                [models[m].eval() for m in models.keys()]
-
-                #################################################################################
                 # Validation
                 #################################################################################
                 print("=" * 10, "VALIDATING", "=" * 10)
@@ -360,28 +340,21 @@ def train(cfg, writer, logger, logdir):
                             # Read batch from only one camera
                             bs = cfg['training']['batch_size']
                             images_val = {m: inputs[m][:bs, :, :, :] for m in cfg["models"].keys()}
-                            # images_val = inputs[m][:bs,:,:,:]                                          
-                            # images_val = torch.cat((inputs["rgb"][:bs,:,:,:],inputs["d"][:bs,:,:,:]),1)                            
                             labels_val = labels[:bs, :, :]
 
                             if labels_val.shape[0] <= 1:
                                 continue
 
                             # Run Models
-                            output_bp = {}
                             mean = {}
                             variance = {}
                             val_loss = {}
 
                             for m in cfg["models"].keys():
-                                if cfg["recal"] != "None":
-                                    output_bp[m], mean[m], variance[m] = models[m](images_val[m], cfg["recal"])
-                                else:
-                                    output_bp[m], mean[m], variance[m] = models[m](images_val[m])
+                                mean[m], variance[m] = models[m].module.forwardMCDO(images_val[m], cfg["recal"])
                                 val_loss[m] = loss_fn(input=mean[m], target=labels_val)
 
                             # Fusion Type
-
                             if cfg["fusion"] == "None":
                                 outputs = mean[list(cfg["models"].keys())[0]]
                             elif cfg["fusion"] == "SoftmaxMultiply":
@@ -403,37 +376,34 @@ def train(cfg, writer, logger, logdir):
                                 exit()
 
                                 print(variance["d"])
-                                outputs = (mean["rgb"] * rgb_var) / (rgb_var + d_var) + (mean["d"] * d_var) / (
-                                        rgb_var + d_var)
+                                outputs = (mean["rgb"] * rgb_var) / (rgb_var + d_var) + \
+                                          (mean["d"] * d_var) / (rgb_var + d_var)
                             else:
                                 print("Fusion Type Not Supported")
 
                             # plot ground truth vs mean/variance of outputs
-
                             pred = outputs.argmax(1).cpu().numpy()
                             gt = labels_val.data.cpu().numpy()
 
                             if i_val % cfg["training"]["png_frames"] == 0:
                                 plotPrediction(logdir, cfg, n_classes, i, i_val, k, inputs, pred, gt)
+                                for m in cfg["models"].keys():
+                                    plotMeansVariances(logdir, cfg, n_classes, i, i_val, m, k + "/" + m, inputs,
+                                                       pred, gt, mean[m], variance[m])
 
                             running_metrics_val[k].update(gt, pred)
 
                             for m in cfg["models"].keys():
                                 val_loss_meter[m][k].update(val_loss[m].item())
-                                # val_CE_loss_meter[k].update(CE_loss.item())
-                                # val_REG_loss_meter[k].update(REG_loss)
 
                     for m in cfg["models"].keys():
                         for k in valloaders.keys():
                             writer.add_scalar('loss/val_loss/{}/{}'.format(m, k), val_loss_meter[m][k].avg, i + 1)
-                            # writer.add_scalar('loss/val_CE_loss/{}'.format(k), val_CE_loss_meter[k].avg, i+1)
-                            # writer.add_scalar('loss/val_REG_loss/{}'.format(k), val_REG_loss_meter[k].avg, i+1)
                             logger.info("%s %s Iter %d Loss: %.4f" % (m, k, i + 1, val_loss_meter[m][k].avg))
 
                 for env, valloader in valloaders.items():
                     score, class_iou = running_metrics_val[env].get_scores()
                     for k, v in score.items():
-                        print(k, v)
                         logger.info('{}: {}'.format(k, v))
                         writer.add_scalar('val_metrics/{}/{}'.format(env, k), v, i + 1)
 
@@ -454,7 +424,7 @@ def train(cfg, writer, logger, logdir):
                     if score["Mean IoU : \t"] >= best_iou:
                         best_iou = score["Mean IoU : \t"]
                         state = {
-                            "epoch": i + 1,
+                            "epoch": i,
                             "model_state": model.state_dict(),
                             "optimizer_state": optimizer.state_dict(),
                             "scheduler_state": scheduler.state_dict(),
@@ -466,13 +436,9 @@ def train(cfg, writer, logger, logdir):
                                                      cfg['model']['arch'],
                                                      cfg['data']['dataset']))
                         torch.save(state, save_path)
-
-                # if cfg["recal"]!="None":
-                #   exit()
-            if (i + 1) >= cfg["training"]["train_iters"]:
-                flag = False
+            
+            if i >= cfg["training"]["train_iters"]:
                 break
-
 
 def parseEightCameras(images, labels, aux, device):
     # Stack 8 Cameras into 1 for MCDO Dataset Testing
@@ -559,12 +525,12 @@ def plotPrediction(logdir, cfg, n_classes, i, i_val, k, inputs, pred, gt):
     path = "{}/{}".format(logdir, k)
     if not os.path.exists(path):
         os.makedirs(path)
+    plt.tight_layout()
     plt.savefig("{}/{}_{}.png".format(path, i_val, i))
     plt.close(fig)
 
 
 def plotMeansVariances(logdir, cfg, n_classes, i, i_val, m, k, inputs, pred, gt, mean, variance):
-    # n_classes = int(mean.shape[1])
 
     fig, axes = plt.subplots(4, n_classes // 2 + 1)
     [axi.set_axis_off() for axi in axes.ravel()]
@@ -591,6 +557,7 @@ def plotMeansVariances(logdir, cfg, n_classes, i, i_val, m, k, inputs, pred, gt,
     path = "{}/{}/{}/{}".format(logdir, "meanvar", m, k)
     if not os.path.exists(path):
         os.makedirs(path)
+    plt.tight_layout()
     plt.savefig("{}/{}_{}.png".format(path, i_val, i))
     plt.close(fig)
 
@@ -601,15 +568,15 @@ if __name__ == "__main__":
         "--config",
         nargs="?",
         type=str,
-        default="configs/train/segnet_airsim_normal.yml",
+        default="configs/train/rgbd_BayesianSegnet_0.5_T000.yml",
         help="Configuration file to use",
     )
 
     args = parser.parse_args()
 
+    # cfg is a  with two-level dictionary ['training','data','model']['batch_size']
     with open(args.config) as fp:
-        cfg = yaml.load(fp)
-        # cfg is a  with two-level dictionary ['training','data','model']['batch_size']
+        cfg = defaultdict(lambda: None, yaml.load(fp))
 
     run_id = cfg["id"]
     logdir = os.path.join("runs", os.path.basename(args.config)[:-4], str(run_id))

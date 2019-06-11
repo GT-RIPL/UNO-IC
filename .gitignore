@@ -1,3 +1,6 @@
+# Dataset Directory
+/datasets/airsim_data_async
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -12,6 +15,7 @@ video_test*.py
 *.swp
 data
 ckpt
+/models/
 
 # C extensions
 *.so
@@ -103,4 +107,6 @@ ENV/
 .ropeproject
 
 runs
+*.csv
+*.png
 #models

@@ -1,5 +1,7 @@
 import matplotlib
-matplotlib.use('TkAgg')
+# matplotlib.use('TkAgg')
+matplotlib.use('Agg')
+
 
 import tensorflow as tf
 import glob
@@ -10,184 +12,18 @@ import yaml
 import os
 
 include = [
-           # 'run1',
-           # 'run2',
-           # 'run3',
-           # 'run4',
-           'run5',
-           # 'run6',
-           # 'run7',
-           # 'run8',
-           # 'run9',
-           # 'run10',
-           # "run11",
-           # "run12",
-           # "run13",
-           "run14",
-           "run15",
+           "redo0",
            ]
 
 run_comments = {
-    "run1": {
+    "redo0": {
         "names": [
-            ("83811","RGB Only (No Dropout)"),
+            ("rgb_BayesianSegnet_0.5_NoTScale_T000_BS4_02","RGB Only (without Temperature Scaling)"),
+            ("d_BayesianSegnet_0.5_TScale_T000_BS4_02","D Only (with Temperature Scaling)"),
         ],
         "text":
-            """initial test on RGB only; no dropout; batch size 2""",
-    },
-    "run2": {
-        "names": [
-            ("rgb_dropout_between_layers_0.1",None),
-            ("rgb_dropout_between_layers_0.3",None),
-            ("rgb_dropout_between_layers_0.5",None),
-            ("rgb_dropout_between_layers_0.9",None),
-        ],
-        "text":
-            """testing for best dropout performance (0.1,0.3,0.5,0.9); dropout after each block; batch size 2""",
-    },
-    "run3": {
-        "names": [
-            ("rgb_baseline_0.1dropout_extensiveDropout",None),
-            ("rgb_baseline_0.5dropout_extensiveDropout",None),
-            ("d_baseline_0.1dropout_extensiveDropout",None),
-            ("d_baseline_0.5dropout_extensiveDropout",None),            
-        ],
-        "text":
-            """testing for best dropout performance (0.1,0.3,0.5,0.9); dropout after each convolutional layer; batch size 2""",
-    },    
-    "run4": {
-        "names": [
-            # ("d_BayesianSegnet_0.1","Depth Only (Bayesian Segnet, p = 0.1)"),
-            # ("rgb_BayesianSegnet_0.1","RGB Only (Bayesian Segnet, p = 0.1)"),
-            ("d_BayesianSegnet_0.5","Depth Only (Bayesian Segnet, p = 0.5)"),
-            ("rgb_BayesianSegnet_0.5","RGB Only (Bayesian Segnet, p = 0.5)"),
-        ],
-        "text":
-            """following architecture from BayesSegnet paper""",
-    },
-    "run5": {
-        "names": [
-            ("outputFusion_calibratedSoftmaxMultiply",   "[Train on 000, Recal on 000] RGB x D Hist"),
-            ("outputFusion_uncalibratedSoftmaxMultiply", "[Train on 000, No Recal] RGB x D Hist"),
-            # ("outputFusion_uncalibratedSoftmaxDonly",    "[Train on 000, No Recal] D"),
-            # ("outputFusion_uncalibratedSoftmaxRGBonly",  "[Train on 000, No Recal] RGB"),
-        ],
-        "text":
-            """calibrated softmaxes before adding values for fusion""",            
-    },
-    "run6": {
-        "names": [
-            ("outputFusion_calibratedSoftmaxMultiply_recalibrateOn050",            "[Train on 000, Recal on 050] RGB x D"),
-            ("outputFusion_calibratedSoftmaxMultiply_recalibrateOn100",            "[Train on 000, Recal on 100] RGB x D"),
-            # ("outputFusion_calibratedSoftmaxMultiply_recalibrateOn100DBlackout",   "[Train on 000, Recal on 100 / No D] RGB x D"),
-            # ("outputFusion_calibratedSoftmaxMultiply_recalibrateOn100RGBBlackout", "[Train on 000, Recal on 100 / No RGB] RGB x D"),
-            # ("outputFusion_calibratedSoftmaxMultiply_recalibrateOnAllSplit",       "[Train on 000, Recal on All] RGB x D"),            
-        ],
-        "text":
-            """recalibrating on testing distribution""",            
-    },
-    "run7": {
-        "names": [
-            ("inputFusion_baseline", "[Train on 000, No Recal] RGBD Input Fusion"),
-        ],
-        "text":
-            """input fusion baseline""",            
-    },    
-    "run8": {
-        "names": [
-            ("outputFusion_FusionSoftmaxMultiply_Train000_Recal000", ".(p=0.5) [Train on 000, Recal on 000] RGB x D"),
-            ("outputFusion_FusionSoftmaxMultiply_Train000_Recal100", ".(p=0.5) [Train on 000, Recal on 100] RGB x D"),
-        ],
-        "text":
-            """refactored code check""",            
-    },    
-    "run9": {
-        "names": [
-            ("outputFusion_BayesianSegnet_0.5_T100_R000","[Train on 100, Recal on 000] RGB x D"),
-            ("outputFusion_BayesianSegnet_0.5_T100_R050","[Train on 100, Recal on 050] RGB x D"),
-            ("outputFusion_BayesianSegnet_0.5_T100_R100","[Train on 100, Recal on 100] RGB x D"),
-            ("outputFusion_BayesianSegnet_0.5_T050_R000","[Train on 050, Recal on 000] RGB x D"),
-            ("outputFusion_BayesianSegnet_0.5_T050_R050","[Train on 050, Recal on 050] RGB x D"),
-            ("outputFusion_BayesianSegnet_0.5_T050_R100","[Train on 050, Recal on 100] RGB x D"),            
-        ],
-        "text":
-            """train on 050,100pct fog levels""",
-    },    
-    "run10": {
-        "names": [
-            ("outputFusion_BayesianSegnet_0.5_Before6MCDO_T000_R000","(p=0.5) [Train on 000, Sample Recal on 000] RGB x D MCDO Recal"),
-            # ("outputFusion_BayesianSegnet_0.5_Before6MCDO_T000_R000.050.100","(p=0.5) [Train on 000, Sample Recal on 000,050,100] RGB x D MCDO Recal"),
-            # ("outputFusion_BayesianSegnet_0.5_Before6MCDO_T000_R050","(p=0.5) [Train on 000, Sample Recal on 050] RGB x D MCDO Recal"),
-            ("outputFusion_BayesianSegnet_0.5_Before6MCDO_T000_R100","(p=0.5) [Train on 000, Sample Recal on 100] RGB x D MCDO Recal"),
-        ],
-        "text":
-            """recalibrating 50pct dropout before mean var calculations""",
-    },     
-    "run11": {
-        "names": [
-            ("outputFusion_BayesianSegnet_0.1_After6MCDO_T000_R000",".(p=0.1) [Train on 000, Sample Recal on 000] RGB x D"),
-            ("outputFusion_BayesianSegnet_0.1_After6MCDO_T000_R100",".(p=0.1) [Train on 000, Sample Recal on 100] RGB x D"),
-            ("outputFusion_BayesianSegnet_0.1_Before6MCDO_T000_R000","(p=0.1) [Train on 000, Sample Recal on 000] RGB x D MCDO Recal"),
-            ("outputFusion_BayesianSegnet_0.1_Before6MCDO_T000_R100","(p=0.1) [Train on 000, Sample Recal on 100] RGB x D MCDO Recal"),            
-        ],
-        "text":
-            """trying recalibrating 10pct dropout before/after mean var calculations""",
-    },        
-    "run12": {
-        "names": [
-            ("outputFusion_LearnedRecalibrator_Polynomial4","[Train on 000, Recal on 000] RGB x D Poly4"),
-            ("outputFusion_LearnedRecalibrator_Polynomial8","[Train on 000, Recal on 000] RGB x D Poly8"),
-            ("outputFusion_LearnedRecalibrator_Polynomial16","[Train on 000, Recal on 000] RGB x D Poly16"),
-        ],
-        "text":
-            """trying learned parameterized recalibration curves""",
-    },     
-    "run13": {
-        "names": [
-            ("d_BayesianSegnet_0.5_dropout2d","D Only (Bayesian Segnet 2D, p = 0.5)"),
-            ("rgb_BayesianSegnet_0.5_dropout2d","RGB Only (Bayesian Segnet 2D, p = 0.5)"),
-        ],
-        "text":
-            """trying dropout2d instead of dropout, better suited for convnets""",
-    },     
-    "run14": {
-        "names": [
-            ("outputFusion_LearnedRecalibrator_Polynomial2","[Train on 000, Recal on 000] RGB x D Poly2"),
-            ("outputFusion_LearnedRecalibrator_Polynomial4","[Train on 000, Recal on 000] RGB x D Poly4"),
-            ("outputFusion_LearnedRecalibrator_Polynomial16","[Train on 000, Recal on 000] RGB x D Poly16"),
-            ("outputFusion_LearnedRecalibrator_Polynomial64","[Train on 000, Recal on 000] RGB x D Poly64"),
-        ],
-        "text":
-            """polynomial reparameterized recalibration""",
-    },     
-    "run15": {
-        "names": [
-            ("outputFusion_HistogramLinear_3","[Train on 000, Recal on 000] RGB x D Hist3"),
-            ("outputFusion_HistogramLinear_5","[Train on 000, Recal on 000] RGB x D Hist5"),
-            ("outputFusion_HistogramLinear_7","[Train on 000, Recal on 000] RGB x D Hist7"),
-            ("outputFusion_HistogramLinear_9","[Train on 000, Recal on 000] RGB x D Hist9"),
-            ("outputFusion_HistogramLinear_10","[Train on 000, Recal on 000] RGB x D Hist10"),
-            ("outputFusion_HistogramLinear_20","[Train on 000, Recal on 000] RGB x D Hist20"),
-            ("outputFusion_HistogramLinear_30","[Train on 000, Recal on 000] RGB x D Hist30"),
-        ],
-        "text":
-            """testing number of histogram bins""",
-    },     
-    "run16": {
-        "names": [
-            ("outputFusion_HistogramLinear_4_R100","[Train on 000, Recal on 100] RGB x D Hist4"),
-            ("outputFusion_HistogramLinear_8_R100","[Train on 000, Recal on 100] RGB x D Hist8"),
-            ("outputFusion_HistogramLinear_16_R100","[Train on 000, Recal on 100] RGB x D Hist16"),
-            ("outputFusion_HistogramLinear_32_R100","[Train on 000, Recal on 100] RGB x D Hist32"),            
-        ],
-        "text":
-            """testing number of histogram bins""",
-    },     
-
-
-
-
-
+            """pretraining MCDO legs""",
+    },  
 }
 
 
@@ -281,9 +117,6 @@ for k,v in runs.items():
     # v['std_config']['start_layers'] = c['start_layers']
     v['std_config']['mcdo_passes'] = c['models'][model]['mcdo_passes']
     v['std_config']['fuse_mech'] = "ModeSummed" if "fuse" in c['models'].keys() and c['models']['fuse']['in_channels']==-1 else "ModeStacked"
-    v['std_config']['mcdo_start_iter'] = c['models'][model]['mcdo_start_iter']
-    v['std_config']['multipass_backprop'] = c['models'][model]['mcdo_backprop']
-    v['std_config']['learned_uncertainty'] = True if c['models'][model]['learned_uncertainty']=='yes' else False
     v['std_config']['dropoutP'] = c['models'][model]['dropoutP']
     v['std_config']['pretrained'] = str(c['models'][model]['resume']) != "None"
 
@@ -518,12 +351,18 @@ print(df)
 
 plt.figure()
 ax = plt.subplot2grid((4, 4), (0, 0), colspan=4, rowspan=2)
+ax.grid()
 # df.plot(kind='bar',ax=ax).legend(bbox_to_anchor=(1.0,0.99))
 df.plot(kind='bar',ax=ax).legend(bbox_to_anchor=(1.0,-0.5)) #,prop={'size':5})
 plt.xlabel("Test")
 plt.xticks(rotation=00)
+
 # plt.xticks(rotation=45)
 plt.ylabel("Mean Accuracy")
+plt.minorticks_on()
+plt.grid(b=True, which='major', color='black', linestyle='-')
+plt.grid(b=True, which='minor', color='black', linestyle='-')
+plt.grid(True)
 plt.show()
 
 print(df)
@@ -531,7 +370,352 @@ print(df)
 df.to_csv('out.csv',index=False)
 
 
+plt.savefig("histogram.png")
+# plt.show()
 
-plt.show()
 
 
+# include = [
+#            # 'run1',
+#            # 'run2',
+#            # 'run3',
+#            # 'run4',
+#            # 'run5',
+#            # 'run6',
+#            # 'run7',
+#            # 'run8',
+#            # 'run9',
+#            # 'run10',
+#            # "run11",
+#            # "run12",
+#            # "run13",
+#            # "run14",
+#            # "run15",
+#            # "run16",
+#            # "run17",
+#            # "run18",
+#            # "run19",
+#            # "run20",
+#            # "run21",
+#            # "run22",
+#            # "run23",
+#            # "run24",
+#            # "run25",
+#            # "run26",
+#            "run27",
+#            "run28",
+#            ]
+
+# run_comments = {
+#     "run1": {
+#         "names": [
+#             ("83811","RGB Only (No Dropout)"),
+#         ],
+#         "text":
+#             """initial test on RGB only; no dropout; batch size 2""",
+#     },
+#     "run2": {
+#         "names": [
+#             ("rgb_dropout_between_layers_0.1",None),
+#             ("rgb_dropout_between_layers_0.3",None),
+#             ("rgb_dropout_between_layers_0.5",None),
+#             ("rgb_dropout_between_layers_0.9",None),
+#         ],
+#         "text":
+#             """testing for best dropout performance (0.1,0.3,0.5,0.9); dropout after each block; batch size 2""",
+#     },
+#     "run3": {
+#         "names": [
+#             ("rgb_baseline_0.1dropout_extensiveDropout",None),
+#             ("rgb_baseline_0.5dropout_extensiveDropout",None),
+#             ("d_baseline_0.1dropout_extensiveDropout",None),
+#             ("d_baseline_0.5dropout_extensiveDropout",None),            
+#         ],
+#         "text":
+#             """testing for best dropout performance (0.1,0.3,0.5,0.9); dropout after each convolutional layer; batch size 2""",
+#     },    
+#     "run4": {
+#         "names": [
+#             # ("d_BayesianSegnet_0.1","Depth Only (Bayesian Segnet, p = 0.1)"),
+#             # ("rgb_BayesianSegnet_0.1","RGB Only (Bayesian Segnet, p = 0.1)"),
+#             ("d_BayesianSegnet_0.5","Depth Only (Bayesian Segnet, p = 0.5)"),
+#             ("rgb_BayesianSegnet_0.5","RGB Only (Bayesian Segnet, p = 0.5)"),
+#         ],
+#         "text":
+#             """following architecture from BayesSegnet paper""",
+#     },
+#     "run5": {
+#         "names": [
+#             ("outputFusion_calibratedSoftmaxMultiply",   "[Train on 000, Recal on 000] RGB x D Hist"),
+#             ("outputFusion_uncalibratedSoftmaxMultiply", "[Train on 000, No Recal] RGB x D Hist"),
+#             # ("outputFusion_uncalibratedSoftmaxDonly",    "[Train on 000, No Recal] D"),
+#             # ("outputFusion_uncalibratedSoftmaxRGBonly",  "[Train on 000, No Recal] RGB"),
+#         ],
+#         "text":
+#             """calibrated softmaxes before adding values for fusion""",            
+#     },
+#     "run6": {
+#         "names": [
+#             # ("outputFusion_calibratedSoftmaxMultiply_recalibrateOn050",            "[Train on 000, Recal on 050] RGB x D"),
+#             ("outputFusion_calibratedSoftmaxMultiply_recalibrateOn100",            "[Train on 000, Recal on 100] RGB x D"),
+#             # ("outputFusion_calibratedSoftmaxMultiply_recalibrateOn100DBlackout",   "[Train on 000, Recal on 100 / No D] RGB x D"),
+#             # ("outputFusion_calibratedSoftmaxMultiply_recalibrateOn100RGBBlackout", "[Train on 000, Recal on 100 / No RGB] RGB x D"),
+#             # ("outputFusion_calibratedSoftmaxMultiply_recalibrateOnAllSplit",       "[Train on 000, Recal on All] RGB x D"),            
+#         ],
+#         "text":
+#             """recalibrating on testing distribution""",            
+#     },
+#     "run7": {
+#         "names": [
+#             ("inputFusion_baseline", "[Train on 000, No Recal] RGBD Input Fusion"),
+#         ],
+#         "text":
+#             """input fusion baseline""",            
+#     },    
+#     "run8": {
+#         "names": [
+#             ("outputFusion_FusionSoftmaxMultiply_Train000_Recal000", ".(p=0.5) [Train on 000, Recal on 000] RGB x D"),
+#             ("outputFusion_FusionSoftmaxMultiply_Train000_Recal100", ".(p=0.5) [Train on 000, Recal on 100] RGB x D"),
+#         ],
+#         "text":
+#             """refactored code check""",            
+#     },    
+#     "run9": {
+#         "names": [
+#             ("outputFusion_BayesianSegnet_0.5_T100_R000","[Train on 100, Recal on 000] RGB x D"),
+#             ("outputFusion_BayesianSegnet_0.5_T100_R050","[Train on 100, Recal on 050] RGB x D"),
+#             ("outputFusion_BayesianSegnet_0.5_T100_R100","[Train on 100, Recal on 100] RGB x D"),
+#             ("outputFusion_BayesianSegnet_0.5_T050_R000","[Train on 050, Recal on 000] RGB x D"),
+#             ("outputFusion_BayesianSegnet_0.5_T050_R050","[Train on 050, Recal on 050] RGB x D"),
+#             ("outputFusion_BayesianSegnet_0.5_T050_R100","[Train on 050, Recal on 100] RGB x D"),            
+#         ],
+#         "text":
+#             """train on 050,100pct fog levels""",
+#     },    
+#     "run10": {
+#         "names": [
+#             # ("outputFusion_BayesianSegnet_0.5_Before6MCDO_T000_R000","(p=0.5) [Train on 000, Sample Recal on 000] RGB x D MCDO Recal"),
+#             # ("outputFusion_BayesianSegnet_0.5_Before6MCDO_T000_R000.050.100","(p=0.5) [Train on 000, Sample Recal on 000,050,100] RGB x D MCDO Recal"),
+#             # ("outputFusion_BayesianSegnet_0.5_Before6MCDO_T000_R050","(p=0.5) [Train on 000, Sample Recal on 050] RGB x D MCDO Recal"),
+#             ("outputFusion_BayesianSegnet_0.5_Before6MCDO_T000_R100","(p=0.5) [Train on 000, Sample Recal on 100] RGB x D MCDO Recal [Original Results]"),
+#         ],
+#         "text":
+#             """recalibrating 50pct dropout before mean var calculations""",
+#     },     
+#     "run11": {
+#         "names": [
+#             ("outputFusion_BayesianSegnet_0.1_After6MCDO_T000_R000",".(p=0.1) [Train on 000, Sample Recal on 000] RGB x D"),
+#             ("outputFusion_BayesianSegnet_0.1_After6MCDO_T000_R100",".(p=0.1) [Train on 000, Sample Recal on 100] RGB x D"),
+#             ("outputFusion_BayesianSegnet_0.1_Before6MCDO_T000_R000","(p=0.1) [Train on 000, Sample Recal on 000] RGB x D MCDO Recal"),
+#             ("outputFusion_BayesianSegnet_0.1_Before6MCDO_T000_R100","(p=0.1) [Train on 000, Sample Recal on 100] RGB x D MCDO Recal"),            
+#         ],
+#         "text":
+#             """trying recalibrating 10pct dropout before/after mean var calculations""",
+#     },        
+#     "run12": {
+#         "names": [
+#             ("outputFusion_LearnedRecalibrator_Polynomial4","[Train on 000, Recal on 000] RGB x D Poly4"),
+#             ("outputFusion_LearnedRecalibrator_Polynomial8","[Train on 000, Recal on 000] RGB x D Poly8"),
+#             ("outputFusion_LearnedRecalibrator_Polynomial16","[Train on 000, Recal on 000] RGB x D Poly16"),
+#         ],
+#         "text":
+#             """trying learned parameterized recalibration curves""",
+#     },     
+#     "run13": {
+#         "names": [
+#             ("d_BayesianSegnet_0.5_dropout2d","D Only (Bayesian Segnet 2D, p = 0.5)"),
+#             ("rgb_BayesianSegnet_0.5_dropout2d","RGB Only (Bayesian Segnet 2D, p = 0.5)"),
+#         ],
+#         "text":
+#             """trying dropout2d instead of dropout, better suited for convnets""",
+#     },     
+#     "run14": {
+#         "names": [
+#             ("outputFusion_LearnedRecalibrator_Polynomial2","[Train on 000, Recal on 000] RGB x D Poly2"),
+#             ("outputFusion_LearnedRecalibrator_Polynomial4","[Train on 000, Recal on 000] RGB x D Poly4"),
+#             ("outputFusion_LearnedRecalibrator_Polynomial16","[Train on 000, Recal on 000] RGB x D Poly16"),
+#             ("outputFusion_LearnedRecalibrator_Polynomial64","[Train on 000, Recal on 000] RGB x D Poly64"),
+#         ],
+#         "text":
+#             """polynomial reparameterized recalibration""",
+#     },     
+#     "run15": {
+#         "names": [
+#             ("outputFusion_HistogramLinear_3","[Train on 000, Recal on 000] RGB x D Hist3"),
+#             ("outputFusion_HistogramLinear_5","[Train on 000, Recal on 000] RGB x D Hist5"),
+#             ("outputFusion_HistogramLinear_7","[Train on 000, Recal on 000] RGB x D Hist7"),
+#             ("outputFusion_HistogramLinear_9","[Train on 000, Recal on 000] RGB x D Hist9"),
+#             ("outputFusion_HistogramLinear_10","[Train on 000, Recal on 000] RGB x D Hist10"),
+#             ("outputFusion_HistogramLinear_20","[Train on 000, Recal on 000] RGB x D Hist20"),
+#             ("outputFusion_HistogramLinear_30","[Train on 000, Recal on 000] RGB x D Hist30"),
+#         ],
+#         "text":
+#             """testing number of histogram bins""",
+#     },     
+#     "run16": {
+#         "names": [
+#             ("outputFusion_HistogramLinear_4_R100","[Train on 000, Recal on 100] RGB x D Hist4"),
+#             ("outputFusion_HistogramLinear_8_R100","[Train on 000, Recal on 100] RGB x D Hist8"),
+#             ("outputFusion_HistogramLinear_16_R100","[Train on 000, Recal on 100] RGB x D Hist16"),
+#             ("outputFusion_HistogramLinear_32_R100","[Train on 000, Recal on 100] RGB x D Hist32"),            
+#         ],
+#         "text":
+#             """testing number of histogram bins""",
+#     },     
+#     # SOMETHING WONKY AROUND HERE; wherever new dropout implenetation went
+#     "run17": {
+#         "names": [
+#             ("rgb_BayesianSegnet_0.5_Masks0-5_T000_RNone_PLOT","[Train on 000, Recal on None] RGB x D Mask 0-5"),
+#             ("rgb_BayesianSegnet_0.5_Masks6-11_T000_RNone_PLOT","[Train on 000, Recal on None] RGB x D Mask 6-11"),
+#             ("rgb_BayesianSegnet_0.5_Masks12-17_T000_RNone_PLOT","[Train on 000, Recal on None] RGB x D Mask 12-17"),
+#         ],
+#         "text":
+#             """trying different mask splits""",
+#     },   
+#     "run18": {
+#         "names": [
+#             ("outputFusion_BayesianSegnet_0.5_Masks0-5_T000_RNone_PLOT","[Train on 000, Recal on None] RGB x D Mask 00-05"),
+#             ("outputFusion_BayesianSegnet_0.5_Masks12-17_T000_RNone_PLOT","[Train on 000, Recal on None] RGB x D Mask 12-17"),
+#             ("outputFusion_BayesianSegnet_0.5_Masks18-23_T000_RNone_PLOT","[Train on 000, Recal on None] RGB x D Mask 18-23"),
+#             ("outputFusion_BayesianSegnet_0.5_Masks24-29_T000_RNone_PLOT","[Train on 000, Recal on None] RGB x D Mask 24-29"),
+#             ("outputFusion_BayesianSegnet_0.5_Masks30-35_T000_RNone_PLOT","[Train on 000, Recal on None] RGB x D Mask 30-35"),
+#             ("outputFusion_BayesianSegnet_0.5_Masks36-41_T000_RNone_PLOT","[Train on 000, Recal on None] RGB x D Mask 36-41"),
+#             ("outputFusion_BayesianSegnet_0.5_Masks42-47_T000_RNone_PLOT","[Train on 000, Recal on None] RGB x D Mask 42-47"),
+#             ("outputFusion_BayesianSegnet_0.5_Masks48-53_T000_RNone_PLOT","[Train on 000, Recal on None] RGB x D Mask 48-53"),
+#             ("outputFusion_BayesianSegnet_0.5_Masks54-59_T000_RNone_PLOT","[Train on 000, Recal on None] RGB x D Mask 54-59"),
+#             ("outputFusion_BayesianSegnet_0.5_Masks6-11_T000_RNone_PLOT","[Train on 000, Recal on None] RGB x D Mask 06-11"),
+#         ],
+#         "text":
+#             """trying even more mask splits; seems to indicate that masks are pretty reasonably sampled; recal size 0.2x""",
+#     },   
+#     "run19": {
+#         "names": [
+#             ("outputFusion_BayesianSegnet_0.5_T000_R100_WAvg_RecalFunctionCrawl_HistogramFlat_10","[Train on 000, Recal on 100] RGB x D HistFlat 10"),
+#             ("outputFusion_BayesianSegnet_0.5_T000_R100_WAvg_RecalFunctionCrawl_HistogramFlat_20","[Train on 000, Recal on 100] RGB x D HistFlat 20"),
+#             ("outputFusion_BayesianSegnet_0.5_T000_R100_WAvg_RecalFunctionCrawl_HistogramFlat_3","[Train on 000, Recal on 100] RGB x D HistFlat 03"),
+#             ("outputFusion_BayesianSegnet_0.5_T000_R100_WAvg_RecalFunctionCrawl_HistogramFlat_5","[Train on 000, Recal on 100] RGB x D HistFlat 05"),
+#             ("outputFusion_BayesianSegnet_0.5_T000_R100_WAvg_RecalFunctionCrawl_HistogramFlat_50","[Train on 000, Recal on 100] RGB x D HistFlat 50"),
+#         ],
+#         "text":
+#             """testing flat histogram parameters; recal size 0.2x; using weight averaging""",
+#     },  
+#     "run20": {
+#         "names": [
+#             ("outputFusion_BayesianSegnet_0.5_T000_R100_WAvg_RecalFunctionCrawl_HistogramLinear_10","[Train on 000, Recal on 100] RGB x D HistLinear 10"),
+#             ("outputFusion_BayesianSegnet_0.5_T000_R100_WAvg_RecalFunctionCrawl_HistogramLinear_20","[Train on 000, Recal on 100] RGB x D HistLinear 20"),
+#             ("outputFusion_BayesianSegnet_0.5_T000_R100_WAvg_RecalFunctionCrawl_HistogramLinear_3","[Train on 000, Recal on 100] RGB x D HistLinear 03"),
+#             ("outputFusion_BayesianSegnet_0.5_T000_R100_WAvg_RecalFunctionCrawl_HistogramLinear_5","[Train on 000, Recal on 100] RGB x D HistLinear 05"),
+#             ("outputFusion_BayesianSegnet_0.5_T000_R100_WAvg_RecalFunctionCrawl_HistogramLinear_50","[Train on 000, Recal on 100] RGB x D HistLinear 50"),
+#         ],
+#         "text":
+#             """testing linear interpolated histogram parameters; recal size 0.2x; using weight averaging""",
+#     },  
+#     "run21": {
+#         "names": [
+#             ("outputFusion_BayesianSegnet_0.5_T000_R100_WAvg_RecalFunctionCrawl_Polynomial_10","[Train on 000, Recal on 100] RGB x D Polynomial 10"),
+#             ("outputFusion_BayesianSegnet_0.5_T000_R100_WAvg_RecalFunctionCrawl_Polynomial_20","[Train on 000, Recal on 100] RGB x D Polynomial 20"),
+#             ("outputFusion_BayesianSegnet_0.5_T000_R100_WAvg_RecalFunctionCrawl_Polynomial_3","[Train on 000, Recal on 100] RGB x D Polynomial 03"),
+#             ("outputFusion_BayesianSegnet_0.5_T000_R100_WAvg_RecalFunctionCrawl_Polynomial_5","[Train on 000, Recal on 100] RGB x D Polynomial 05"),
+#             ("outputFusion_BayesianSegnet_0.5_T000_R100_WAvg_RecalFunctionCrawl_Polynomial_50","[Train on 000, Recal on 100] RGB x D Polynomial 50"),
+#         ],
+#         "text":
+#             """testing polynomial parameters; recal size 0.2x; using weight averaging""",
+#     },    
+#     "run22": {
+#         "names": [
+#             ("outputFusion_BayesianSegnet_0.5_WAvg_T000_R100_Reduction0.1_NoExtraTrain","[Train on 000, Recal on 100] RGB x D HistogramLinear 50 [My Implementation of Dropout]"),
+#             ("outputFusion_BayesianSegnet_0.5_WAvg_T000_R100_Reduction0.1_NoExtraTrain_OldDropout","[Train on 000, Recal on 100] RGB x D HistogramLinear 50 [Back to nn.Dropout()]"),
+#             # ("outputFusion_BayesianSegnet_0.5_WAvg_T000_R100_Reduction0.2_NoExtraTrain","[Train on 000, (0.2x) Recal on 100] RGB x D HistogramLinear 50"),
+#             # ("outputFusion_BayesianSegnet_0.5_WAvg_T000_R100_Reduction0.5_NoExtraTrain","[Train on 000, (0.5x) Recal on 100] RGB x D HistogramLinear 50"),
+#             # ("outputFusion_BayesianSegnet_0.5_WAvg_T000_R100_Reduction1.0_NoExtraTrain","[Train on 000, (1.0x) Recal on 100] RGB x D HistogramLinear 50"),
+#         ],
+#         "text":
+#             """trying to figure out discrepancy between previous recalibration and current recalibration; current recalibration has worse performance; maybe because I changed the size of the recalibration dataset?; hm, there is something missing between the versions (possibly rescaling during forward evaluation pass?); found it, something off with dropout masks""",
+#     },   
+#     "run23": {
+#         "names": [
+#             ("outputFusion_BayesianSegnet_0.5_Masks0-5_T000_R100_HistogramLinear50_BeforeMCDO_PLOT","[Train on 000, Recal on 100] RGB x D Masks00-05 PerPass Recal"),
+#             ("outputFusion_BayesianSegnet_0.5_Masks12-17_T000_R100_HistogramLinear50_BeforeMCDO_PLOT","[Train on 000, Recal on 100] RGB x D Masks12-17 PerPass Recal"),
+#             ("outputFusion_BayesianSegnet_0.5_Masks18-23_T000_R100_HistogramLinear50_BeforeMCDO_PLOT","[Train on 000, Recal on 100] RGB x D Masks18-23 PerPass Recal"),
+#             ("outputFusion_BayesianSegnet_0.5_Masks24-29_T000_R100_HistogramLinear50_BeforeMCDO_PLOT","[Train on 000, Recal on 100] RGB x D Masks24-29 PerPass Recal"),
+#             ("outputFusion_BayesianSegnet_0.5_Masks30-35_T000_R100_HistogramLinear50_BeforeMCDO_PLOT","[Train on 000, Recal on 100] RGB x D Masks30-35 PerPass Recal"),
+#             ("outputFusion_BayesianSegnet_0.5_Masks36-41_T000_R100_HistogramLinear50_BeforeMCDO_PLOT","[Train on 000, Recal on 100] RGB x D Masks36-41 PerPass Recal"),
+#             ("outputFusion_BayesianSegnet_0.5_Masks42-47_T000_R100_HistogramLinear50_BeforeMCDO_PLOT","[Train on 000, Recal on 100] RGB x D Masks42-47 PerPass Recal"),
+#             ("outputFusion_BayesianSegnet_0.5_Masks48-53_T000_R100_HistogramLinear50_BeforeMCDO_PLOT","[Train on 000, Recal on 100] RGB x D Masks48-53 PerPass Recal"),
+#             ("outputFusion_BayesianSegnet_0.5_Masks6-11_T000_R100_HistogramLinear50_BeforeMCDO_PLOT","[Train on 000, Recal on 100] RGB x D Masks06-11 PerPass Recal"),
+#         ],
+#         "text":
+#             """testing recalibration of different masks; per pass recalibration""",
+#     },  
+#     "run24": {
+#         "names": [
+#             ("outputFusion_BayesianSegnet_0.5_Masks0-5_T000_R100_HistogramLinear50_AfterMCDO_PLOT","[Train on 000, Recal on 100] RGB x D Masks00-05 WAvg Recal"),
+#             ("outputFusion_BayesianSegnet_0.5_Masks12-17_T000_R100_HistogramLinear50_AfterMCDO_PLOT","[Train on 000, Recal on 100] RGB x D Masks12-17 WAvg Recal"),
+#             ("outputFusion_BayesianSegnet_0.5_Masks18-23_T000_R100_HistogramLinear50_AfterMCDO_PLOT","[Train on 000, Recal on 100] RGB x D Masks18-23 WAvg Recal"),
+#             ("outputFusion_BayesianSegnet_0.5_Masks24-29_T000_R100_HistogramLinear50_AfterMCDO_PLOT","[Train on 000, Recal on 100] RGB x D Masks24-29 WAvg Recal"),
+#             ("outputFusion_BayesianSegnet_0.5_Masks30-35_T000_R100_HistogramLinear50_AfterMCDO_PLOT","[Train on 000, Recal on 100] RGB x D Masks30-35 WAvg Recal"),
+#             ("outputFusion_BayesianSegnet_0.5_Masks36-41_T000_R100_HistogramLinear50_AfterMCDO_PLOT","[Train on 000, Recal on 100] RGB x D Masks36-41 WAvg Recal"),
+#             ("outputFusion_BayesianSegnet_0.5_Masks42-47_T000_R100_HistogramLinear50_AfterMCDO_PLOT","[Train on 000, Recal on 100] RGB x D Masks42-47 WAvg Recal"),
+#             ("outputFusion_BayesianSegnet_0.5_Masks6-11_T000_R100_HistogramLinear50_AfterMCDO_PLOT","[Train on 000, Recal on 100] RGB x D Masks06-11 WAvg Recal"),
+#         ],
+#         "text":
+#             """testing recalibration of different masks; after weight averaging""",
+#     },  
+#     "run25": {
+#         "names": [
+#             ("outputFusion_BayesianSegnet_0.5_Masks0-5_T000_R000_HistogramLinear50_PPass_UndoneScaling","[Train on 000, Recal on 000] RGB x D Masks00-05 PerPass Recal UndoneScaling"),
+#             ("outputFusion_BayesianSegnet_0.5_Masks12-17_T000_R000_HistogramLinear50_PPass_UndoneScaling","[Train on 000, Recal on 000] RGB x D Masks12-17 PerPass Recal UndoneScaling"),
+#             ("outputFusion_BayesianSegnet_0.5_Masks18-23_T000_R000_HistogramLinear50_PPass_UndoneScaling","[Train on 000, Recal on 000] RGB x D Masks18-23 PerPass Recal UndoneScaling"),
+#             ("outputFusion_BayesianSegnet_0.5_Masks24-29_T000_R000_HistogramLinear50_PPass_UndoneScaling","[Train on 000, Recal on 000] RGB x D Masks24-29 PerPass Recal UndoneScaling"),
+#             ("outputFusion_BayesianSegnet_0.5_Masks30-35_T000_R000_HistogramLinear50_PPass_UndoneScaling","[Train on 000, Recal on 000] RGB x D Masks30-35 PerPass Recal UndoneScaling"),
+#             ("outputFusion_BayesianSegnet_0.5_Masks36-41_T000_R000_HistogramLinear50_PPass_UndoneScaling","[Train on 000, Recal on 000] RGB x D Masks36-41 PerPass Recal UndoneScaling"),
+#             ("outputFusion_BayesianSegnet_0.5_Masks42-47_T000_R000_HistogramLinear50_PPass_UndoneScaling","[Train on 000, Recal on 000] RGB x D Masks42-47 PerPass Recal UndoneScaling"),
+#             ("outputFusion_BayesianSegnet_0.5_Masks48-53_T000_R000_HistogramLinear50_PPass_UndoneScaling","[Train on 000, Recal on 000] RGB x D Masks48-53 PerPass Recal UndoneScaling"),
+#             ("outputFusion_BayesianSegnet_0.5_Masks6-11_T000_R000_HistogramLinear50_PPass_UndoneScaling","[Train on 000, Recal on 000] RGB x D Masks06-11 PerPass Recal UndoneScaling"),
+#         ],
+#         "text":
+#             """testing recalibration of different masks; per pass recalibration; rescaling dropout mask""",
+#     },
+#     "run26": {
+#         "names": [
+#             ("outputFusion_BayesianSegnet_0.5_Masks0-5_T000_R050_HistogramLinear50_PPass_UndoneScaling","[Train on 000, Recal on 050] RGB x D Masks00-05 PerPass Recal UndoneScaling"),
+#             ("outputFusion_BayesianSegnet_0.5_Masks12-17_T000_R050_HistogramLinear50_PPass_UndoneScaling","[Train on 000, Recal on 050] RGB x D Masks12-17 PerPass Recal UndoneScaling"),
+#             ("outputFusion_BayesianSegnet_0.5_Masks18-23_T000_R050_HistogramLinear50_PPass_UndoneScaling","[Train on 000, Recal on 050] RGB x D Masks18-23 PerPass Recal UndoneScaling"),
+#             ("outputFusion_BayesianSegnet_0.5_Masks24-29_T000_R050_HistogramLinear50_PPass_UndoneScaling","[Train on 000, Recal on 050] RGB x D Masks24-29 PerPass Recal UndoneScaling"),
+#             ("outputFusion_BayesianSegnet_0.5_Masks30-35_T000_R050_HistogramLinear50_PPass_UndoneScaling","[Train on 000, Recal on 050] RGB x D Masks30-35 PerPass Recal UndoneScaling"),
+#             ("outputFusion_BayesianSegnet_0.5_Masks36-41_T000_R050_HistogramLinear50_PPass_UndoneScaling","[Train on 000, Recal on 050] RGB x D Masks36-41 PerPass Recal UndoneScaling"),
+#             ("outputFusion_BayesianSegnet_0.5_Masks42-47_T000_R050_HistogramLinear50_PPass_UndoneScaling","[Train on 000, Recal on 050] RGB x D Masks42-47 PerPass Recal UndoneScaling"),
+#             ("outputFusion_BayesianSegnet_0.5_Masks48-53_T000_R050_HistogramLinear50_PPass_UndoneScaling","[Train on 000, Recal on 050] RGB x D Masks48-53 PerPass Recal UndoneScaling"),
+#             ("outputFusion_BayesianSegnet_0.5_Masks6-11_T000_R050_HistogramLinear50_PPass_UndoneScaling","[Train on 000, Recal on 050] RGB x D Masks06-11 PerPass Recal UndoneScaling"),
+#         ],
+#         "text":
+#             """testing recalibration of different masks; per pass recalibration; rescaling dropout mask""",
+#     },
+#     "run27": {
+#         "names": [
+#             ("outputFusion_BayesianSegnet_0.5_Masks0-5_T000_R100_HistogramLinear50_PPass_UndoneScaling","[Train on 000, Recal on 100] RGB x D Masks00-05 PerPass Recal UndoneScaling"),
+#             ("outputFusion_BayesianSegnet_0.5_Masks12-17_T000_R100_HistogramLinear50_PPass_UndoneScaling","[Train on 000, Recal on 100] RGB x D Masks12-17 PerPass Recal UndoneScaling"),
+#             ("outputFusion_BayesianSegnet_0.5_Masks18-23_T000_R100_HistogramLinear50_PPass_UndoneScaling","[Train on 000, Recal on 100] RGB x D Masks18-23 PerPass Recal UndoneScaling"),
+#             ("outputFusion_BayesianSegnet_0.5_Masks24-29_T000_R100_HistogramLinear50_PPass_UndoneScaling","[Train on 000, Recal on 100] RGB x D Masks24-29 PerPass Recal UndoneScaling"),
+#             ("outputFusion_BayesianSegnet_0.5_Masks30-35_T000_R100_HistogramLinear50_PPass_UndoneScaling","[Train on 000, Recal on 100] RGB x D Masks30-35 PerPass Recal UndoneScaling"),
+#             ("outputFusion_BayesianSegnet_0.5_Masks36-41_T000_R100_HistogramLinear50_PPass_UndoneScaling","[Train on 000, Recal on 100] RGB x D Masks36-41 PerPass Recal UndoneScaling"),
+#             ("outputFusion_BayesianSegnet_0.5_Masks42-47_T000_R100_HistogramLinear50_PPass_UndoneScaling","[Train on 000, Recal on 100] RGB x D Masks42-47 PerPass Recal UndoneScaling"),
+#             ("outputFusion_BayesianSegnet_0.5_Masks48-53_T000_R100_HistogramLinear50_PPass_UndoneScaling","[Train on 000, Recal on 100] RGB x D Masks48-53 PerPass Recal UndoneScaling"),
+#             ("outputFusion_BayesianSegnet_0.5_Masks6-11_T000_R100_HistogramLinear50_PPass_UndoneScaling","[Train on 000, Recal on 100] RGB x D Masks06-11 PerPass Recal UndoneScaling"),
+#         ],
+#         "text":
+#             """testing recalibration of different masks; per pass recalibration; rescaling dropout mask""",
+#     },
+#     "run28": {
+#         "names": [
+#             ("outputFusion_BayesianSegnet_0.5Channel_Masks0-5_T000_R100_HistogramLinear50_PPass_UndoneScaling","[Train on 000, Recal on 100] RGB x D Masks00-05 PerPass Recal Channel Dropout"),
+#             ("outputFusion_BayesianSegnet_0.5Channel_Masks12-17_T000_R100_HistogramLinear50_PPass_UndoneScaling","[Train on 000, Recal on 100] RGB x D Masks12-17 PerPass Recal Channel Dropout"),
+#             ("outputFusion_BayesianSegnet_0.5Channel_Masks18-23_T000_R100_HistogramLinear50_PPass_UndoneScaling","[Train on 000, Recal on 100] RGB x D Masks18-23 PerPass Recal Channel Dropout"),
+#             ("outputFusion_BayesianSegnet_0.5Channel_Masks24-29_T000_R100_HistogramLinear50_PPass_UndoneScaling","[Train on 000, Recal on 100] RGB x D Masks24-29 PerPass Recal Channel Dropout"),
+#             ("outputFusion_BayesianSegnet_0.5Channel_Masks30-35_T000_R100_HistogramLinear50_PPass_UndoneScaling","[Train on 000, Recal on 100] RGB x D Masks30-35 PerPass Recal Channel Dropout"),
+#             ("outputFusion_BayesianSegnet_0.5Channel_Masks6-11_T000_R100_HistogramLinear50_PPass_UndoneScaling","[Train on 000, Recal on 100] RGB x D Masks06-11 PerPass Recal Channel Dropout"),
+#         ],
+#         "text":
+#             """testing recalibration of different masks; per pass recalibration; rescaling dropout mask; dropout channels""",
+#     }    
+# }

@@ -1,5 +1,5 @@
 # Dataset Directory
-/datasets/airsim_data_async
+/datasets/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

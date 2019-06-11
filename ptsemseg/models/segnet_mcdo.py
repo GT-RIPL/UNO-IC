@@ -173,7 +173,7 @@ class segnet_mcdo(nn.Module):
         return up1
 
     def forwardMCDO(self, inputs, recalType="None", backprop=False):
-        
+
         if not backprop:
             torch.set_grad_enabled(False)
 

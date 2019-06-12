@@ -188,7 +188,6 @@ def train(cfg, writer, logger, logdir):
                 models[model].load_state_dict(pretrained_dict)
 
                 if attr['resume'] == 'same_yaml':
-
                     optimizers[model].load_state_dict(checkpoint["optimizer_state"])
                     schedulers[model].load_state_dict(checkpoint["scheduler_state"])
                     start_iter = checkpoint["epoch"]

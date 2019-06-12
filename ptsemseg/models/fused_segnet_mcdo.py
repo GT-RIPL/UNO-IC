@@ -23,17 +23,29 @@ class fused_segnet_mcdo(nn.Module):
                  device="cpu",
                  recalibrator="None",
                  temperatureScaling="False",
-                 bins=0
+                 bins=0,
+                 resumeRGB="./models/rgb_BayesianSegnet_0.5_T000/rgb_segnet_mcdo_airsim_best_model.pkl",
+                 resumeD="./models/d_BayesianSegnet_0.5_T000/d_segnet_mcdo_airsim_best_model.pkl"
                  ):
         super(fused_segnet_mcdo, self).__init__()
-        print(recalibrator)
 
         self.rgb_segnet = segnet_mcdo(n_classes, in_channels, is_unpooling, input_size, batch_size, version,
                                       mcdo_passes, dropoutP, full_mcdo, start_layer,
                                       end_layer, reduction, device, recalibrator, temperatureScaling, bins)
+
         self.d_segnet = segnet_mcdo(n_classes, in_channels, is_unpooling, input_size, batch_size, version,
                                     mcdo_passes, dropoutP, full_mcdo, start_layer,
                                     end_layer, reduction, device, recalibrator, temperatureScaling, bins)
+
+        # initialize segnet weights
+        self.loadModel(self.rgb_segnet, resumeRGB)
+        self.loadModel(self.d_segnet, resumeD)
+
+        # freeze segnet networks
+        for param in self.rgb_segnet.parameters():
+            param.requires_grad = False
+        for param in self.d_segnet.parameters():
+            param.requires_grad = False
 
         self.gatedFusion = GatedFusion(n_classes)
 
@@ -50,3 +62,20 @@ class fused_segnet_mcdo(nn.Module):
         x = self.gatedFusion(mean_rgb, mean_d)
 
         return x
+
+    def loadModel(self, model, path):
+        model_pkl = path
+
+        if os.path.isfile(model_pkl):
+            pretrained_dict = torch.load(model_pkl)['model_state']
+            model_dict = model.state_dict()
+
+            # 1. filter out unnecessary keys
+            pretrained_dict = {k: v.resize_(model_dict[k].shape) for k, v in pretrained_dict.items() if (
+                    k in model_dict)}  # and ((model!="fuse") or (model=="fuse" and not start_layer in k))}
+
+            # 2. overwrite entries in the existing state dict
+            model_dict.update(pretrained_dict)
+
+            # 3. load the new state dict
+            model.load_state_dict(pretrained_dict)

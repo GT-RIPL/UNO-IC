@@ -38,7 +38,7 @@ class segnet_mcdo(nn.Module):
         # Select Recalibrator
         self.temperatureScaling = temperatureScaling
         self.recalibrator = recalibrator
-        print(recalibrator)
+
         if recalibrator != "None" and bins > 0:
             self.ranges = list(zip([1. * a / bins for a in range(bins + 2)][:-2],
                                    [1. * a / bins for a in range(bins + 2)][1:]))

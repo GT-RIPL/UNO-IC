@@ -10,6 +10,7 @@ from ptsemseg.models.icnet import *
 from ptsemseg.models.linknet import *
 from ptsemseg.models.frrn import *
 from ptsemseg.models.fused_segnet import *
+from ptsemseg.models.fused_segnet_mcdo import *
 def get_model(model_dict, 
               n_classes, 
               input_size=(512,512),
@@ -73,14 +74,14 @@ def get_model(model_dict,
                       version=version, 
                       reduction=reduction, 
                       mcdo_passes=mcdo_passes,
-                      fixed_mcdo=fixed_mcdo,
                       dropoutP=dropoutP,
-                      learned_uncertainty=learned_uncertainty,
+                      full_mcdo=full_mcdo,
                       in_channels=in_channels,
                       start_layer=start_layer,
                       end_layer=end_layer,
                       device=device,
                       recalibrator=recalibrator,
+                      temperatureScaling=temperatureScaling,
                       bins=bins,
                       **param_dict)
         vgg16 = models.vgg16(pretrained=True)
@@ -136,7 +137,8 @@ def _get_model_instance(name):
             "linknet": linknet,
             "frrnA": frrn,
             "frrnB": frrn,
-            "fused_segnet": fused_segnet
+            "fused_segnet": fused_segnet,
+            "fused_segnet_mcdo": fused_segnet_mcdo
         }[name]
     except:
         raise("Model {} not available".format(name))

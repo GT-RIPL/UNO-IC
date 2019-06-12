@@ -22,4 +22,4 @@ class fused_segnet(nn.Module):
 
         x = self.gatedFusion(rgb, d)
 
-        return x, x, 0
+        return x

@@ -38,7 +38,7 @@ class segnet_mcdo(nn.Module):
         # Select Recalibrator
         self.temperatureScaling = temperatureScaling
         self.recalibrator = recalibrator
-
+        print(recalibrator)
         if recalibrator != "None" and bins > 0:
             self.ranges = list(zip([1. * a / bins for a in range(bins + 2)][:-2],
                                    [1. * a / bins for a in range(bins + 2)][1:]))
@@ -172,6 +172,18 @@ class segnet_mcdo(nn.Module):
 
         return up1
 
+    def forwardAvg(self, inputs, recalType="None", backprop=False):
+
+        for i in range(self.mcdo_passes):
+            if i == 0:
+                x = self.forward(inputs)
+            else:
+                x = x + self.forward(inputs)
+
+        x = x / self.mcdo_passes
+        return x
+
+
     def forwardMCDO(self, inputs, recalType="None", backprop=False):
 
         if not backprop:
@@ -218,7 +230,8 @@ class segnet_mcdo(nn.Module):
             mean = x.mean(-1)
             variance = x.std(-1)
 
-        torch.set_grad_enabled(True)
+        if not backprop:
+            torch.set_grad_enabled(True)
         return mean, variance
 
     def applyCalibration(self, output):

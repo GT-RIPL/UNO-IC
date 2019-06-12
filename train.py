@@ -318,7 +318,11 @@ def train(cfg, writer, logger, logdir):
                                 # plot predictions with calibration
                                 # TODO calibrate outputs instead of rereunning model with calibration
                                 # outputs = models[m].module.calibrateOutput(output)
-                                outputs, mean, variance = models[m](images_recal[m], cfg["recal"])
+                                if hasattr(models[m].module, 'forwardMCDO'):
+                                    mean[m], variance[m] = models[m].module.forwardMCDO(images_val[m], cfg["recal"])
+                                else:
+                                    mean[m] = models[m](images_val[m])
+                                    variance[m] = torch.zeros(mean[m].shape)
                                 post_pred = mean.data.max(1)[1].cpu().numpy()
                                 plotMeansVariances(logdir, cfg, n_classes, i, i_recal, m, "recal/post_recal", inputs,
                                                    post_pred, gt, mean, variance)
@@ -351,7 +355,11 @@ def train(cfg, writer, logger, logdir):
                             val_loss = {}
 
                             for m in cfg["models"].keys():
-                                mean[m], variance[m] = models[m].module.forwardMCDO(images_val[m], cfg["recal"])
+                                if hasattr(models[m].module, 'forwardMCDO'):
+                                    mean[m], variance[m] = models[m].module.forwardMCDO(images_val[m], cfg["recal"])
+                                else:
+                                    mean[m] = models[m](images_val[m])
+                                    variance[m] = torch.zeros(mean[m].shape)
                                 val_loss[m] = loss_fn(input=mean[m], target=labels_val)
 
                             # Fusion Type

@@ -27,6 +27,7 @@ def get_model(model_dict,
               reduction=1.0,
               recalibrator=None,
               temperatureScaling=False,
+              freeze=False,
               bins=0,
               device="cpu"):
     name = model_dict['arch']
@@ -62,6 +63,7 @@ def get_model(model_dict,
                       device=device,
                       recalibrator=recalibrator,
                       temperatureScaling=temperatureScaling,
+                      freeze=freeze,
                       bins=bins,
                       **param_dict)
         vgg16 = models.vgg16(pretrained=True)
@@ -82,12 +84,9 @@ def get_model(model_dict,
                       device=device,
                       recalibrator=recalibrator,
                       temperatureScaling=temperatureScaling,
+                      freeze=freeze,
                       bins=bins,
                       **param_dict)
-        vgg16 = models.vgg16(pretrained=True)
-        model.rgb_segnet.init_vgg16_params(vgg16)
-        model.d_segnet.init_vgg16_params(vgg16)
-
     elif name == "fused_segnet":
         model = model(n_classes=n_classes,
                       **param_dict)

@@ -134,13 +134,13 @@ def train(cfg, writer, logger, logdir):
                                   start_layer=attr['start_layer'],
                                   end_layer=attr['end_layer'],
                                   mcdo_passes=attr['mcdo_passes'],
-                                  fixed_mcdo=(attr['fixed_mcdo'] == "Yes"),
                                   dropoutP=attr['dropoutP'],
                                   full_mcdo=full_mcdo,
                                   reduction=attr['reduction'],
                                   device=device,
                                   recalibrator=cfg['recalibrator'],
                                   temperatureScaling=cfg['temperatureScaling'],
+                                  freeze=attr['freeze'],
                                   bins=cfg["bins"]).to(device)
 
         if "caffemodel" in attr['resume']:
@@ -185,7 +185,7 @@ def train(cfg, writer, logger, logdir):
                 model_dict.update(pretrained_dict)
 
                 # 3. load the new state dict
-                models[model].load_state_dict(pretrained_dict)
+                models[model].load_state_dict(pretrained_dict, strict=False)
 
                 if attr['resume'] == 'same_yaml':
                     optimizers[model].load_state_dict(checkpoint["optimizer_state"])
@@ -203,10 +203,12 @@ def train(cfg, writer, logger, logdir):
     i = start_iter
     print(i)
 
+
     while i <= cfg["training"]["train_iters"]:
 
         print("=" * 10, "TRAINING", "=" * 10)
         for (images_list, labels_list, aux_list) in trainloader:
+
             i += 1
             #################################################################################
             # Training
@@ -334,6 +336,7 @@ def train(cfg, writer, logger, logdir):
                 # Validation
                 #################################################################################
                 print("=" * 10, "VALIDATING", "=" * 10)
+                print(models['rgb'].module.temperature)
                 with torch.no_grad():
                     for k, valloader in valloaders.items():
                         for i_val, (images_list, labels_list, aux_list) in tqdm(enumerate(valloader)):

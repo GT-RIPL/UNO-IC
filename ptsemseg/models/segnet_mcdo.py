@@ -21,7 +21,8 @@ class segnet_mcdo(nn.Module):
                  reduction=1.0,
                  device="cpu",
                  recalibrator="None",
-                 temperatureScaling="False",
+                 temperatureScaling=False,
+                 freeze=False,
                  bins=0
                  ):
         super(segnet_mcdo, self).__init__()
@@ -60,9 +61,6 @@ class segnet_mcdo(nn.Module):
                 print("Recalibrator: Not Supported")
                 exit()
 
-        if self.temperatureScaling:
-            self.temperature = torch.nn.Parameter(torch.ones(1))
-
         if not self.full_mcdo:
 
             self.layers = {
@@ -92,6 +90,17 @@ class segnet_mcdo(nn.Module):
                 "up2": segnetUp2MCDO(128, 64, pMCDO=dropoutP),
                 "up1": segnetUp2MCDO(64, n_classes, pMCDO=dropoutP),
             }
+
+        if self.temperatureScaling:
+            self.temperature = torch.nn.Parameter(torch.ones(1))
+
+        if freeze:
+            for layer in self.layers.values():
+                for param in layer.parameters():
+                    param.requires_grad = False
+
+                    print(param)
+            print("HIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIii")
 
         self.softmaxMCDO = torch.nn.Softmax(dim=1)
 

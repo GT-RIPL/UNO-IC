@@ -1,4 +1,4 @@
-id: GatedFusionSegnet_T000
+id: GatedFusion_BayesianSegnet_T000
 model:
     arch: fused_segnet_mcdo
 models:
@@ -7,7 +7,7 @@ models:
         start_layer: down1
         end_layer: up1
         reduction: 1.0
-        mcdo_passes: 2
+        mcdo_passes: 6
         mask_dir: models/DropoutMasks/Random 
         masks: [0,1,2,3,4,5] 
         fixed_mcdo: No

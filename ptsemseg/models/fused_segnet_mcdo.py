@@ -37,6 +37,10 @@ class fused_segnet_mcdo(nn.Module):
                                     mcdo_passes, dropoutP, full_mcdo, start_layer,
                                     end_layer, reduction, device, recalibrator, temperatureScaling, bins)
 
+        self.rgb_segnet = torch.nn.DataParallel(self.rgb_segnet, device_ids=range(torch.cuda.device_count()))
+        self.d_segnet = torch.nn.DataParallel(self.d_segnet, device_ids=range(torch.cuda.device_count()))
+
+
         # initialize segnet weights
         self.loadModel(self.rgb_segnet, resumeRGB)
         self.loadModel(self.d_segnet, resumeD)
@@ -54,10 +58,8 @@ class fused_segnet_mcdo(nn.Module):
         inputs_d = inputs[:, 3:, :, :]
 
         # TODO figure out how to backpropagate the mean of mcdo passes
-        mean_rgb = self.rgb_segnet.forwardAvg(inputs_rgb, recalType="None", backprop=True)
-        mean_d = self.d_segnet.forwardAvg(inputs_d, recalType="None", backprop=True)
-
-        print(mean_rgb.shape, mean_d.shape)
+        mean_rgb = self.rgb_segnet.module.forwardAvg(inputs_rgb, recalType="None", backprop=True)
+        mean_d = self.d_segnet.module.forwardAvg(inputs_d, recalType="None", backprop=True)
 
         x = self.gatedFusion(mean_rgb, mean_d)
 

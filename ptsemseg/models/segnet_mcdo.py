@@ -99,9 +99,6 @@ class segnet_mcdo(nn.Module):
                 for param in layer.parameters():
                     param.requires_grad = False
 
-                    print(param)
-            print("HIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIii")
-
         self.softmaxMCDO = torch.nn.Softmax(dim=1)
 
         for k, v in self.layers.items():
@@ -193,10 +190,7 @@ class segnet_mcdo(nn.Module):
         return x
 
 
-    def forwardMCDO(self, inputs, recalType="None", backprop=False):
-
-        if not backprop:
-            torch.set_grad_enabled(False)
+    def forwardMCDO(self, inputs, recalType="None"):
 
         for i in range(self.mcdo_passes):
             if i == 0:
@@ -239,8 +233,6 @@ class segnet_mcdo(nn.Module):
             mean = x.mean(-1)
             variance = x.std(-1)
 
-        if not backprop:
-            torch.set_grad_enabled(True)
         return mean, variance
 
     def applyCalibration(self, output):

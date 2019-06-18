@@ -121,10 +121,7 @@ def train(cfg, writer, logger, logdir):
     # Setup Model
     for model, attr in cfg["models"].items():
 
-        if 'full_mcdo' in cfg.keys():
-            full_mcdo = cfg['full_mcdo']
-        else:
-            full_mcdo = False
+        attr = defaultdict(lambda: None, attr)
 
         models[model] = get_model(cfg["model"],
                                   n_classes,
@@ -135,7 +132,7 @@ def train(cfg, writer, logger, logdir):
                                   end_layer=attr['end_layer'],
                                   mcdo_passes=attr['mcdo_passes'],
                                   dropoutP=attr['dropoutP'],
-                                  full_mcdo=full_mcdo,
+                                  full_mcdo=cfg['full_mcdo'],
                                   reduction=attr['reduction'],
                                   device=device,
                                   recalibrator=cfg['recalibrator'],
@@ -310,7 +307,7 @@ def train(cfg, writer, logger, logdir):
                                 outputs, mean, variance = models[m](images_recal[m])
 
                                 # plot predictions without calibration
-                                pred = mean.data.max(1)[1].cpu().numpy()
+                                pred = mean.data.argmax(1).cpu().numpy()
                                 plotMeansVariances(logdir, cfg, n_classes, i, i_recal, m, "recal/pre_recal", inputs,
                                                    pred, gt, mean, variance)
                                 plotPrediction(logdir, cfg, n_classes, i, i_recal, "recal/" + m + "/pre_recal_pred",
@@ -324,7 +321,7 @@ def train(cfg, writer, logger, logdir):
                                 else:
                                     mean[m] = models[m](images_val[m])
                                     variance[m] = torch.zeros(mean[m].shape)
-                                post_pred = mean.data.max(1)[1].cpu().numpy()
+                                post_pred = mean.data.argmax(1).cpu().numpy()
                                 plotMeansVariances(logdir, cfg, n_classes, i, i_recal, m, "recal/post_recal", inputs,
                                                    post_pred, gt, mean, variance)
                                 plotPrediction(logdir, cfg, n_classes, i, i_recal, "recal/" + m + "/post_recal_pred",
@@ -336,7 +333,6 @@ def train(cfg, writer, logger, logdir):
                 # Validation
                 #################################################################################
                 print("=" * 10, "VALIDATING", "=" * 10)
-                print(models['rgb'].module.temperature)
                 with torch.no_grad():
                     for k, valloader in valloaders.items():
                         for i_val, (images_list, labels_list, aux_list) in tqdm(enumerate(valloader)):
@@ -368,10 +364,10 @@ def train(cfg, writer, logger, logdir):
                             if cfg["fusion"] == "None":
                                 outputs = mean[list(cfg["models"].keys())[0]]
                             elif cfg["fusion"] == "SoftmaxMultiply":
-                                outputs = mean["rgb"] * mean["d"]
+
+                                outputs = torch.nn.Softmax(dim=1)(mean["rgb"]) * torch.nn.Softmax(dim=1)(mean["d"])
                             elif cfg["fusion"] == "SoftmaxAverage":
-                                outputs = torch.nn.functional.normalize(mean["rgb"]) + torch.nn.functional.normalize(
-                                    mean["d"])
+                                outputs = torch.nn.Softmax(dim=1)(mean["rgb"]) + torch.nn.Softmax(dim=1)(mean["d"])
                             elif cfg["fusion"] == "WeightedVariance":
                                 rgb_var = 1 / (variance["rgb"] + 1e-5)
                                 d_var = 1 / (variance["d"] + 1e-5)
@@ -549,12 +545,6 @@ def plotMeansVariances(logdir, cfg, n_classes, i, i_val, m, k, inputs, pred, gt,
         mean_c = mean[0, c, :, :].cpu().numpy()
         variance_c = variance[0, c, :, :].cpu().numpy()
 
-        # Normarlize Image
-        mean_c[0, 0] = 0.0
-        mean_c[0, 0] = 1.0
-        variance_c[0, 0] = 0.0
-        variance_c[0, 0] = 1.0
-
         axes[2 * (c % 2), c // 2].imshow(mean_c)
         axes[2 * (c % 2), c // 2].set_title(str(c) + " Mean")
 
@@ -567,9 +557,15 @@ def plotMeansVariances(logdir, cfg, n_classes, i, i_val, m, k, inputs, pred, gt,
     path = "{}/{}/{}/{}".format(logdir, "meanvar", m, k)
     if not os.path.exists(path):
         os.makedirs(path)
-    plt.tight_layout()
     plt.savefig("{}/{}_{}.png".format(path, i_val, i))
     plt.close(fig)
+
+
+    fig, axes = plt.subplots(1,1)
+    axes.imshow(variance[0, :, :, :].mean(0).cpu().numpy())
+    plt.savefig("{}/{}_{}avg.png".format(path, i_val, i))
+    plt.close(fig)
+
 
 
 if __name__ == "__main__":

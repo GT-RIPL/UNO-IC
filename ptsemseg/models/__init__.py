@@ -11,9 +11,12 @@ from ptsemseg.models.linknet import *
 from ptsemseg.models.frrn import *
 from ptsemseg.models.fused_segnet import *
 from ptsemseg.models.fused_segnet_mcdo import *
-def get_model(model_dict, 
-              n_classes, 
-              input_size=(512,512),
+from ptsemseg.models.CAF_segnet import *
+
+
+def get_model(model_dict,
+              n_classes,
+              input_size=(512, 512),
               batch_size=2,
               mcdo_passes=1,
               fixed_mcdo=False,
@@ -23,10 +26,11 @@ def get_model(model_dict,
               start_layer="convbnrelu1_1",
               end_layer="classification",
               learned_uncertainty="none",
-              version=None, 
+              version=None,
               reduction=1.0,
               recalibrator=None,
               temperatureScaling=False,
+              varianceScaling=False,
               freeze=False,
               bins=0,
               device="cpu"):
@@ -49,11 +53,11 @@ def get_model(model_dict,
         model.init_vgg16_params(vgg16)
 
     elif name == "segnet_mcdo":
-        model = model(n_classes=n_classes, 
+        model = model(n_classes=n_classes,
                       input_size=input_size,
                       batch_size=batch_size,
-                      version=version, 
-                      reduction=reduction, 
+                      version=version,
+                      reduction=reduction,
                       mcdo_passes=mcdo_passes,
                       dropoutP=dropoutP,
                       full_mcdo=full_mcdo,
@@ -68,13 +72,38 @@ def get_model(model_dict,
                       **param_dict)
         vgg16 = models.vgg16(pretrained=True)
         model.init_vgg16_params(vgg16)
-        
+
     elif name == "fused_segnet_mcdo":
-        model = model(n_classes=n_classes, 
+        model = model(n_classes=n_classes,
                       input_size=input_size,
                       batch_size=batch_size,
-                      version=version, 
-                      reduction=reduction, 
+                      version=version,
+                      reduction=reduction,
+                      mcdo_passes=mcdo_passes,
+                      dropoutP=dropoutP,
+                      full_mcdo=full_mcdo,
+                      in_channels=in_channels,
+                      start_layer=start_layer,
+                      end_layer=end_layer,
+                      device=device,
+                      recalibrator=recalibrator,
+                      temperatureScaling=temperatureScaling,
+                      varianceScaling=varianceScaling,
+                      freeze=freeze,
+                      bins=bins,
+                      **param_dict)
+    elif name == "fused_segnet":
+        model = model(n_classes=n_classes,
+                      **param_dict)
+        vgg16 = models.vgg16(pretrained=True)
+        model.rgb_segnet.init_vgg16_params(vgg16)
+        model.d_segnet.init_vgg16_params(vgg16)
+    elif name == "CAF_segnet":
+        model = model(n_classes=n_classes,
+                      input_size=input_size,
+                      batch_size=batch_size,
+                      version=version,
+                      reduction=reduction,
                       mcdo_passes=mcdo_passes,
                       dropoutP=dropoutP,
                       full_mcdo=full_mcdo,
@@ -87,20 +116,14 @@ def get_model(model_dict,
                       freeze=freeze,
                       bins=bins,
                       **param_dict)
-    elif name == "fused_segnet":
-        model = model(n_classes=n_classes,
-                      **param_dict)
-        vgg16 = models.vgg16(pretrained=True)
-        model.rgb_segnet.init_vgg16_params(vgg16)
-        model.d_segnet.init_vgg16_params(vgg16)
     elif name == "unet":
         model = model(n_classes=n_classes, **param_dict)
 
     elif name == "pspnet":
-        model = model(n_classes=n_classes, 
+        model = model(n_classes=n_classes,
                       input_size=input_size,
-                      version=version, 
-                      reduction=reduction, 
+                      version=version,
+                      reduction=reduction,
                       mcdo_passes=mcdo_passes,
                       dropoutP=dropoutP,
                       learned_uncertainty=learned_uncertainty,
@@ -137,7 +160,8 @@ def _get_model_instance(name):
             "frrnA": frrn,
             "frrnB": frrn,
             "fused_segnet": fused_segnet,
-            "fused_segnet_mcdo": fused_segnet_mcdo
+            "fused_segnet_mcdo": fused_segnet_mcdo,
+            "CAF_segnet": CAF_segnet
         }[name]
     except:
-        raise("Model {} not available".format(name))
+        raise ("Model {} not available".format(name))

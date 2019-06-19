@@ -24,7 +24,7 @@ models:
         fixed_mcdo: No
         dropoutP: 0.5
         resume: models/d_BayesianSegnet_0.5_T000/d_segnet_mcdo_airsim_best_model.pkl
-fusion: SoftmaxMultiply #{None,SoftmaxMultiply}
+fusion: SoftmaxAvg #{None,SoftmaxMultiply}
 recal: afterMCDO #{None,afterMCDO,beforeMCDO}
 recalibrator: Platt #{Histogram,Polynomial_X}
 bins: 20

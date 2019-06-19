@@ -178,7 +178,7 @@ class segnet_mcdo(nn.Module):
 
         return up1
 
-    def forwardAvg(self, inputs, recalType="None", backprop=False):
+    def forwardAvg(self, inputs):
 
         for i in range(self.mcdo_passes):
             if i == 0:
@@ -216,7 +216,7 @@ class segnet_mcdo(nn.Module):
         """
 
         # Uncalibrated Softmax Mean and Variance
-        if self.recalibrator != "None":
+        if recalType != "None":
             mean = self.softmaxMCDO(x).mean(-1)
             variance = self.softmaxMCDO(x).std(-1)
             if recalType == "beforeMCDO":

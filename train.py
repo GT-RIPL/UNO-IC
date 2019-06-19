@@ -33,6 +33,7 @@ from functools import partial
 import matplotlib.pyplot as plt
 from collections import defaultdict
 
+
 def train(cfg, writer, logger, logdir):
     # Setup seeds
     torch.manual_seed(cfg.get("seed", 1337))
@@ -137,6 +138,7 @@ def train(cfg, writer, logger, logdir):
                                   device=device,
                                   recalibrator=cfg['recalibrator'],
                                   temperatureScaling=cfg['temperatureScaling'],
+                                  varianceScaling=cfg['varianceScaling'],
                                   freeze=attr['freeze'],
                                   bins=cfg["bins"]).to(device)
 
@@ -199,7 +201,6 @@ def train(cfg, writer, logger, logdir):
     best_iou = -100.0
     i = start_iter
     print(i)
-
 
     while i <= cfg["training"]["train_iters"]:
 
@@ -328,11 +329,14 @@ def train(cfg, writer, logger, logdir):
                                                inputs, post_pred, gt)
 
                                 torch.cuda.empty_cache()
-                    
+
                 #################################################################################
                 # Validation
                 #################################################################################
                 print("=" * 10, "VALIDATING", "=" * 10)
+
+                # print(models["rbgd"].module.gatedFusion.conv)
+
                 with torch.no_grad():
                     for k, valloader in valloaders.items():
                         for i_val, (images_list, labels_list, aux_list) in tqdm(enumerate(valloader)):
@@ -362,7 +366,7 @@ def train(cfg, writer, logger, logdir):
 
                             # Fusion Type
                             if cfg["fusion"] == "None":
-                                outputs = mean[list(cfg["models"].keys())[0]]
+                                outputs = torch.nn.Softmax(dim=1)(mean[list(cfg["models"].keys())[0]])
                             elif cfg["fusion"] == "SoftmaxMultiply":
 
                                 outputs = torch.nn.Softmax(dim=1)(mean["rgb"]) * torch.nn.Softmax(dim=1)(mean["d"])
@@ -371,19 +375,8 @@ def train(cfg, writer, logger, logdir):
                             elif cfg["fusion"] == "WeightedVariance":
                                 rgb_var = 1 / (variance["rgb"] + 1e-5)
                                 d_var = 1 / (variance["d"] + 1e-5)
-                                plt.figure()
-                                plt.title("rgb output variance (w/ blackoutNoise)")
-                                plt.hist(variance["rgb"].reshape(-1).data.cpu(), bins=50)
-                                plt.savefig("rgb.png")
-
-                                plt.figure()
-                                plt.hist(variance["d"].reshape(-1).data.cpu(), bins=50)
-                                plt.savefig("d.png")
-                                exit()
-
-                                print(variance["d"])
-                                outputs = (mean["rgb"] * rgb_var) / (rgb_var + d_var) + \
-                                          (mean["d"] * d_var) / (rgb_var + d_var)
+                                outputs = (torch.nn.Softmax(dim=1)(mean["rgb"]) * rgb_var) / (rgb_var + d_var) + \
+                                          (torch.nn.Softmax(dim=1)(mean["d"]) * d_var) / (rgb_var + d_var)
                             else:
                                 print("Fusion Type Not Supported")
 
@@ -442,9 +435,10 @@ def train(cfg, writer, logger, logdir):
                                                      cfg['model']['arch'],
                                                      cfg['data']['dataset']))
                         torch.save(state, save_path)
-            
+
             if i >= cfg["training"]["train_iters"]:
                 break
+
 
 def parseEightCameras(images, labels, aux, device):
     # Stack 8 Cameras into 1 for MCDO Dataset Testing
@@ -537,7 +531,6 @@ def plotPrediction(logdir, cfg, n_classes, i, i_val, k, inputs, pred, gt):
 
 
 def plotMeansVariances(logdir, cfg, n_classes, i, i_val, m, k, inputs, pred, gt, mean, variance):
-
     fig, axes = plt.subplots(4, n_classes // 2 + 1)
     [axi.set_axis_off() for axi in axes.ravel()]
 
@@ -560,12 +553,10 @@ def plotMeansVariances(logdir, cfg, n_classes, i, i_val, m, k, inputs, pred, gt,
     plt.savefig("{}/{}_{}.png".format(path, i_val, i))
     plt.close(fig)
 
-
-    fig, axes = plt.subplots(1,1)
+    fig, axes = plt.subplots(1, 1)
     axes.imshow(variance[0, :, :, :].mean(0).cpu().numpy())
     plt.savefig("{}/{}_{}avg.png".format(path, i_val, i))
     plt.close(fig)
-
 
 
 if __name__ == "__main__":
@@ -584,8 +575,7 @@ if __name__ == "__main__":
     with open(args.config) as fp:
         cfg = defaultdict(lambda: None, yaml.load(fp))
 
-    run_id = cfg["id"]
-    logdir = os.path.join("runs", os.path.basename(args.config)[:-4], str(run_id))
+    logdir = "/".join(["runs"] + args.config.split("/")[1:])
     writer = SummaryWriter(logdir)
 
     print("RUNDIR: {}".format(logdir))

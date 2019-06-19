@@ -1067,9 +1067,9 @@ class ConditionalAttentionFusion(nn.Module):
         )
         self.sigmoid = nn.Sigmoid()
 
-    def forward(self, rgb, d, rbg_var, d_var):
+    def forward(self, rgb, d, rgb_var, d_var):
 
-        fusion = torch.cat([rgb, d], dim=1)
+        fusion = torch.cat([rgb, d, rgb_var, d_var], dim=1)
 
         G = self.conv(fusion)
         G = self.sigmoid(G)

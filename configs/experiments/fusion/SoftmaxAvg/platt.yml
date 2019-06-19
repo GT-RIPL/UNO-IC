@@ -1,4 +1,4 @@
-id: rgbd_BayesianSegnet_SoftmaxMult_histogramFlat
+id: rgbd_BayesianSegnet_SoftmaxMult_platt
 model:
     arch: segnet_mcdo
 models:
@@ -24,9 +24,9 @@ models:
         fixed_mcdo: No
         dropoutP: 0.5
         resume: models/d_BayesianSegnet_0.5_T000/d_segnet_mcdo_airsim_best_model.pkl
-fusion: SoftmaxAvg #{None,SoftmaxMultiply}
+fusion: SoftmaxMultiply #{None,SoftmaxMultiply}
 recal: afterMCDO #{None,afterMCDO,beforeMCDO}
-recalibrator: HistogramFlat #{Histogram,Polynomial_X}
+recalibrator: Platt #{Histogram,Polynomial_X}
 bins: 20
 data:
     dataset: airsim

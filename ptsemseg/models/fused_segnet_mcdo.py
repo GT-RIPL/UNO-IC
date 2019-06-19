@@ -22,7 +22,8 @@ class fused_segnet_mcdo(nn.Module):
                  reduction=1.0,
                  device="cpu",
                  recalibrator="None",
-                 temperatureScaling="False",
+                 temperatureScaling=False,
+                 varianceScaling=False,
                  bins=0,
                  resumeRGB="./models/rgb_BayesianSegnet_0.5_T000/rgb_segnet_mcdo_airsim_best_model.pkl",
                  resumeD="./models/d_BayesianSegnet_0.5_T000/d_segnet_mcdo_airsim_best_model.pkl"
@@ -40,7 +41,6 @@ class fused_segnet_mcdo(nn.Module):
         self.rgb_segnet = torch.nn.DataParallel(self.rgb_segnet, device_ids=range(torch.cuda.device_count()))
         self.d_segnet = torch.nn.DataParallel(self.d_segnet, device_ids=range(torch.cuda.device_count()))
 
-
         # initialize segnet weights
         self.loadModel(self.rgb_segnet, resumeRGB)
         self.loadModel(self.d_segnet, resumeD)
@@ -57,9 +57,15 @@ class fused_segnet_mcdo(nn.Module):
         inputs_rgb = inputs[:, :3, :, :]
         inputs_d = inputs[:, 3:, :, :]
 
-        # TODO figure out how to backpropagate the mean of mcdo passes
-        mean_rgb = self.rgb_segnet.module.forwardAvg(inputs_rgb, recalType="None", backprop=True)
-        mean_d = self.d_segnet.module.forwardAvg(inputs_d, recalType="None", backprop=True)
+        if self.varianceScaling:
+            mean_rgb, var_rgb = self.rgb_segnet.module.forwardMCDO(inputs_rgb)
+            mean_d, var_d = self.d_segnet.module.forwardMCDO(inputs_d)
+
+            mean_rgb = mean_rgb / (var_rgb + 1e-5)
+            mean_d = mean_d / (var_d + 1e-5)
+        else:
+            mean_rgb = self.rgb_segnet.module.forwardAvg(inputs_rgb)
+            mean_d = self.d_segnet.module.forwardAvg(inputs_d)
 
         x = self.gatedFusion(mean_rgb, mean_d)
 

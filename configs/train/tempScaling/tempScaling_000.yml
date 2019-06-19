@@ -1,4 +1,4 @@
-id: rgbd_BayesianSegnet_SoftmaxMult_histogramFlat
+id: BayesianSegnet_tempScaling_T000
 model:
     arch: segnet_mcdo
 models:
@@ -12,7 +12,7 @@ models:
         masks: [0,1,2,3,4,5] # Number Mask Indices Should Equal Number of MCDO Passes
         fixed_mcdo: No # Yes: Fixed Masks per Pass; No: Randomized Masks per Pass
         dropoutP: 0.5 # Dropout Probability
-        resume: models/rgb_BayesianSegnet_0.5_T000/rgb_segnet_mcdo_airsim_best_model.pkl
+        resume: None
     d:
         in_channels: 3
         start_layer: down1
@@ -23,10 +23,11 @@ models:
         masks: [0,1,2,3,4,5] 
         fixed_mcdo: No
         dropoutP: 0.5
-        resume: models/d_BayesianSegnet_0.5_T000/d_segnet_mcdo_airsim_best_model.pkl
-fusion: SoftmaxAvg #{None,SoftmaxMultiply}
-recal: afterMCDO #{None,afterMCDO,beforeMCDO}
-recalibrator: HistogramFlat #{Histogram,Polynomial_X}
+        resume: None
+fusion: None #{None,SoftmaxMultiply}
+recal: None #{None,afterMCDO,beforeMCDO}
+recalibrator: None #{Histogram,Polynomial_X}
+temperatureScaling: True
 bins: 20
 data:
     dataset: airsim
@@ -53,10 +54,10 @@ data:
 training:
     train_iters: 100000
     batch_size: 2
-    val_interval: 50 #5000
+    val_interval: 50000
     n_workers: 8
-    print_interval: 50
-    png_frames: 50 #5000
+    print_interval: 1000
+    png_frames: 5000
     optimizer:
         name: 'adam'
         lr: 1.0e-5
@@ -65,4 +66,3 @@ training:
         size_average: False
     lr_schedule:
     resume: None
-

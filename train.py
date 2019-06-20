@@ -305,7 +305,7 @@ def train(cfg, writer, logger, logdir):
 
                             # Run Models
                             for m in cfg["models"].keys():
-                                outputs, mean, variance = models[m](images_recal[m])
+                                mean, variance = models[m].module.forwardMCDO(images_recal[m], cfg["recal"])
 
                                 # plot predictions without calibration
                                 pred = mean.data.argmax(1).cpu().numpy()
@@ -375,8 +375,7 @@ def train(cfg, writer, logger, logdir):
                             elif cfg["fusion"] == "WeightedVariance":
                                 rgb_var = 1 / (variance["rgb"] + 1e-5)
                                 d_var = 1 / (variance["d"] + 1e-5)
-                                outputs = (torch.nn.Softmax(dim=1)(mean["rgb"]) * rgb_var) / (rgb_var + d_var) + \
-                                          (torch.nn.Softmax(dim=1)(mean["d"]) * d_var) / (rgb_var + d_var)
+                                outputs = (torch.nn.Softmax(dim=1)(mean["rgb"]) * rgb_var) + (torch.nn.Softmax(dim=1)(mean["d"]) * d_var)
                             else:
                                 print("Fusion Type Not Supported")
 

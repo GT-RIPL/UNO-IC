@@ -108,5 +108,6 @@ ENV/
 
 runs
 *.csv
+*.log
 *.png
 #models

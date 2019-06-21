@@ -318,10 +318,10 @@ def train(cfg, writer, logger, logdir):
                                 # TODO calibrate outputs instead of rereunning model with calibration
                                 # outputs = models[m].module.calibrateOutput(output)
                                 if hasattr(models[m].module, 'forwardMCDO'):
-                                    mean[m], variance[m] = models[m].module.forwardMCDO(images_val[m], cfg["recal"])
+                                    mean, variance = models[m].module.forwardMCDO(images_recal[m], cfg["recal"])
                                 else:
-                                    mean[m] = models[m](images_val[m])
-                                    variance[m] = torch.zeros(mean[m].shape)
+                                    mean = models[m](images_recal[m])
+                                    variance = torch.zeros(mean.shape)
                                 post_pred = mean.data.argmax(1).cpu().numpy()
                                 plotMeansVariances(logdir, cfg, n_classes, i, i_recal, m, "recal/post_recal", inputs,
                                                    post_pred, gt, mean, variance)

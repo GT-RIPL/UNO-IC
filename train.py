@@ -375,7 +375,13 @@ def train(cfg, writer, logger, logdir):
                             elif cfg["fusion"] == "WeightedVariance":
                                 rgb_var = 1 / (variance["rgb"] + 1e-5)
                                 d_var = 1 / (variance["d"] + 1e-5)
-                                outputs = (torch.nn.Softmax(dim=1)(mean["rgb"]) * rgb_var) + (torch.nn.Softmax(dim=1)(mean["d"]) * d_var)
+                                outputs = (torch.nn.Softmax(dim=1)(mean["rgb"]) * rgb_var) + (
+                                            torch.nn.Softmax(dim=1)(mean["d"]) * d_var)
+                            elif cfg["fusion"] == "FuzzyLogic":
+                                outputs = torch.max(torch.nn.Softmax(dim=1)(mean["rgb"]),
+                                                    torch.nn.Softmax(dim=1)(mean["d"]))
+                            elif cfg["fusion"] == "FuzzyLogicVariance":
+                                outputs = torch.max(variance["rgb"], variance["d"])
                             else:
                                 print("Fusion Type Not Supported")
 

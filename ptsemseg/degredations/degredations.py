@@ -9,6 +9,7 @@ import torchvision.datasets as dset
 import torchvision.transforms as trn
 import torch.utils.data as data
 import numpy as np
+from ptsemseg.degredations import *
 
 from PIL import Image
 
@@ -571,11 +572,62 @@ def elastic_transform(image, severity=1):
     return np.clip(map_coordinates(image, indices, order=1, mode='reflect').reshape(shape), 0, 1) * 255
 
 
+
+
+def blackoutNoise(image, severity=1):
+    image = np.zeros(image.shape,dtype=np.uint8)
+    m = (severity,severity,severity) 
+    s = (severity,severity,severity)
+
+    image = np.clip(cv2.randn(image,m,s),0,255)
+    
+    return image
+
+
+def additiveGaussianNoise(image, severity=1):
+
+    m = (severity,severity,severity) 
+    s = (severity,severity,severity)
+    corr = cv2.randn(np.zeros(image.shape,dtype=np.uint8),m,s)
+
+    image = np.clip(image.copy()+corr,0,255)
+    return image
+
+def occlusion(image, severity=1):
+
+    mask = np.ones(image.shape,dtype=np.uint8)
+
+    x = int(image.shape[0]*np.random.rand())
+    y = int(image.shape[1]*np.random.rand())
+    r = int((min(image.shape[:2])/4)*np.random.rand()+(min(image.shape[:2])/4))
+
+    cv2.circle(mask,(x,y),r,0,-1)
+
+    image = np.clip(image.copy()*mask,0,255)
+    return image
+
+def brightnessCircle(image, severity=1):   
+
+    orig = cv2.imread(file)
+    hsv = cv2.cvtColor(orig,cv2.COLOR_BGR2HSV)
+    corr = np.zeros(hsv.shape[:2],dtype=np.uint8)
+
+    x = int(hsv.shape[0]*np.random.rand())
+    y = int(hsv.shape[1]*np.random.rand())
+    r = int((min(hsv.shape[:2])/2)*np.random.rand()+(min(hsv.shape[:2])/4))
+
+    cv2.circle(corr,(x,y),r,noise_amount,-1)
+
+    hsv[:,:,2] = np.array(hsv[:,:,2])+corr 
+
+    print(x,y,r)
+
+    img = cv2.cvtColor(np.array(np.clip(hsv,0,255),np.uint8),cv2.COLOR_HSV2BGR)
+
 # /////////////// End Distortions ///////////////
 
 
 # /////////////// Further Setup ///////////////
-
 
 def save_distorted(dir="/share/data/vision-greg/ImageNet/clsloc/images/val",method=gaussian_noise):
     for severity in range(1, 6):
@@ -592,35 +644,3 @@ def save_distorted(dir="/share/data/vision-greg/ImageNet/clsloc/images/val",meth
 
 # /////////////// End Further Setup ///////////////
 
-
-# /////////////// Display Results ///////////////
-import collections
-
-print('\nUsing ImageNet data')
-
-d = collections.OrderedDict()
-d['Gaussian Noise'] = gaussian_noise
-d['Shot Noise'] = shot_noise
-d['Impulse Noise'] = impulse_noise
-d['Defocus Blur'] = defocus_blur
-d['Glass Blur'] = glass_blur
-d['Motion Blur'] = motion_blur
-d['Zoom Blur'] = zoom_blur
-d['Snow'] = snow
-d['Frost'] = frost
-d['Fog'] = fog
-d['Brightness'] = brightness
-d['Contrast'] = contrast
-d['Elastic'] = elastic_transform
-d['Pixelate'] = pixelate
-d['JPEG'] = jpeg_compression
-
-d['Speckle Noise'] = speckle_noise
-d['Gaussian Blur'] = gaussian_blur
-d['Spatter'] = spatter
-d['Saturate'] = saturate
-import sys
-dir = sys.argv[1]
-
-for method_name in d.keys():
-    save_distorted(dir, d[method_name])

@@ -1,4 +1,4 @@
-id: rgbd_BayesianSegnet_WeightedVariance
+id: rgbd_BayesianSegnet_SoftmaxMult
 model:
     arch: segnet_mcdo
 models:
@@ -7,7 +7,7 @@ models:
         start_layer: down1
         end_layer: up1
         reduction: 1.0
-        mcdo_passes: 50
+        mcdo_passes: 6 # Number of Passes
         mask_dir: models/DropoutMasks/Random # Directory of Indexed Masks
         masks: [0,1,2,3,4,5] # Number Mask Indices Should Equal Number of MCDO Passes
         fixed_mcdo: No # Yes: Fixed Masks per Pass; No: Randomized Masks per Pass
@@ -18,13 +18,13 @@ models:
         start_layer: down1
         end_layer: up1
         reduction: 1.0
-        mcdo_passes: 50
+        mcdo_passes: 6
         mask_dir: models/DropoutMasks/Random 
         masks: [0,1,2,3,4,5] 
         fixed_mcdo: No
         dropoutP: 0.5
         resume: models/d_BayesianSegnet_0.5_T000/d_segnet_mcdo_airsim_best_model.pkl
-fusion: WeightedVariance #{None,SoftmaxMultiply}
+fusion: SoftmaxMultiply #{None,SoftmaxMultiply}
 recal: None #{None,afterMCDO,beforeMCDO}
 recalibrator: None #{Histogram,Polynomial_X}
 bins: 20
@@ -38,12 +38,7 @@ data:
     recal_reduction: 0.5
     val_split: val
     val_subsplit: [
-                   'async_fog_000_clear',
-                   'async_fog_050_clear',
-                   'async_fog_100_clear',
-                   "async_fog_100_clear__{'channel':'rgb','type':'blackoutNoise','value':'20'}",
-                   "async_fog_100_clear__{'channel':'d','type':'blackoutNoise','value':'20'}",
-                   "async_fog_100_clear__{'channel':'rgbd','type':'blackoutNoise','value':'20'}",                   
+                   "async_fog_100_clear__{'channel':'rgb','type':'snow','value':'3'}",                
                   ]    
     val_reduction: 1.0
     img_rows: 512

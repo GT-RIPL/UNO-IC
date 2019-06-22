@@ -24,6 +24,7 @@ from ptsemseg.metrics import runningScore, averageMeter
 from ptsemseg.augmentations import get_composed_augmentations
 from ptsemseg.schedulers import get_scheduler
 from ptsemseg.optimizers import get_optimizer
+from ptsemseg.degredations import *
 
 from tensorboardX import SummaryWriter
 from scipy.misc import imsave
@@ -291,6 +292,7 @@ def train(cfg, writer, logger, logdir):
                             models[m].module.calibrationPerClass[c].fit(output_all, labels_all)
                         models[m].module.showCalibration(output_all, labels_all, logdir, m, i)
 
+                    """
                     # plot mean/variances of predictions of (un)calibrated models
                     with torch.no_grad():
                         for i_recal, (images_list, labels_list, aux_list) in tqdm(enumerate(recalloader)):
@@ -302,7 +304,6 @@ def train(cfg, writer, logger, logdir):
                             images_recal = {m: inputs[m][:bs, :, :, :] for m in cfg["models"].keys()}
                             labels_recal = labels[:bs, :, :]
                             gt = labels_recal.data.cpu().numpy()
-
                             # Run Models
                             for m in cfg["models"].keys():
                                 mean, variance = models[m].module.forwardMCDO(images_recal[m], cfg["recal"])
@@ -329,7 +330,7 @@ def train(cfg, writer, logger, logdir):
                                                inputs, post_pred, gt)
 
                                 torch.cuda.empty_cache()
-
+                    """
                 #################################################################################
                 # Validation
                 #################################################################################
@@ -375,8 +376,10 @@ def train(cfg, writer, logger, logdir):
                             elif cfg["fusion"] == "WeightedVariance":
                                 rgb_var = 1 / (variance["rgb"] + 1e-5)
                                 d_var = 1 / (variance["d"] + 1e-5)
+                                print(variance["rgb"].shape)
+                                print(rgb_var.shape)
                                 outputs = (torch.nn.Softmax(dim=1)(mean["rgb"]) * rgb_var) + (
-                                            torch.nn.Softmax(dim=1)(mean["d"]) * d_var)
+                                           torch.nn.Softmax(dim=1)(mean["d"]) * d_var)
                             elif cfg["fusion"] == "FuzzyLogic":
                                 outputs = torch.max(torch.nn.Softmax(dim=1)(mean["rgb"]),
                                                     torch.nn.Softmax(dim=1)(mean["d"]))
@@ -493,7 +496,7 @@ def plotPrediction(logdir, cfg, n_classes, i, i_val, k, inputs, pred, gt):
     axes[0, 0].imshow(inputs['rgb'][0, :, :, :].permute(1, 2, 0).cpu().numpy()[:, :, 0])
     axes[0, 0].set_title("RGB")
 
-    axes[0, 1].imshow(inputs['d'][0, :, :, :].permute(1, 2, 0).cpu().numpy())
+    axes[0, 1].imshow(inputs['d'][0, :, :, :].permute(1, 2, 0).cpu().numpy()[:, :, 0])
     axes[0, 1].set_title("D")
 
     axes[0, 2].imshow(gt_norm)

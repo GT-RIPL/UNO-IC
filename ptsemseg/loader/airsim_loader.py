@@ -45,12 +45,6 @@ def label_region_n_compute_distance(i,path_tuple):
 
 
 
-
-
-
-
-
-
 class airsimLoader(data.Dataset):
     
     name2color = {"person":      [[135, 169, 180]],
@@ -631,9 +625,6 @@ class airsimLoader(data.Dataset):
 
             #start_ts = time.time()
 
-
-
-
             img_path, mask_path = self.imgs[self.split][camera]['scene'][index], self.imgs[self.split][camera]['segmentation'][index]
             img, mask = np.array(cv2.imread(img_path),dtype=np.uint8)[:,:,:3], np.array(cv2.imread(mask_path),dtype=np.uint8)[:,:,:3]
 
@@ -652,9 +643,6 @@ class airsimLoader(data.Dataset):
 
             #start_ts = time.time()
 
-            degradation = self.dgrd[self.split][camera]['scene'][index]
-            if not degradation is None:
-                img, depth = self.degradation(degradation, img, depth)
 
 
             aux = depth            
@@ -683,73 +671,14 @@ class airsimLoader(data.Dataset):
 
         degradation = yaml.load((degradation))
 
-        if degradation['type'] == 'blackoutNoise':
-        
-            rgb_corr = np.zeros(img.shape,dtype=np.uint8)
-            d_corr = np.zeros(depth.shape,dtype=np.uint8)
-
-            m = (int(degradation['value']),int(degradation['value']),int(degradation['value'])) 
-            s = (int(degradation['value']),int(degradation['value']),int(degradation['value']))
-
-            rgb_corr = np.clip(cv2.randn(rgb_corr,m,s),0,255)
-            d_corr = np.clip(cv2.randn(d_corr,m,s),0,255)
-
-
-        elif degradation['type'] == 'additiveGaussianNoise':
-
-            m = (int(degradation['value']),int(degradation['value']),int(degradation['value'])) 
-            s = (int(degradation['value']),int(degradation['value']),int(degradation['value']))
-            corr = cv2.randn(np.zeros(img.shape,dtype=np.uint8),m,s)
-
-            rgb_corr = np.clip(img.copy()+corr,0,255)
-            d_corr = np.clip(depth.copy()+corr,0,255)
-
-        elif degradation['type'] == 'occlusion':
-
-            mask = np.ones(img.shape,dtype=np.uint8)
-
-            x = int(img.shape[0]*np.random.rand())
-            y = int(img.shape[1]*np.random.rand())
-            r = int((min(img.shape[:2])/4)*np.random.rand()+(min(img.shape[:2])/4))
-
-            cv2.circle(mask,(x,y),r,0,-1)
-
-            corr_rgb = np.clip(img.copy()*mask,0,255)
-            corr_d = np.clip(depth.copy()*mask,0,255)
-
+        if degradation['type'] in key2deg.keys():
+            if "rgb" in degradation['channel']:
+                img = key2deg[degradation['type']](img, degradation['value'])
+            if "d" in degradation['channel']:
+                depth = key2deg[degradation['type']](depth, degradation['value'])
         else:
-
             print("Corruption Type Not Implemented")
-            rgb_corr = img
-            d_corr = depth
-
-        # elif degradation['type'] == 'brightnessCircle':          
-
-            # orig = cv2.imread(file)
-            # hsv = cv2.cvtColor(orig,cv2.COLOR_BGR2HSV)
-            # corr = np.zeros(hsv.shape[:2],dtype=np.uint8)
-
-            # x = int(hsv.shape[0]*np.random.rand())
-            # y = int(hsv.shape[1]*np.random.rand())
-            # r = int((min(hsv.shape[:2])/2)*np.random.rand()+(min(hsv.shape[:2])/4))
-
-            # cv2.circle(corr,(x,y),r,noise_amount,-1)
-
-            # hsv[:,:,2] = np.array(hsv[:,:,2])+corr 
-
-            # print(x,y,r)
-
-
-            # img = cv2.cvtColor(np.array(np.clip(hsv,0,255),np.uint8),cv2.COLOR_HSV2BGR)
-
-
-
-
-        if "rgb" in degradation['channel']:
-            img = rgb_corr
-        if "d" in degradation['channel']:
-            depth = d_corr
-
+            
         return img, depth
 
 

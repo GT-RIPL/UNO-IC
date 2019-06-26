@@ -52,6 +52,7 @@ class fused_segnet_mcdo(nn.Module):
             param.requires_grad = False
 
         self.gatedFusion = GatedFusion(n_classes)
+        self.varianceScaling = varianceScaling
 
     def forward(self, inputs):
         inputs_rgb = inputs[:, :3, :, :]

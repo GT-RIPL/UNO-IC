@@ -89,7 +89,6 @@ def get_model(model_dict,
                       recalibrator=recalibrator,
                       temperatureScaling=temperatureScaling,
                       varianceScaling=varianceScaling,
-                      freeze=freeze,
                       bins=bins,
                       **param_dict)
     elif name == "fused_segnet":
@@ -113,7 +112,6 @@ def get_model(model_dict,
                       device=device,
                       recalibrator=recalibrator,
                       temperatureScaling=temperatureScaling,
-                      freeze=freeze,
                       bins=bins,
                       **param_dict)
     elif name == "unet":

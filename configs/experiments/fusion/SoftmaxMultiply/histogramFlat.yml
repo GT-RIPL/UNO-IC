@@ -1,4 +1,4 @@
-id: rgbd_BayesianSegnet_SoftmaxMult_histogramLinear
+id: rgbd_BayesianSegnet_SoftmaxMult_histogramFlat
 model:
     arch: segnet_mcdo
 models:
@@ -26,7 +26,7 @@ models:
         resume: models/d_BayesianSegnet_0.5_T000/d_segnet_mcdo_airsim_best_model.pkl
 fusion: SoftmaxMultiply #{None,SoftmaxMultiply}
 recal: afterMCDO #{None,afterMCDO,beforeMCDO}
-recalibrator: HistogramLinear #{Histogram,Polynomial_X}
+recalibrator: HistogramFlat #{Histogram,Polynomial_X}
 bins: 20
 data:
     dataset: airsim
@@ -35,7 +35,7 @@ data:
     train_reduction: 1.0    
     recal_split: recal
     recal_subsplit: ['async_fog_000_clear']
-    recal_reduction: 0.5
+    recal_reduction: 0.2
     val_split: val
     val_subsplit: [
                    'async_fog_000_clear',

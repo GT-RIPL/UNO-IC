@@ -16,7 +16,7 @@ from torch.utils import data
 import yaml
 from tqdm import tqdm
 import pickle
-
+from ptsemseg.degredations import *
 random.seed(42) 
 
 
@@ -644,6 +644,9 @@ class airsimLoader(data.Dataset):
             #start_ts = time.time()
 
 
+            degradation = self.dgrd[self.split][camera]['scene'][index]
+            if not degradation is None:
+                img, depth = self.degradation(degradation, img, depth)
 
             aux = depth            
             lbl = self.ignore_index*np.ones((img.shape[0],img.shape[1]),dtype=np.uint8)
@@ -673,9 +676,9 @@ class airsimLoader(data.Dataset):
 
         if degradation['type'] in key2deg.keys():
             if "rgb" in degradation['channel']:
-                img = key2deg[degradation['type']](img, degradation['value'])
+                img = key2deg[degradation['type']](img, int(degradation['value']))
             if "d" in degradation['channel']:
-                depth = key2deg[degradation['type']](depth, degradation['value'])
+                depth = key2deg[degradation['type']](depth, int(degradation['value']))
         else:
             print("Corruption Type Not Implemented")
             

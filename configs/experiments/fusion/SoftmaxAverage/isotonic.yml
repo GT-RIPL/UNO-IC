@@ -1,4 +1,4 @@
-id: rgbd_BayesianSegnet_WeightedVariance_histogramLinear
+id: rgbd_BayesianSegnet_SoftmaxAverage_isotonic
 model:
     arch: segnet_mcdo
 models:
@@ -24,9 +24,9 @@ models:
         fixed_mcdo: No
         dropoutP: 0.5
         resume: models/d_BayesianSegnet_0.5_T000/d_segnet_mcdo_airsim_best_model.pkl
-fusion: WeightedVariance #{None,SoftmaxMultiply}
+fusion: SoftmaxAverage #{None,SoftmaxMultiply}
 recal: afterMCDO #{None,afterMCDO,beforeMCDO}
-recalibrator: HistogramLinear #{Histogram,Polynomial_X}
+recalibrator: Isotonic #{Histogram,Polynomial_X}
 bins: 20
 data:
     dataset: airsim

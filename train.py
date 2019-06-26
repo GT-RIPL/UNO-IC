@@ -284,7 +284,7 @@ def train(cfg, writer, logger, logdir):
                                 mean, variance = models[m].module.forwardMCDO(images_recal)
 
                                 # concat results
-                                output_all[bs * i_recal:bs * (i_recal + 1), :, :, :] = mean
+                                output_all[bs * i_recal:bs * (i_recal + 1), :, :, :] = torch.nn.Softmax(dim=1)(mean)
                                 labels_all[bs * i_recal:bs * (i_recal + 1), :, :] = labels_recal
 
                         # fit calibration models
@@ -369,7 +369,6 @@ def train(cfg, writer, logger, logdir):
                             if cfg["fusion"] == "None":
                                 outputs = torch.nn.Softmax(dim=1)(mean[list(cfg["models"].keys())[0]])
                             elif cfg["fusion"] == "SoftmaxMultiply":
-
                                 outputs = torch.nn.Softmax(dim=1)(mean["rgb"]) * torch.nn.Softmax(dim=1)(mean["d"])
                             elif cfg["fusion"] == "SoftmaxAverage":
                                 outputs = torch.nn.Softmax(dim=1)(mean["rgb"]) + torch.nn.Softmax(dim=1)(mean["d"])
@@ -496,7 +495,7 @@ def plotPrediction(logdir, cfg, n_classes, i, i_val, k, inputs, pred, gt):
     axes[0, 0].imshow(inputs['rgb'][0, :, :, :].permute(1, 2, 0).cpu().numpy()[:, :, 0])
     axes[0, 0].set_title("RGB")
 
-    axes[0, 1].imshow(inputs['d'][0, :, :, :].permute(1, 2, 0).cpu().numpy()[:, :, 0])
+    axes[0, 1].imshow(inputs['d'][0, :, :, :].permute(1, 2, 0).cpu().numpy())
     axes[0, 1].set_title("D")
 
     axes[0, 2].imshow(gt_norm)

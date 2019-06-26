@@ -38,7 +38,7 @@ data:
     recal_reduction: 0.5
     val_split: val
     val_subsplit: [
-                   "async_fog_100_clear__{'channel':'rgb','type':'snow','value':'3'}",                
+                   "async_fog_000_clear__{'channel':'rgb','type':'snow','value':'3'}",                
                   ]    
     val_reduction: 1.0
     img_rows: 512

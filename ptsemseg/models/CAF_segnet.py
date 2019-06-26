@@ -6,7 +6,7 @@ from ptsemseg.models.recalibrator import *
 from ptsemseg.models.segnet_mcdo import *
 
 
-class fused_segnet_mcdo(nn.Module):
+class CAF_segnet(nn.Module):
     def __init__(self,
                  n_classes=21,
                  in_channels=3,
@@ -22,12 +22,12 @@ class fused_segnet_mcdo(nn.Module):
                  reduction=1.0,
                  device="cpu",
                  recalibrator="None",
-                 temperatureScaling="False",
+                 temperatureScaling=False,
                  bins=0,
                  resumeRGB="./models/rgb_BayesianSegnet_0.5_T000/rgb_segnet_mcdo_airsim_best_model.pkl",
                  resumeD="./models/d_BayesianSegnet_0.5_T000/d_segnet_mcdo_airsim_best_model.pkl"
                  ):
-        super(fused_segnet_mcdo, self).__init__()
+        super(CAF_segnet, self).__init__()
 
         self.rgb_segnet = segnet_mcdo(n_classes, in_channels, is_unpooling, input_size, batch_size, version,
                                       mcdo_passes, dropoutP, full_mcdo, start_layer,
@@ -58,9 +58,9 @@ class fused_segnet_mcdo(nn.Module):
         inputs_d = inputs[:, 3:, :, :]
 
         mean_rgb, var_rgb = self.rgb_segnet.module.forwardMCDO(inputs_rgb)
-        mean_d, var_rgb = self.d_segnet.module.forwardMCDO(inputs_d)
+        mean_d, var_d = self.d_segnet.module.forwardMCDO(inputs_d)
 
-        x = self.gatedFusion(mean_rgb, mean_d)
+        x = self.gatedFusion(mean_rgb, mean_d, var_rgb, var_d)
 
         return x
 

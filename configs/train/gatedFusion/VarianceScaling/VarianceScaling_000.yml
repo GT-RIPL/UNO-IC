@@ -1,6 +1,6 @@
-id: GatedFusionSegnet_T000
+id: GatedFusionSegnet_VarianceScaling_T000
 model:
-    arch: CAF_segnet
+    arch: fused_segnet_mcdo
 models:
     rgbd:
         in_channels: 3
@@ -13,6 +13,7 @@ models:
         fixed_mcdo: No
         dropoutP: 0.5
         resume: None
+        varianceScaling: True
 fusion: None #{None,SoftmaxMultiply}
 recal: None #{None,afterMCDO,beforeMCDO}
 recalibrator: None #{Histogram,Polynomial_X}
@@ -40,9 +41,9 @@ data:
     path: datasets/airsim_data_async #../../ros/data/airsim_03-30-2019/airsim_data_async
     noisy_type: None 
 training:
-    train_iters: 100000
+    train_iters: 10000
     batch_size: 2
-    val_interval: 5000
+    val_interval: 1000
     n_workers: 8
     print_interval: 50
     png_frames: 50

@@ -13,17 +13,17 @@ models:
         fixed_mcdo: No # Yes: Fixed Masks per Pass; No: Randomized Masks per Pass
         dropoutP: 0.5 # Dropout Probability
         resume: None
-    d:
-        in_channels: 3
-        start_layer: down1
-        end_layer: up1
-        reduction: 1.0
-        mcdo_passes: 6
-        mask_dir: models/DropoutMasks/Random 
-        masks: [0,1,2,3,4,5] 
-        fixed_mcdo: No
-        dropoutP: 0.5
-        resume: None
+    #d:
+    #    in_channels: 3
+    #    start_layer: down1
+    #    end_layer: up1
+    #    reduction: 1.0
+    #    mcdo_passes: 6
+    #    mask_dir: models/DropoutMasks/Random 
+    #    masks: [0,1,2,3,4,5] 
+    #    fixed_mcdo: No
+    #    dropoutP: 0.5
+    #    resume: None
 fusion: None #{None,SoftmaxMultiply}
 recal: None #{None,afterMCDO,beforeMCDO}
 recalibrator: None #{Histogram,Polynomial_X}
@@ -54,9 +54,9 @@ data:
 training:
     train_iters: 100000
     batch_size: 2
-    val_interval: 50000
+    val_interval: 10000
     n_workers: 8
-    print_interval: 1000
+    print_interval: 50
     png_frames: 5000
     optimizer:
         name: 'adam'

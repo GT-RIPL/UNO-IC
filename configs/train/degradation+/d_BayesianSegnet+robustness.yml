@@ -37,7 +37,7 @@ data:
                    #'async_fog_100_clear',
                    "async_fog_000_clear__{'channel':'rgbd','type':'gaussianNoise','value':'3'}",
                    #"async_fog_000_clear__{'channel':'rgbd','type':'shotNoise','value':'3'}",
-                   "async_fog_000_clear__{'channel':'rgbd','type':'impulseNoise','value':'3'}",
+                   #"async_fog_000_clear__{'channel':'rgbd','type':'impulseNoise','value':'3'}",
                    ]
     train_reduction: 1.0
     recal_split: recal
@@ -51,16 +51,16 @@ data:
                    "async_fog_000_clear__{'channel':'rgbd','type':'gaussianNoise','value':'3'}",
                    "async_fog_000_clear__{'channel':'rgbd','type':'shotNoise','value':'3'}",
                    "async_fog_000_clear__{'channel':'rgbd','type':'impulseNoise','value':'3'}",
-                  ]
+                  ]    
     val_reduction: 0.5
     img_rows: 512
     img_cols: 512
     path: datasets/airsim_data_async #../../ros/data/airsim_03-30-219/airsim_data_async
-    noisy_type: None
+    noisy_type: None 
 training:
-    train_iters: 300000
-    batch_size: 4
-    val_interval: 5000
+    train_iters: 200000
+    batch_size: 2
+    val_interval: 10000
     n_workers: 8
     print_interval: 50
     png_frames: 50 #5000
@@ -72,4 +72,3 @@ training:
         size_average: False
     lr_schedule:
     resume: None
-

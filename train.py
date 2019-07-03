@@ -292,51 +292,15 @@ def train(cfg, writer, logger, logdir):
                             models[m].module.calibrationPerClass[c].fit(output_all, labels_all)
                         models[m].module.showCalibration(output_all, labels_all, logdir, m, i)
 
-                    """
-                    # plot mean/variances of predictions of (un)calibrated models
-                    with torch.no_grad():
-                        for i_recal, (images_list, labels_list, aux_list) in tqdm(enumerate(recalloader)):
-
-                            inputs, labels = parseEightCameras(images_list, labels_list, aux_list, device)
-
-                            # Read batch from only one camera
-                            bs = cfg['training']['batch_size']
-                            images_recal = {m: inputs[m][:bs, :, :, :] for m in cfg["models"].keys()}
-                            labels_recal = labels[:bs, :, :]
-                            gt = labels_recal.data.cpu().numpy()
-                            # Run Models
-                            for m in cfg["models"].keys():
-                                mean, variance = models[m].module.forwardMCDO(images_recal[m], cfg["recal"])
-
-                                # plot predictions without calibration
-                                pred = mean.data.argmax(1).cpu().numpy()
-                                plotMeansVariances(logdir, cfg, n_classes, i, i_recal, m, "recal/pre_recal", inputs,
-                                                   pred, gt, mean, variance)
-                                plotPrediction(logdir, cfg, n_classes, i, i_recal, "recal/" + m + "/pre_recal_pred",
-                                               inputs, pred, gt)
-
-                                # plot predictions with calibration
-                                # TODO calibrate outputs instead of rereunning model with calibration
-                                # outputs = models[m].module.calibrateOutput(output)
-                                if hasattr(models[m].module, 'forwardMCDO'):
-                                    mean, variance = models[m].module.forwardMCDO(images_recal[m], cfg["recal"])
-                                else:
-                                    mean = models[m](images_recal[m])
-                                    variance = torch.zeros(mean.shape)
-                                post_pred = mean.data.argmax(1).cpu().numpy()
-                                plotMeansVariances(logdir, cfg, n_classes, i, i_recal, m, "recal/post_recal", inputs,
-                                                   post_pred, gt, mean, variance)
-                                plotPrediction(logdir, cfg, n_classes, i, i_recal, "recal/" + m + "/post_recal_pred",
-                                               inputs, post_pred, gt)
-
-                                torch.cuda.empty_cache()
-                    """
                 #################################################################################
                 # Validation
                 #################################################################################
                 print("=" * 10, "VALIDATING", "=" * 10)
 
-                # print(models["rbgd"].module.gatedFusion.conv)
+                for m in models:
+                    print(models[m].module.temperature)
+
+
 
                 with torch.no_grad():
                     for k, valloader in valloaders.items():
@@ -365,6 +329,7 @@ def train(cfg, writer, logger, logdir):
                                     variance[m] = torch.zeros(mean[m].shape)
                                 val_loss[m] = loss_fn(input=mean[m], target=labels_val)
 
+
                             # Fusion Type
                             if cfg["fusion"] == "None":
                                 outputs = torch.nn.Softmax(dim=1)(mean[list(cfg["models"].keys())[0]])
@@ -373,12 +338,17 @@ def train(cfg, writer, logger, logdir):
                             elif cfg["fusion"] == "SoftmaxAverage":
                                 outputs = torch.nn.Softmax(dim=1)(mean["rgb"]) + torch.nn.Softmax(dim=1)(mean["d"])
                             elif cfg["fusion"] == "WeightedVariance":
-                                rgb_var = 1 / (variance["rgb"] + 1e-5)
-                                d_var = 1 / (variance["d"] + 1e-5)
-                                print(variance["rgb"].shape)
-                                print(rgb_var.shape)
-                                outputs = (torch.nn.Softmax(dim=1)(mean["rgb"]) * rgb_var) + (
-                                           torch.nn.Softmax(dim=1)(mean["d"]) * d_var)
+                                rgb_var = 1 / (torch.mean(variance["rgb"], 1) + 1e-5)
+                                d_var = 1 / (torch.mean(variance["d"], 1) + 1e-5)
+                                
+                                rgb = torch.nn.Softmax(dim=1)(mean["rgb"])
+                                d = torch.nn.Softmax(dim=1)(mean["d"])
+                                for n in range(n_classes):
+                                    rgb[:, n, :, :] = rgb[:, n, :, :] * rgb_var
+                                    d[:, n, :, :] = d[:, n, :, :] * d_var
+
+                                outputs = rgb + d
+                                
                             elif cfg["fusion"] == "FuzzyLogic":
                                 outputs = torch.max(torch.nn.Softmax(dim=1)(mean["rgb"]),
                                                     torch.nn.Softmax(dim=1)(mean["d"]))

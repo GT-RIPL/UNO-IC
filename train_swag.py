@@ -140,11 +140,12 @@ def train(cfg, writer, logger, logdir):
     i = start_iter
     print(i)
 
-    while i <= cfg["training"]["train_iters"] + 1:
+    while i <= cfg["training"]["train_iters"]:
 
         print("=" * 10, "TRAINING", "=" * 10)
         for (images_list, labels_list, aux_list) in loaders['train']:
 
+            i += 1
             
             if i % cfg["training"]["val_interval"] == 0 or i >= cfg["training"]["train_iters"]:
 
@@ -299,8 +300,6 @@ def train(cfg, writer, logger, logdir):
                                                      cfg['data']['dataset']))
                         torch.save(state, save_path)
 
-            i += 1
-            
             if i >= cfg["training"]["train_iters"]:
                 break
             

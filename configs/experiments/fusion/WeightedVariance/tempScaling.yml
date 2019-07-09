@@ -1,4 +1,4 @@
-id: rgbd_BayesianSegnet_WeightedVariance
+id: rgbd_BayesianSegnet_WeightedVariance_tempScaling
 model:
     arch: segnet_mcdo
 models:
@@ -18,7 +18,7 @@ models:
         mcdo_passes: 6
         dropoutP: 0.5
         resume: models/tempScaling/d_BayesianSegnet_0.5_T000/d_segnet_mcdo_airsim_best_model.pkl
-fusion: None #{None,SoftmaxMultiply}
+fusion: WeightedVariance #{None,SoftmaxMultiply}
 recal: None #{None,afterMCDO,beforeMCDO}
 recalibrator: None #{Histogram,Polynomial_X}
 temperatureScaling: True

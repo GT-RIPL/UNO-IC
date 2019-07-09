@@ -46,11 +46,12 @@ class CAF_segnet(nn.Module):
         self.loadModel(self.d_segnet, resumeD)
 
         # freeze segnet networks
+        """
         for param in self.rgb_segnet.parameters():
             param.requires_grad = False
         for param in self.d_segnet.parameters():
             param.requires_grad = False
-
+        """
         self.gatedFusion = ConditionalAttentionFusion(n_classes)
 
     def forward(self, inputs):
@@ -59,6 +60,11 @@ class CAF_segnet(nn.Module):
 
         mean_rgb, var_rgb = self.rgb_segnet.module.forwardMCDO(inputs_rgb)
         mean_d, var_d = self.d_segnet.module.forwardMCDO(inputs_d)
+        
+        s = var_rgb.shape
+        
+        var_rgb = torch.mean(var_rgb, 1).view(-1, 1, s[2], s[3])
+        var_d = torch.mean(var_d, 1).view(-1, 1, s[2], s[3])
 
         x = self.gatedFusion(mean_rgb, mean_d, var_rgb, var_d)
 

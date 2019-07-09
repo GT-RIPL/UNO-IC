@@ -1055,23 +1055,32 @@ class GatedFusion(nn.Module):
 class ConditionalAttentionFusion(nn.Module):
     def __init__(self, n_classes):
         super(ConditionalAttentionFusion, self).__init__()
-
-        self.conv = nn.Conv2d(
-            4 * n_classes,
+        self.gate = nn.Conv2d(
+            2 * n_classes + 2,
             n_classes,
-            1,
+            3,
             stride=1,
-            padding=0,
+            padding=1,
             bias=False,
             dilation=1
         )
+        
+        self.fuse = nn.Conv2d(
+            2 * n_classes,
+            n_classes,
+            3,
+            stride=1,
+            padding=1,
+            bias=False,
+            dilation=1
+        )
+        
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, rgb, d, rgb_var, d_var):
-
         fusion = torch.cat([rgb, d, rgb_var, d_var], dim=1)
-
-        G = self.conv(fusion)
+        
+        G = self.gate(fusion)
         G = self.sigmoid(G)
 
         G_rgb = G
@@ -1080,6 +1089,6 @@ class ConditionalAttentionFusion(nn.Module):
         P_rgb = rgb * G_rgb
         P_d = d * G_d
 
-        P_fusion = P_rgb + P_d
+        P_fusion = self.fuse(torch.cat([P_rgb, P_d], dim=1))
 
         return P_fusion

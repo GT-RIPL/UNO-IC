@@ -17,7 +17,6 @@ args = parser.parse_args()
 include = args.include[0] if args.include else []
 match = args.match[0] if args.match else []
 
-print(include, match)
 runs = {}
 for i,file in enumerate(glob.glob("./runs/experiments/**/**/**/*tfevents*",recursive=True)):
 
@@ -86,6 +85,7 @@ for i, file in enumerate(glob.glob("./runs/baselines/**/*tfevents*", recursive=T
     # print("Reading: {}".format(name))
 
     for event in tf.train.summary_iterator(file):
+
         for value in event.summary.value:
 
             if not directory in runs:

@@ -15,11 +15,11 @@ from gpytorch.distributions import MultivariateNormal
 from ..utils import flatten, unflatten_like
 
 def swag_parameters(module, params, no_cov_mat=True):
+
     for name in list(module._parameters.keys()):
         if module._parameters[name] is None:
             continue
         data = module._parameters[name].data
-        module._parameters.pop(name)
         module.register_buffer('%s_mean' % name, data.new(data.size()).zero_())
         module.register_buffer('%s_sq_mean' % name, data.new(data.size()).zero_())
 
@@ -41,11 +41,11 @@ class SWAG(torch.nn.Module):
 
         self.var_clamp = var_clamp
 
-        self.base = base(*args, **kwargs)
+        self.base = base
         self.base.apply(lambda module: swag_parameters(module=module, params=self.params, no_cov_mat=self.no_cov_mat))
 
     def forward(self, *args, **kwargs):
-        return self.base( *args, **kwargs)
+        return self.base(*args, **kwargs)
 
     def sample(self, scale=1.0, cov=False, seed=None, block = False, fullrank = True):
         if seed is not None:
@@ -129,7 +129,7 @@ class SWAG(torch.nn.Module):
 
 
         for (module, name), sample in zip(self.params, samples_list):
-            module.__setattr__(name, sample.cuda())
+            module.__setattr__(name,  torch.nn.Parameter(sample.cuda()))
 
     def collect_model(self, base_model):
         for (module, name), base_param in zip(self.params, base_model.parameters()):

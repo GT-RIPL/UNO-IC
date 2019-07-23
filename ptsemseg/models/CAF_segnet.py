@@ -1,7 +1,7 @@
 import torch.nn as nn
 from torch.autograd import Variable
 
-from ptsemseg.models.utils import *
+from ptsemseg.models.utils import PreweightGatedFusion, ConditionalAttentionFusion, UncertaintyGatedFusion
 from ptsemseg.models.recalibrator import *
 from ptsemseg.models.segnet_mcdo import *
 
@@ -24,8 +24,8 @@ class CAF_segnet(nn.Module):
                  recalibrator="None",
                  temperatureScaling=False,
                  bins=0,
-                 resumeRGB="./models/rgb_BayesianSegnet_0.5_T000/rgb_segnet_mcdo_airsim_best_model.pkl",
-                 resumeD="./models/d_BayesianSegnet_0.5_T000/d_segnet_mcdo_airsim_best_model.pkl"
+                 resumeRGB="./models/joint/rgb_BayesianSegnet_0.5_T000+T050/rgb_segnet_mcdo_airsim_best_model.pkl",
+                 resumeD="./models/joint/d_BayesianSegnet_0.5_T000+T050/d_segnet_mcdo_airsim_best_model.pkl"
                  ):
         super(CAF_segnet, self).__init__()
 
@@ -52,7 +52,7 @@ class CAF_segnet(nn.Module):
         for param in self.d_segnet.parameters():
             param.requires_grad = False
         """
-        self.gatedFusion = ConditionalAttentionFusion(n_classes)
+        self.gatedFusion = UncertaintyGatedFusion(n_classes)
 
     def forward(self, inputs):
         inputs_rgb = inputs[:, :3, :, :]
@@ -73,6 +73,7 @@ class CAF_segnet(nn.Module):
     def loadModel(self, model, path):
         model_pkl = path
 
+        print(path)
         if os.path.isfile(model_pkl):
             pretrained_dict = torch.load(model_pkl)['model_state']
             model_dict = model.state_dict()
@@ -86,3 +87,6 @@ class CAF_segnet(nn.Module):
 
             # 3. load the new state dict
             model.load_state_dict(pretrained_dict)
+        else:
+            print("model not found")
+            exit()

@@ -73,7 +73,7 @@ class segnet_mcdo(nn.Module):
                 "up4": segnetUp3MCDO(512, 256, pMCDO=dropoutP),
                 "up3": segnetUp3MCDO(256, 128, pMCDO=dropoutP),
                 "up2": segnetUp2(128, 64),
-                "up1": segnetUp2(64, n_classes),
+                "up1": segnetUp2(64, n_classes, relu=False),
             }
 
         else:
@@ -88,7 +88,7 @@ class segnet_mcdo(nn.Module):
                 "up4": segnetUp3MCDO(512, 256, pMCDO=dropoutP),
                 "up3": segnetUp3MCDO(256, 128, pMCDO=dropoutP),
                 "up2": segnetUp2MCDO(128, 64, pMCDO=dropoutP),
-                "up1": segnetUp2MCDO(64, n_classes, pMCDO=dropoutP),
+                "up1": segnetUp2MCDO(64, n_classes, pMCDO=dropoutP, relu=False),
             }
 
         if self.temperatureScaling:

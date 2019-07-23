@@ -241,7 +241,7 @@ def _set_momenta(module, momenta):
         module.momentum = momenta[module]
 
 
-def bn_update(loader, model, verbose=False, subset=None, **kwargs):
+def bn_update(loader, model, m='rgbd', verbose=False, subset=None, **kwargs):
     """
         BatchNorm buffers update (if any).
         Performs 1 epochs to estimate buffers average using train dataset.
@@ -258,24 +258,19 @@ def bn_update(loader, model, verbose=False, subset=None, **kwargs):
     model.apply(lambda module: _get_momenta(module, momenta))
     n = 0
     num_batches = len(loader)
-
+    
     with torch.no_grad():
-        if subset is not None:
-            num_batches = int(num_batches * subset)
-            loader = itertools.islice(loader, num_batches)
-        if verbose:
+            
+        for (images_list, labels_list, aux_list) in loader:
 
-            loader = tqdm.tqdm(loader, total=num_batches)
-        for input, _ in loader:
-            input = input.cuda(non_blocking=True)
-            input_var = torch.autograd.Variable(input)
-            b = input_var.data.size(0)
+            inputs, _ = parseEightCameras(images_list, labels_list, aux_list)
+            b = inputs[m].data.size(0)
 
             momentum = b / (n + b)
             for module in momenta.keys():
                 module.momentum = momentum
 
-            model(input_var, **kwargs)
+            model(inputs[m], **kwargs)
             n += b
 
     model.apply(lambda module: _set_momenta(module, momenta))
@@ -314,7 +309,7 @@ def schedule(epoch, lr_init, epochs, swa, swa_start=None, swa_lr=None):
     return lr_init * factor
 
 
-def parseEightCameras(images, labels, aux, device):
+def parseEightCameras(images, labels, aux, device='cuda'):
     # Stack 8 Cameras into 1 for MCDO Dataset Testing
     images = torch.cat(images, 0)
     labels = torch.cat(labels, 0)
@@ -419,7 +414,7 @@ def plotMeansVariances(logdir, cfg, n_classes, i, i_val, m, k, inputs, pred, gt,
         axes[2 * (c % 2) + 1, c // 2].set_title(str(c) + " Var")
 
     axes[-1, -1].imshow(variance[0, :, :, :].mean(0).cpu().numpy())
-    axes[-1, -1].set_title("Average Variance")
+    axes[-1, -1].set_title("Average Variance" + str(np.average(variance[0, :, :, :].mean(0).cpu().numpy())))
 
     path = "{}/{}/{}/{}".format(logdir, "meanvar", m, k)
     if not os.path.exists(path):

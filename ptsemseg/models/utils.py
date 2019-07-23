@@ -81,12 +81,12 @@ class conv2DBatchNorm(nn.Module):
                              dilation=dilation, )
 
         if is_batchnorm:
-            self.cb_unit = nn.Sequential(conv_mod, nn.BatchNorm2d(int(n_filters)))
+            self.cbr_unit = nn.Sequential(conv_mod, nn.BatchNorm2d(int(n_filters)))
         else:
-            self.cb_unit = nn.Sequential(conv_mod)
+            self.cbr_unit = nn.Sequential(conv_mod)
 
     def forward(self, inputs):
-        outputs = self.cb_unit(inputs)
+        outputs = self.cbr_unit(inputs)
         return outputs
 
 
@@ -169,6 +169,7 @@ class conv2DBatchNormRelu(nn.Module):
                                           nn.ReLU(inplace=True))
         else:
             self.cbr_unit = nn.Sequential(conv_mod, nn.ReLU(inplace=True))
+            
 
     def forward(self, inputs):
         # print(inputs[0].shape)
@@ -332,6 +333,34 @@ class segnetDown3MCDO(nn.Module):
         outputs = dropout_scale * self.dropout(outputs)
         return outputs, indices, unpooled_shape
 
+class segnetUp2MCDONoRelu(nn.Module):
+    def __init__(self, in_size, out_size, pMCDO=0.1, relu=True):
+        super(segnetUp2MCDO, self).__init__()
+        self.unpool = nn.MaxUnpool2d(2, 2)
+        self.conv1 = conv2DBatchNormRelu(in_size, in_size, 3, 1, 1)
+        if relu:
+            self.conv2 = conv2DBatchNormRelu(in_size, out_size, 3, 1, 1)
+        else:
+            self.conv2 = conv2DBatchNorm(in_size, out_size, 3, 1, 1)
+        self.dropout = nn.Dropout(p=pMCDO)
+
+    def forward(self, inputs, indices, output_shape, MCDO=False):
+        # Determine Type of Dropout
+        dropout_scale = 1.0
+        if self.training:
+            self.dropout.train(mode=True)
+        else:
+            if MCDO:
+                self.dropout.train(mode=True)
+                # dropout_scale = 1.0/(1.0-self.dropout.p)
+            else:
+                self.dropout.eval()
+
+        outputs = self.unpool(input=inputs, indices=indices, output_size=output_shape)
+        outputs = self.conv1(outputs)
+        outputs = self.conv2(outputs)
+        outputs = dropout_scale * self.dropout(outputs)
+        return outputs
 
 class segnetUp2MCDO(nn.Module):
     def __init__(self, in_size, out_size, pMCDO=0.1):
@@ -420,13 +449,15 @@ class segnetDown3(nn.Module):
         outputs, indices = self.maxpool_with_argmax(outputs)
         return outputs, indices, unpooled_shape
 
-
 class segnetUp2(nn.Module):
-    def __init__(self, in_size, out_size):
+    def __init__(self, in_size, out_size, relu=True):
         super(segnetUp2, self).__init__()
         self.unpool = nn.MaxUnpool2d(2, 2)
         self.conv1 = conv2DBatchNormRelu(in_size, in_size, 3, 1, 1)
-        self.conv2 = conv2DBatchNormRelu(in_size, out_size, 3, 1, 1)
+        if relu:
+            self.conv2 = conv2DBatchNormRelu(in_size, out_size, 3, 1, 1)
+        else:
+            self.conv2 = conv2DBatchNorm(in_size, out_size, 3, 1, 1)
 
     def forward(self, inputs, indices, output_shape):
         outputs = self.unpool(input=inputs, indices=indices, output_size=output_shape)
@@ -1057,6 +1088,152 @@ class ConditionalAttentionFusion(nn.Module):
         super(ConditionalAttentionFusion, self).__init__()
         self.gate = nn.Conv2d(
             2 * n_classes + 2,
+            1,
+            3,
+            stride=1,
+            padding=1,
+            bias=False,
+            dilation=1
+        )
+        
+        self.fuse = nn.Conv2d(
+            2 * n_classes,
+            n_classes,
+            3,
+            stride=1,
+            padding=1,
+            bias=False,
+            dilation=1
+        )
+        
+        self.sigmoid = nn.Sigmoid()
+        self.n_classes = n_classes
+
+    def forward(self, rgb, d, rgb_var, d_var):
+
+        fusion = torch.cat([rgb, d, rgb_var, d_var], dim=1)
+        
+        G = self.gate(fusion)
+        G = F.relu(G)
+        G = self.sigmoid(G)
+
+        G_rgb = G
+        G_d = torch.ones(G.shape, dtype=torch.float, device=G.device) - G
+
+        P_rgb = rgb * G_rgb
+        P_d = d * G_d
+
+        P_fusion = self.fuse(torch.cat([P_rgb, P_d], dim=1))
+
+        return P_fusion
+
+
+class PreweightGatedFusion(nn.Module):
+    def __init__(self, n_classes):
+        super(PreweightGatedFusion, self).__init__()
+        self.gate = nn.Conv2d(
+            2 * n_classes,
+            1,
+            3,
+            stride=1,
+            padding=1,
+            bias=False,
+            dilation=1
+        )
+        
+        self.fuse = nn.Conv2d(
+            2 * n_classes,
+            n_classes,
+            3,
+            stride=1,
+            padding=1,
+            bias=False,
+            dilation=1
+        )
+        
+        self.sigmoid = nn.Sigmoid()
+        self.n_classes = n_classes
+
+    def forward(self, rgb, d, rgb_var, d_var):
+
+        rgb_var = 1 / (torch.mean(rgb_var, 1) + 1e-5)
+        d_var = 1 / (torch.mean(d_var, 1) + 1e-5)
+        
+        for n in range(n_classes):
+            rgb[:, n, :, :] = rgb[:, n, :, :] * rgb_var
+            d[:, n, :, :] = d[:, n, :, :] * d_var
+            
+        fusion = torch.cat([rgb_var, d_var], dim=1)
+       
+        G = self.gate(fusion)
+        G = F.relu(G)
+        G = self.sigmoid(G)
+
+        G_rgb = G
+        G_d = torch.ones(G.shape, dtype=torch.float, device=G.device) - G
+
+        P_rgb = rgb * G_rgb
+        P_d = d * G_d
+
+        P_fusion = self.fuse(torch.cat([P_rgb, P_d], dim=1))
+
+        return P_fusion
+
+class UncertaintyGatedFusion(nn.Module):
+    def __init__(self, n_classes):
+        super(UncertaintyGatedFusion, self).__init__()
+        self.gate = nn.Conv2d(
+            2,
+            1,
+            3,
+            stride=1,
+            padding=1,
+            bias=False,
+            dilation=1
+        )
+        
+        self.fuse = nn.Conv2d(
+            2 * n_classes,
+            n_classes,
+            3,
+            stride=1,
+            padding=1,
+            bias=False,
+            dilation=1
+        )
+        
+        self.sigmoid = nn.Sigmoid()
+        self.n_classes = n_classes
+
+    def forward(self, rgb, d, rgb_var, d_var):
+
+
+        rgb_var = 1 / (torch.mean(rgb_var, 1) + 1e-5)
+        d_var = 1 / (torch.mean(d_var, 1) + 1e-5)
+
+        rgb_var = rgb_var.view(-1 , 1, rgb_var.shape[1], rgb_var.shape[2])
+        d_var = d_var.view(-1 , 1, d_var.shape[1], d_var.shape[2])
+        fusion = torch.cat([rgb_var, d_var], dim=1)
+       
+        G = self.gate(fusion)
+        G = F.relu(G)
+        G = self.sigmoid(G)
+
+        G_rgb = G
+        G_d = torch.ones(G.shape, dtype=torch.float, device=G.device) - G
+
+        P_rgb = rgb * G_rgb
+        P_d = d * G_d
+
+        P_fusion = self.fuse(torch.cat([P_rgb, P_d], dim=1))
+
+        return P_fusion
+
+class SSMABlock(nn.Module):
+    def __init__(self, n_classes):
+        super(ConditionalAttentionFusion, self).__init__()
+        self.gate = nn.Conv2d(
+            2 * n_classes + 2,
             n_classes,
             3,
             stride=1,
@@ -1081,6 +1258,7 @@ class ConditionalAttentionFusion(nn.Module):
         fusion = torch.cat([rgb, d, rgb_var, d_var], dim=1)
         
         G = self.gate(fusion)
+        G = F.relu(G)
         G = self.sigmoid(G)
 
         G_rgb = G

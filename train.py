@@ -29,6 +29,11 @@ from scipy.misc import imsave
 from functools import partial
 from collections import defaultdict
 
+# SWAG lib imports
+from ptsemseg.posteriors import SWAG
+from ptsemseg.utils import bn_update, adjust_learning_rate, schedule, save_checkpoint
+
+
 
 def train(cfg, writer, logger, logdir):
     # Setup seeds
@@ -54,18 +59,20 @@ def train(cfg, writer, logger, logdir):
 
     start_iter = 0
     models = {}
+    swag_models = {}
     optimizers = {}
     schedulers = {}
 
     # Setup Model
-    for model, attr in cfg["models"].items():
+    for model, attr in cfg['models'].items():
 
         attr = defaultdict(lambda: None, attr)
 
-        models[model] = get_model(cfg["model"],
+
+        models[model] = get_model(cfg['model'],
                                   n_classes,
                                   input_size=(cfg['data']['img_rows'], cfg['data']['img_cols']),
-                                  batch_size=cfg["training"]["batch_size"],
+                                  batch_size=cfg['training']['batch_size'],
                                   in_channels=attr['in_channels'],
                                   start_layer=attr['start_layer'],
                                   end_layer=attr['end_layer'],
@@ -78,10 +85,7 @@ def train(cfg, writer, logger, logdir):
                                   temperatureScaling=cfg['temperatureScaling'],
                                   varianceScaling=cfg['varianceScaling'],
                                   freeze=attr['freeze'],
-                                  bins=cfg["bins"]).to(device)
-
-        if "caffemodel" in attr['resume']:
-            models[model].load_pretrained_model(model_path=attr['resume'])
+                                  bins=cfg['bins']).to(device)
 
         models[model] = torch.nn.DataParallel(models[model], device_ids=range(torch.cuda.device_count()))
 
@@ -97,13 +101,23 @@ def train(cfg, writer, logger, logdir):
 
         loss_fn = get_loss_function(cfg)
         logger.info("Using loss {}".format(loss_fn))
+        
+        
+        # setup swa training
+        if cfg['swa']:
+            print('SWAG training')
+            swag_models[model] = SWAG(models[model],
+                              no_cov_mat=False,
+                              max_num_models=20)
+            
+            swag_models[model].to(device)
+        else:
+            print('SGD training')
 
         # Load pretrained weights
-        if str(attr['resume']) is not "None" and not "caffemodel" in attr['resume']:
+        if str(attr['resume']) is not "None":
 
             model_pkl = attr['resume']
-            if attr['resume'] == 'same_yaml':
-                model_pkl = "{}/{}_pspnet_airsim_best_model.pkl".format(logdir, model)
 
             if os.path.isfile(model_pkl):
                 logger.info(
@@ -139,16 +153,68 @@ def train(cfg, writer, logger, logdir):
     best_iou = -100.0
     i = start_iter
     print(i)
-
-    while i <= cfg["training"]["train_iters"] + 1:
+    while i <= cfg["training"]["train_iters"]:
 
         print("=" * 10, "TRAINING", "=" * 10)
         for (images_list, labels_list, aux_list) in loaders['train']:
 
+            i+=1
+            #################################################################################
+            # Training
+            #################################################################################
+            inputs, labels = parseEightCameras(images_list, labels_list, aux_list, device)
+
+            # Read batch from only one camera
+            bs = cfg['training']['batch_size']
+            images = {m: inputs[m][:bs, :, :, :] for m in cfg["models"].keys()}
+            labels = labels[:bs, :, :]
+
+            if labels.shape[0] <= 1:
+                continue
+
+            start_ts = time.time()
+
+            [schedulers[m].step() for m in schedulers.keys()]
+            [models[m].train() for m in models.keys()]
+            [optimizers[m].zero_grad() for m in optimizers.keys()]
+
+            # Run Models
+            outputs = {}
+            loss = {}
+            for m in cfg["models"].keys():
+                outputs[m] = models[m](images[m])
+
+                loss[m] = loss_fn(input=outputs[m], target=labels)
+                loss[m].backward()
+                optimizers[m].step()
+
+            time_meter.update(time.time() - start_ts)
+            if (i + 1) % cfg['training']['print_interval'] == 0:
+                for m in cfg["models"].keys():
+                    fmt_str = "Iter [{:d}/{:d}]  Loss {}: {:.4f}  Time/Image: {:.4f}"
+                    print_str = fmt_str.format(i + 1,
+                                               cfg['training']['train_iters'],
+                                               m,
+                                               loss[m].item(),
+                                               time_meter.avg / cfg['training']['batch_size'])
+
+                    print(print_str)
+                    logger.info(print_str)
+                    writer.add_scalar('loss/train_loss/' + m, loss[m].item(), i + 1)
+                time_meter.reset()
+                
+            # collect parameters for swa
+            if cfg['swa'] and (i - cfg['swa']['start']) % cfg['swa']['c_iterations'] == 0:
+                swag_models[m].collect_model(models[m])
             
-            if i % cfg["training"]["val_interval"] == 0 or i >= cfg["training"]["train_iters"]:
+            if i % cfg["training"]["val_interval"] == 0 or (i + 1) >= cfg["training"]["train_iters"]:
 
                 [models[m].eval() for m in models.keys()]
+                
+                if cfg['swa']:
+                    print('Updating SWA model')
+                    swag_models[m].sample(0.0)
+                    bn_update(loaders['train'], swag_models[m], m)
 
                 #################################################################################
                 # Recalibration
@@ -209,7 +275,10 @@ def train(cfg, writer, logger, logdir):
                             val_loss = {}
 
                             for m in cfg["models"].keys():
-                                if hasattr(models[m].module, 'forwardMCDO'):
+                                if cfg['swa']:
+                                    mean[m] = swag_models[m](images_val[m])
+                                    variance[m] = torch.zeros(mean[m].shape)
+                                elif hasattr(models[m].module, 'forwardMCDO'):
                                     mean[m], variance[m] = models[m].module.forwardMCDO(images_val[m], cfg["recal"])
                                 else:
                                     mean[m] = models[m](images_val[m])
@@ -234,7 +303,6 @@ def train(cfg, writer, logger, logdir):
                                     rgb[:, n, :, :] = rgb[:, n, :, :] * rgb_var
                                     d[:, n, :, :] = d[:, n, :, :] * d_var
                                 outputs = rgb + d
-                             
                             elif cfg["fusion"] == "FuzzyLogic":
                                 outputs = torch.max(torch.nn.Softmax(dim=1)(mean["rgb"]),
                                                     torch.nn.Softmax(dim=1)(mean["d"]))
@@ -298,55 +366,6 @@ def train(cfg, writer, logger, logdir):
                                                      cfg['model']['arch'],
                                                      cfg['data']['dataset']))
                         torch.save(state, save_path)
-
-            i += 1
-            
-            if i >= cfg["training"]["train_iters"]:
-                break
-            
-            #################################################################################
-            # Training
-            #################################################################################
-            inputs, labels = parseEightCameras(images_list, labels_list, aux_list, device)
-
-            # Read batch from only one camera
-            bs = cfg['training']['batch_size']
-            images = {m: inputs[m][:bs, :, :, :] for m in cfg["models"].keys()}
-            labels = labels[:bs, :, :]
-
-            if labels.shape[0] <= 1:
-                continue
-
-            start_ts = time.time()
-
-            [schedulers[m].step() for m in schedulers.keys()]
-            [models[m].train() for m in models.keys()]
-            [optimizers[m].zero_grad() for m in optimizers.keys()]
-
-            # Run Models
-            outputs = {}
-            loss = {}
-            for m in cfg["models"].keys():
-                outputs[m] = models[m](images[m])
-
-                loss[m] = loss_fn(input=outputs[m], target=labels)
-                loss[m].backward()
-                optimizers[m].step()
-
-            time_meter.update(time.time() - start_ts)
-            if (i + 1) % cfg['training']['print_interval'] == 0:
-                for m in cfg["models"].keys():
-                    fmt_str = "Iter [{:d}/{:d}]  Loss {}: {:.4f}  Time/Image: {:.4f}"
-                    print_str = fmt_str.format(i + 1,
-                                               cfg['training']['train_iters'],
-                                               m,
-                                               loss[m].item(),
-                                               time_meter.avg / cfg['training']['batch_size'])
-
-                    print(print_str)
-                    logger.info(print_str)
-                    writer.add_scalar('loss/train_loss/' + m, loss[m].item(), i + 1)
-                time_meter.reset()
 
 
 

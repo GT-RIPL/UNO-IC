@@ -1,12 +1,12 @@
 import torch.nn as nn
 from torch.autograd import Variable
 
-from ptsemseg.models.utils import *
+from fusion import PreweightGatedFusion, ConditionalAttentionFusion, UncertaintyGatedFusion
 from ptsemseg.models.recalibrator import *
 from ptsemseg.models.segnet_mcdo import *
 
 
-class fused_segnet_mcdo(nn.Module):
+class CAFnet(nn.Module):
     def __init__(self,
                  n_classes=21,
                  in_channels=3,
@@ -23,12 +23,12 @@ class fused_segnet_mcdo(nn.Module):
                  device="cpu",
                  recalibrator="None",
                  temperatureScaling=False,
-                 varianceScaling=False,
                  bins=0,
-                 resumeRGB="./models/rgb_BayesianSegnet_0.5_T000/rgb_segnet_mcdo_airsim_best_model.pkl",
-                 resumeD="./models/d_BayesianSegnet_0.5_T000/d_segnet_mcdo_airsim_best_model.pkl"
+                 fusion="CAF",
+                 resumeRGB="./models/joint/rgb_BayesianSegnet_0.5_T000+T050/rgb_segnet_mcdo_airsim_best_model.pkl",
+                 resumeD="./models/joint/d_BayesianSegnet_0.5_T000+T050/d_segnet_mcdo_airsim_best_model.pkl"
                  ):
-        super(fused_segnet_mcdo, self).__init__()
+        super(CAFnet, self).__init__()
 
         self.rgb_segnet = segnet_mcdo(n_classes, in_channels, is_unpooling, input_size, batch_size, version,
                                       mcdo_passes, dropoutP, full_mcdo, start_layer,
@@ -41,40 +41,48 @@ class fused_segnet_mcdo(nn.Module):
         self.rgb_segnet = torch.nn.DataParallel(self.rgb_segnet, device_ids=range(torch.cuda.device_count()))
         self.d_segnet = torch.nn.DataParallel(self.d_segnet, device_ids=range(torch.cuda.device_count()))
 
+
         # initialize segnet weights
         self.loadModel(self.rgb_segnet, resumeRGB)
         self.loadModel(self.d_segnet, resumeD)
 
         # freeze segnet networks
+        """
         for param in self.rgb_segnet.parameters():
             param.requires_grad = False
         for param in self.d_segnet.parameters():
             param.requires_grad = False
-
-        self.gatedFusion = GatedFusion(n_classes)
-        self.varianceScaling = varianceScaling
+        """
+        
+        if fusion == "ConditionalAttentionFusion":
+            self.gatedFusion = ConditionalAttentionFusion(n_classes)
+        elif fusion == "PreweightGatedFusion":
+            self.gatedFusion = PreweightGatedFusion(n_classes)
+        elif fusion == "UncertaintyGatedFusion":
+            self.gatedFusion = UncertaintyGatedFusion(n_classes)
+        else:
+            raise NotImplementedError
 
     def forward(self, inputs):
         inputs_rgb = inputs[:, :3, :, :]
         inputs_d = inputs[:, 3:, :, :]
 
-        if self.varianceScaling:
-            mean_rgb, var_rgb = self.rgb_segnet.module.forwardMCDO(inputs_rgb)
-            mean_d, var_d = self.d_segnet.module.forwardMCDO(inputs_d)
+        mean_rgb, var_rgb = self.rgb_segnet.module.forwardMCDO(inputs_rgb)
+        mean_d, var_d = self.d_segnet.module.forwardMCDO(inputs_d)
+        
+        s = var_rgb.shape
+        
+        var_rgb = torch.mean(var_rgb, 1).view(-1, 1, s[2], s[3])
+        var_d = torch.mean(var_d, 1).view(-1, 1, s[2], s[3])
 
-            mean_rgb = mean_rgb / (var_rgb + 1e-5)
-            mean_d = mean_d / (var_d + 1e-5)
-        else:
-            mean_rgb = self.rgb_segnet.module.forwardAvg(inputs_rgb)
-            mean_d = self.d_segnet.module.forwardAvg(inputs_d)
-
-        x = self.gatedFusion(mean_rgb, mean_d)
+        x = self.gatedFusion(mean_rgb, mean_d, var_rgb, var_d)
 
         return x
 
     def loadModel(self, model, path):
         model_pkl = path
 
+        print(path)
         if os.path.isfile(model_pkl):
             pretrained_dict = torch.load(model_pkl)['model_state']
             model_dict = model.state_dict()
@@ -88,3 +96,6 @@ class fused_segnet_mcdo(nn.Module):
 
             # 3. load the new state dict
             model.load_state_dict(pretrained_dict)
+        else:
+            print("model not found")
+            exit()

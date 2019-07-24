@@ -9,9 +9,8 @@ from ptsemseg.models.pspnet import *
 from ptsemseg.models.icnet import *
 from ptsemseg.models.linknet import *
 from ptsemseg.models.frrn import *
-from ptsemseg.models.fused_segnet import *
-from ptsemseg.models.fused_segnet_mcdo import *
-from ptsemseg.models.CAF_segnet import *
+from ptsemseg.models.fusion.SSMA import SSMA
+from ptsemseg.models.fusion.CAFnet import CAFnet
 
 
 def get_model(model_dict,
@@ -73,8 +72,9 @@ def get_model(model_dict,
         vgg16 = models.vgg16(pretrained=True)
         model.init_vgg16_params(vgg16)
 
-    elif name == "fused_segnet_mcdo":
-        model = model(n_classes=n_classes,
+    elif name == "CAFnet":
+        model = model(backbone="segnet",
+                      n_classes=n_classes,
                       input_size=input_size,
                       batch_size=batch_size,
                       version=version,
@@ -91,29 +91,14 @@ def get_model(model_dict,
                       varianceScaling=varianceScaling,
                       bins=bins,
                       **param_dict)
+
     elif name == "fused_segnet":
         model = model(n_classes=n_classes,
                       **param_dict)
         vgg16 = models.vgg16(pretrained=True)
         model.rgb_segnet.init_vgg16_params(vgg16)
         model.d_segnet.init_vgg16_params(vgg16)
-    elif name == "CAF_segnet":
-        model = model(n_classes=n_classes,
-                      input_size=input_size,
-                      batch_size=batch_size,
-                      version=version,
-                      reduction=reduction,
-                      mcdo_passes=mcdo_passes,
-                      dropoutP=dropoutP,
-                      full_mcdo=full_mcdo,
-                      in_channels=in_channels,
-                      start_layer=start_layer,
-                      end_layer=end_layer,
-                      device=device,
-                      recalibrator=recalibrator,
-                      temperatureScaling=temperatureScaling,
-                      bins=bins,
-                      **param_dict)
+
     elif name == "unet":
         model = model(n_classes=n_classes, **param_dict)
 
@@ -130,12 +115,10 @@ def get_model(model_dict,
                       end_layer=end_layer,
                       **param_dict)
 
-    elif name == "icnet":
-        model = model(n_classes=n_classes, **param_dict)
-
-    elif name == "icnetBN":
-        model = model(n_classes=n_classes, **param_dict)
-
+    elif name == "SSMA":
+        model = model(backbone='resnet', output_stride=16, num_classes=n_classes, sync_bn=True, freeze_bn=False)
+    elif name == "DeepNet":
+        model = model(backbone='resnet', output_stride=16, num_classes=n_classes, sync_bn=True, freeze_bn=False)
     else:
         model = model(n_classes=n_classes, **param_dict)
 
@@ -158,8 +141,9 @@ def _get_model_instance(name):
             "frrnA": frrn,
             "frrnB": frrn,
             "fused_segnet": fused_segnet,
-            "fused_segnet_mcdo": fused_segnet_mcdo,
-            "CAF_segnet": CAF_segnet
+            "CAFnet": CAFnet,
+            "SSMA": SSMA,
+            "DeepNet": DeepNet
         }[name]
     except:
         raise ("Model {} not available".format(name))

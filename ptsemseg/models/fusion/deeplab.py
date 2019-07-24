@@ -32,6 +32,7 @@ class DeepLab(nn.Module):
         x = F.interpolate(x, size=input.size()[2:], mode='bilinear', align_corners=True)
 
         return x
+        
     def forward_SSMA(self, input):
         x, low_level_feat = self.backbone(input)
         aspp_out = self.aspp(x)
@@ -71,7 +72,7 @@ class DeepLab(nn.Module):
 if __name__ == "__main__":
     model = DeepLab(backbone='mobilenet', output_stride=16)
     model.eval()
-    input = torch.rand(1, 3, 513, 513)
+    input = torch.rand(1, 3, 512, 512)
     output = model(input)
     print(output.size())
 

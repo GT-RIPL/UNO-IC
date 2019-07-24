@@ -215,10 +215,11 @@ class segnet_mcdo(nn.Module):
             plt.close(fig)
         """
 
+        mean = self.softmaxMCDO(x).mean(-1)
+        variance = self.softmaxMCDO(x).std(-1)
+
         # Uncalibrated Softmax Mean and Variance
         if recalType != "None":
-            mean = self.softmaxMCDO(x).mean(-1)
-            variance = self.softmaxMCDO(x).std(-1)
             if recalType == "beforeMCDO":
                 for c in range(self.n_classes):
                     x[:, c, :, :, :] = self.calibrationPerClass[c].predict(x[:, c, :, :, :].reshape(-1)).reshape(
@@ -229,9 +230,6 @@ class segnet_mcdo(nn.Module):
                 for c in range(self.n_classes):
                     mean[:, c, :, :] = self.calibrationPerClass[c].predict(mean[:, c, :, :].reshape(-1)).reshape(
                         mean[:, c, :, :].shape)
-        else:
-            mean = x.mean(-1)
-            variance = x.std(-1)
 
         return mean, variance
 

@@ -1,4 +1,4 @@
-id: rgb_BayesianSegnet_0.5_T000
+id: rgb_BayesianSegnet_0.5_T000_SWAG
 model:
     arch: segnet_mcdo
 models:
@@ -7,12 +7,9 @@ models:
         start_layer: down1
         end_layer: up1
         reduction: 1.0
-        mcdo_passes: 1 # Number of Passes
-        mask_dir: models/DropoutMasks/Random # Directory of Indexed Masks
-        masks: [0] # Number Mask Indices Should Equal Number of MCDO Passes
-        fixed_mcdo: No # Yes: Fixed Masks per Pass; No: Randomized Masks per Pass
+        mcdo_passes: 6 # Number of Passes
         dropoutP: 0.5 # Dropout Probability
-        resume: None #models/BayesianSegnet/rgb_BayesianSegnet_0.5_T000/rgb_segnet_mcdo_airsim_best_model.pkl        
+        resume: ./models/rgb_BayesianSegnet_0.5_T000/rgb_segnet_mcdo_airsim_best_model.pkl
     # d:
     #     in_channels: 3
     #     start_layer: down1
@@ -51,11 +48,11 @@ data:
     img_rows: 512
     img_cols: 512
     path: datasets/airsim_data_async #../../ros/data/airsim_03-30-2019/airsim_data_async
-    noisy_type: None 
+    noisy_type: None
 training:
-    train_iters: 300000
-    batch_size: 4
-    val_interval: 5000
+    train_iters: 125000
+    batch_size: 2
+    val_interval: 25000
     n_workers: 8
     print_interval: 50
     png_frames: 5000
@@ -67,3 +64,8 @@ training:
         size_average: False
     lr_schedule:
     resume: None
+swa:
+    start: 100000 # SWA start epoch number (default: 100000)
+    lr: 0.02 # SWA LR (default: 0.02)
+    c_iterations: 500 # SWA model collection frequency/cycle length in epochs (default: 1)
+    resume: None # checkpoint to restore SWA from (default: None)

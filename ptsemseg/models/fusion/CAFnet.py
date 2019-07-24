@@ -1,7 +1,7 @@
 import torch.nn as nn
 from torch.autograd import Variable
 
-from fusion import PreweightGatedFusion, ConditionalAttentionFusion, UncertaintyGatedFusion
+from fusion import PreweightedGatedFusion, ConditionalAttentionFusion, UncertaintyGatedFusion
 from ptsemseg.models.recalibrator import *
 from ptsemseg.models.segnet_mcdo import *
 

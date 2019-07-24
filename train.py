@@ -31,7 +31,7 @@ from collections import defaultdict
 
 # SWAG lib imports
 from ptsemseg.posteriors import SWAG
-from ptsemseg.utils import bn_update, adjust_learning_rate, schedule, save_checkpoint
+from ptsemseg.utils import bn_update, mem_report
 
 
 
@@ -123,9 +123,10 @@ def train(cfg, writer, logger, logdir):
                 logger.info(
                     "Loading model and optimizer from checkpoint '{}'".format(model_pkl)
                 )
+
                 checkpoint = torch.load(model_pkl)
 
-                pretrained_dict = torch.load(model_pkl)['model_state']
+                pretrained_dict = checkpoint['model_state']
                 model_dict = models[model].state_dict()
 
                 # 1. filter out unnecessary keys
@@ -150,6 +151,11 @@ def train(cfg, writer, logger, logdir):
             else:
                 logger.info("No checkpoint found at '{}'".format(model_pkl))
 
+        if args.swa and cfg['swa']['resume'] is not None:
+            checkpoint = torch.load(cfg['swa']['resume'])
+            swag_models[model].load_state_dict(checkpoint['model_state'])
+
+
     best_iou = -100.0
     i = start_iter
     print(i)
@@ -158,7 +164,7 @@ def train(cfg, writer, logger, logdir):
         print("=" * 10, "TRAINING", "=" * 10)
         for (images_list, labels_list, aux_list) in loaders['train']:
 
-            i+=1
+            i += 1
             #################################################################################
             # Training
             #################################################################################
@@ -204,10 +210,10 @@ def train(cfg, writer, logger, logdir):
                 time_meter.reset()
                 
             # collect parameters for swa
-            if cfg['swa'] and (i - cfg['swa']['start']) % cfg['swa']['c_iterations'] == 0:
+            if cfg['swa'] and (i + 1 - cfg['swa']['start']) % cfg['swa']['c_iterations'] == 0:
                 swag_models[m].collect_model(models[m])
             
-            if i % cfg["training"]["val_interval"] == 0 or (i + 1) >= cfg["training"]["train_iters"]:
+            if (i + 1) % cfg["training"]["val_interval"] == 0 or (i + 1) >= cfg["training"]["train_iters"]:
 
                 [models[m].eval() for m in models.keys()]
                 
@@ -288,26 +294,21 @@ def train(cfg, writer, logger, logdir):
 
                             # Fusion Type
                             if cfg["fusion"] == "None":
-                                outputs = torch.nn.Softmax(dim=1)(mean[list(cfg["models"].keys())[0]])
+                                outputs = mean[list(cfg["models"].keys())[0]]
                             elif cfg["fusion"] == "SoftmaxMultiply":
-                                outputs = torch.nn.Softmax(dim=1)(mean["rgb"]) * torch.nn.Softmax(dim=1)(mean["d"])
+                                outputs = mean["rgb"] * mean["d"]
                             elif cfg["fusion"] == "SoftmaxAverage":
-                                outputs = torch.nn.Softmax(dim=1)(mean["rgb"]) + torch.nn.Softmax(dim=1)(mean["d"])
+                                outputs = mean["rgb"] + mean["d"]
                             elif cfg["fusion"] == "WeightedVariance":
                                 rgb_var = 1 / (torch.mean(variance["rgb"], 1) + 1e-5)
                                 d_var = 1 / (torch.mean(variance["d"], 1) + 1e-5)
-                                
-                                rgb = torch.nn.Softmax(dim=1)(mean["rgb"])
-                                d = torch.nn.Softmax(dim=1)(mean["d"])
+
+                                rgb = mean["rgb"]
+                                d = mean["d"]
                                 for n in range(n_classes):
                                     rgb[:, n, :, :] = rgb[:, n, :, :] * rgb_var
                                     d[:, n, :, :] = d[:, n, :, :] * d_var
                                 outputs = rgb + d
-                            elif cfg["fusion"] == "FuzzyLogic":
-                                outputs = torch.max(torch.nn.Softmax(dim=1)(mean["rgb"]),
-                                                    torch.nn.Softmax(dim=1)(mean["d"]))
-                            elif cfg["fusion"] == "FuzzyLogicVariance":
-                                outputs = torch.max(variance["rgb"], variance["d"])
                             else:
                                 print("Fusion Type Not Supported")
 
@@ -325,6 +326,9 @@ def train(cfg, writer, logger, logdir):
 
                             for m in cfg["models"].keys():
                                 val_loss_meter[m][k].update(val_loss[m].item())
+
+                            del mean[m]
+                            del variance[m]
 
                     for m in cfg["models"].keys():
                         for k in loaders['val'].keys():
@@ -344,6 +348,9 @@ def train(cfg, writer, logger, logdir):
                     for m in cfg["models"].keys():
                         val_loss_meter[m][env].reset()
                     running_metrics_val[env].reset()
+
+                if i > cfg["training"]["train_iters"]:
+                    break
 
                 # save best model
                 for m in optimizers.keys():
@@ -366,6 +373,22 @@ def train(cfg, writer, logger, logdir):
                                                      cfg['model']['arch'],
                                                      cfg['data']['dataset']))
                         torch.save(state, save_path)
+
+                        if args.swa and i > cfg['swa']['start']:
+                            state = {
+                                "epoch": i,
+                                "model_state": swag_models[m].state_dict(),
+                            }
+                            save_path = os.path.join(writer.file_writer.get_logdir(),
+                                                     "{}_{}_{}_swag.pkl".format(
+                                                         m,
+                                                         cfg['model']['arch'],
+                                                         cfg['data']['dataset']))
+
+                            torch.save(state, save_path)
+
+            if i > cfg["training"]["train_iters"]:
+                break
 
 
 

@@ -1,13 +1,10 @@
 matplotlib
 numpy
-scipy
+scipy=0.19.1
 pytorch==0.4.1
 torchvision==0.2.0
 tqdm==4.11.2
-<<<<<<< HEAD
-protobuf
-=======
-protobuf
-opencv 
+scikit-image
 scikit-learn
->>>>>>> de2cf35bcd8ae0e3e39fb5fd45ba69e2a4398ca1
+protobuf
+opencv

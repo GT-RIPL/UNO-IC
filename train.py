@@ -114,7 +114,7 @@ def train(cfg, writer, logger, logdir):
             print('SGD training')
 
         # Load pretrained weights
-        if str(attr['resume']) is not "None":
+        if str(attr['resume']) != "None":
 
             model_pkl = attr['resume']
 
@@ -149,11 +149,17 @@ def train(cfg, writer, logger, logdir):
                 logger.info("Loaded checkpoint '{}' (iter {})".format(model_pkl, checkpoint["epoch"]))
             else:
                 logger.info("No checkpoint found at '{}'".format(model_pkl))
+                print("No checkpoint found at '{}'".format(model_pkl))
                 exit()
 
         if cfg['swa'] and str(cfg['swa']['resume']) != "None":
-            checkpoint = torch.load(cfg['swa']['resume'])
-            swag_models[model].load_state_dict(checkpoint['model_state'])
+            if os.path.isfile(cfg['swa']['resume']):
+                checkpoint = torch.load(cfg['swa']['resume'])
+                swag_models[model].load_state_dict(checkpoint['model_state'])
+            else:
+                logger.info("No checkpoint found at '{}'".format(model_pkl))
+                print("No checkpoint found at '{}'".format(model_pkl))
+                exit()
 
 
     best_iou = -100.0

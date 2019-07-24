@@ -1086,9 +1086,20 @@ class GatedFusion(nn.Module):
 class ConditionalAttentionFusion(nn.Module):
     def __init__(self, n_classes):
         super(ConditionalAttentionFusion, self).__init__()
+        self.bottleneck = nn.Conv2d(
+            4 * n_channels,
+            n_channels // compression_rate,
+            3,
+            stride=1,
+            padding=1,
+            bias=False,
+            dilation=1
+        )
+        
+        
         self.gate = nn.Conv2d(
-            2 * n_classes + 2,
-            1,
+            n_channels // compression_rate,
+            2 * n_channels,
             3,
             stride=1,
             padding=1,
@@ -1096,9 +1107,9 @@ class ConditionalAttentionFusion(nn.Module):
             dilation=1
         )
         
-        self.fuse = nn.Conv2d(
-            2 * n_classes,
-            n_classes,
+        conv_mod = nn.Conv2d(
+            2 * n_channels,
+            n_channels,
             3,
             stride=1,
             padding=1,
@@ -1106,85 +1117,102 @@ class ConditionalAttentionFusion(nn.Module):
             dilation=1
         )
         
+        self.fuser = nn.Sequential(conv_mod, nn.BatchNorm2d(int(n_channels)))
         self.sigmoid = nn.Sigmoid()
         self.n_classes = n_classes
 
     def forward(self, rgb, d, rgb_var, d_var):
 
-        fusion = torch.cat([rgb, d, rgb_var, d_var], dim=1)
+        ABCD = torch.cat([rgb, d, rgb_var, d_var], dim=1)
         
-        G = self.gate(fusion)
+        G = self.bottleneck(ABCD)
         G = F.relu(G)
+        G = self.gate(G)
         G = self.sigmoid(G)
 
-        G_rgb = G
-        G_d = torch.ones(G.shape, dtype=torch.float, device=G.device) - G
+        ABCD = ABCD * G
+        
+        fused = self.fuser(ABCD)
 
-        P_rgb = rgb * G_rgb
-        P_d = d * G_d
-
-        P_fusion = self.fuse(torch.cat([P_rgb, P_d], dim=1))
-
-        return P_fusion
+        return fused
 
 
-class PreweightGatedFusion(nn.Module):
+class PreweightedGatedFusion(nn.Module):
     def __init__(self, n_classes):
-        super(PreweightGatedFusion, self).__init__()
+        super(UncertaintyGatedFusion, self).__init__()
+        self.bottleneck = nn.Conv2d(
+            2 * n_channels,
+            n_channels // compression_rate,
+            3,
+            stride=1,
+            padding=1,
+            bias=False,
+            dilation=1
+        )
+
         self.gate = nn.Conv2d(
-            2 * n_classes,
-            1,
+            n_channels // compression_rate,
+            2 * n_channels,
             3,
             stride=1,
             padding=1,
             bias=False,
             dilation=1
         )
-        
-        self.fuse = nn.Conv2d(
-            2 * n_classes,
-            n_classes,
+
+        conv_mod = nn.Conv2d(
+            2 * n_channels,
+            n_channels,
             3,
             stride=1,
             padding=1,
             bias=False,
             dilation=1
         )
-        
+
+        self.fuser = nn.Sequential(conv_mod, nn.BatchNorm2d(int(n_channels)))
         self.sigmoid = nn.Sigmoid()
         self.n_classes = n_classes
 
     def forward(self, rgb, d, rgb_var, d_var):
 
-        rgb_var = 1 / (torch.mean(rgb_var, 1) + 1e-5)
-        d_var = 1 / (torch.mean(d_var, 1) + 1e-5)
-        
-        for n in range(n_classes):
+        rgb_var = 1 / (rgb_var + 1e-5)
+        d_var = 1 / (d_var + 1e-5)
+
+        for n in range(rgb.shape[1]):
             rgb[:, n, :, :] = rgb[:, n, :, :] * rgb_var
             d[:, n, :, :] = d[:, n, :, :] * d_var
-            
-        fusion = torch.cat([rgb_var, d_var], dim=1)
-       
-        G = self.gate(fusion)
+
+        AB = torch.cat([rgb, d], dim=1)
+
+        G = self.bottleneck(AB)
         G = F.relu(G)
+        G = self.gate(G)
         G = self.sigmoid(G)
 
-        G_rgb = G
-        G_d = torch.ones(G.shape, dtype=torch.float, device=G.device) - G
+        AB = AB * G
 
-        P_rgb = rgb * G_rgb
-        P_d = d * G_d
+        fused = self.fuser(fusion)
 
-        P_fusion = self.fuse(torch.cat([P_rgb, P_d], dim=1))
-
-        return P_fusion
+        return fused
 
 class UncertaintyGatedFusion(nn.Module):
     def __init__(self, n_classes):
         super(UncertaintyGatedFusion, self).__init__()
+        self.bottleneck = nn.Conv2d(
+            2 * n_channels,
+            n_channels // compression_rate,
+            3,
+            stride=1,
+            padding=1,
+            bias=False,
+            dilation=1
+        )
+        
+        
         self.gate = nn.Conv2d(
-            2,
-            1,
+            n_channels // compression_rate,
+            2 * n_channels,
             3,
             stride=1,
             padding=1,
@@ -1192,9 +1220,9 @@ class UncertaintyGatedFusion(nn.Module):
             dilation=1
         )
         
-        self.fuse = nn.Conv2d(
-            2 * n_classes,
-            n_classes,
+        conv_mod = nn.Conv2d(
+            2 * n_channels,
+            n_channels,
             3,
             stride=1,
             padding=1,
@@ -1202,39 +1230,43 @@ class UncertaintyGatedFusion(nn.Module):
             dilation=1
         )
         
+        self.fuser = nn.Sequential(conv_mod, nn.BatchNorm2d(int(n_channels)))
         self.sigmoid = nn.Sigmoid()
         self.n_classes = n_classes
 
     def forward(self, rgb, d, rgb_var, d_var):
 
-
-        rgb_var = 1 / (torch.mean(rgb_var, 1) + 1e-5)
-        d_var = 1 / (torch.mean(d_var, 1) + 1e-5)
-
-        rgb_var = rgb_var.view(-1 , 1, rgb_var.shape[1], rgb_var.shape[2])
-        d_var = d_var.view(-1 , 1, d_var.shape[1], d_var.shape[2])
-        fusion = torch.cat([rgb_var, d_var], dim=1)
+        AB = torch.cat([rgb, d], dim=1)
+        CD = torch.cat([rgb_var, d_var], dim=1)
        
-        G = self.gate(fusion)
+        G = self.bottleneck(CD)
         G = F.relu(G)
+        G = self.gate(G)
         G = self.sigmoid(G)
 
-        G_rgb = G
-        G_d = torch.ones(G.shape, dtype=torch.float, device=G.device) - G
+        AB = AB * G
+        
+        fused = self.fuser(fusion)
 
-        P_rgb = rgb * G_rgb
-        P_d = d * G_d
-
-        P_fusion = self.fuse(torch.cat([P_rgb, P_d], dim=1))
-
-        return P_fusion
-
+        return fused
+        
 class SSMABlock(nn.Module):
-    def __init__(self, n_classes):
-        super(ConditionalAttentionFusion, self).__init__()
+    def __init__(self, n_channels, compression_rate=6):
+        super(SSMABlock, self).__init__()
+        self.bottleneck = nn.Conv2d(
+            2 * n_channels,
+            n_channels // compression_rate,
+            3,
+            stride=1,
+            padding=1,
+            bias=False,
+            dilation=1
+        )
+        
+        
         self.gate = nn.Conv2d(
-            2 * n_classes + 2,
-            n_classes,
+            n_channels // compression_rate,
+            2 * n_channels,
             3,
             stride=1,
             padding=1,
@@ -1242,9 +1274,9 @@ class SSMABlock(nn.Module):
             dilation=1
         )
         
-        self.fuse = nn.Conv2d(
-            2 * n_classes,
-            n_classes,
+        conv_mod = nn.Conv2d(
+            2 * n_channels,
+            n_channels,
             3,
             stride=1,
             padding=1,
@@ -1252,21 +1284,19 @@ class SSMABlock(nn.Module):
             dilation=1
         )
         
+        self.fuser = nn.Sequential(conv_mod, nn.BatchNorm2d(int(n_channels)))
         self.sigmoid = nn.Sigmoid()
 
-    def forward(self, rgb, d, rgb_var, d_var):
-        fusion = torch.cat([rgb, d, rgb_var, d_var], dim=1)
+    def forward(self, A, B):
+        AB = torch.cat([A, B], dim=1)
         
-        G = self.gate(fusion)
+        G = self.bottleneck(AB)
         G = F.relu(G)
+        G = self.gate(G)
         G = self.sigmoid(G)
 
-        G_rgb = G
-        G_d = torch.ones(G.shape, dtype=torch.float, device=G.device) - G
+        AB = AB * G
+        
+        fused = self.fuser(AB)
 
-        P_rgb = rgb * G_rgb
-        P_d = d * G_d
-
-        P_fusion = self.fuse(torch.cat([P_rgb, P_d], dim=1))
-
-        return P_fusion
+        return fused

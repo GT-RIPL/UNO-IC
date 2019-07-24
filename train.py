@@ -68,7 +68,6 @@ def train(cfg, writer, logger, logdir):
 
         attr = defaultdict(lambda: None, attr)
 
-
         models[model] = get_model(cfg['model'],
                                   n_classes,
                                   input_size=(cfg['data']['img_rows'], cfg['data']['img_cols']),
@@ -150,8 +149,9 @@ def train(cfg, writer, logger, logdir):
                 logger.info("Loaded checkpoint '{}' (iter {})".format(model_pkl, checkpoint["epoch"]))
             else:
                 logger.info("No checkpoint found at '{}'".format(model_pkl))
+                exit()
 
-        if args.swa and cfg['swa']['resume'] is not None:
+        if cfg['swa'] and str(cfg['swa']['resume']) != "None":
             checkpoint = torch.load(cfg['swa']['resume'])
             swag_models[model].load_state_dict(checkpoint['model_state'])
 
@@ -211,6 +211,7 @@ def train(cfg, writer, logger, logdir):
                 
             # collect parameters for swa
             if cfg['swa'] and (i + 1 - cfg['swa']['start']) % cfg['swa']['c_iterations'] == 0:
+                print('Saving SWA model at iteration: ', i+1)
                 swag_models[m].collect_model(models[m])
             
             if (i + 1) % cfg["training"]["val_interval"] == 0 or (i + 1) >= cfg["training"]["train_iters"]:
@@ -374,7 +375,7 @@ def train(cfg, writer, logger, logdir):
                                                      cfg['data']['dataset']))
                         torch.save(state, save_path)
 
-                        if args.swa and i > cfg['swa']['start']:
+                        if cfg['swa'] and i > cfg['swa']['start']:
                             state = {
                                 "epoch": i,
                                 "model_state": swag_models[m].state_dict(),

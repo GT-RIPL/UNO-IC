@@ -1,7 +1,6 @@
 import torch.nn as nn
 from torch.autograd import Variable
 
-from ptsemseg.models.utils import *
 from ptsemseg.models.recalibrator import *
 
 
@@ -73,7 +72,7 @@ class segnet_mcdo(nn.Module):
                 "up4": segnetUp3MCDO(512, 256, pMCDO=dropoutP),
                 "up3": segnetUp3MCDO(256, 128, pMCDO=dropoutP),
                 "up2": segnetUp2(128, 64),
-                "up1": segnetUp2(64, n_classes, relu=False),
+                "up1": segnetUp2(64, n_classes, relu=True),
             }
 
         else:
@@ -88,7 +87,7 @@ class segnet_mcdo(nn.Module):
                 "up4": segnetUp3MCDO(512, 256, pMCDO=dropoutP),
                 "up3": segnetUp3MCDO(256, 128, pMCDO=dropoutP),
                 "up2": segnetUp2MCDO(128, 64, pMCDO=dropoutP),
-                "up1": segnetUp2MCDO(64, n_classes, pMCDO=dropoutP, relu=False),
+                "up1": segnetUp2MCDO(64, n_classes, pMCDO=dropoutP, relu=True),
             }
 
         if self.temperatureScaling:

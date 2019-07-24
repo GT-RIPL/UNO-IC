@@ -1,5 +1,5 @@
 from ptsemseg.models.segnet import *
-
+from .fusion import GatedFusion
 
 class fused_segnet(nn.Module):
     def __init__(self,

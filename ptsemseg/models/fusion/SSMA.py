@@ -1,10 +1,10 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from sync_batchnorm.batchnorm import SynchronizedBatchNorm2d
+from .sync_batchnorm.batchnorm import SynchronizedBatchNorm2d
 
-from deeplab import DeepLab
-from decoder import build_decoder
+from .deeplab import DeepLab
+from .decoder import build_decoder
 
 class SSMA(nn.Module):
     def __init__(self, backbone='resnet', output_stride=16, num_classes=21,
@@ -25,8 +25,8 @@ class SSMA(nn.Module):
         self.decoder = build_decoder(num_classes, backbone, BatchNorm)
 
         if freeze_bn:
-            model1.freeze_bn()
-            model2.freeze_bn()
+            self.expert_A.freeze_bn()
+            self.expert_B.freeze_bn()
 
     def forward(self, input):
         

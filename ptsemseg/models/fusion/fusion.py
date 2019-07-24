@@ -1,3 +1,7 @@
+import torch
+import torch.nn as nn
+import numpy as np
+import torch.nn.functional as F
 
 class GatedFusion(nn.Module):
     def __init__(self, n_classes):
@@ -81,6 +85,65 @@ class ConditionalAttentionFusion(nn.Module):
         AB = AB * G
         
         fused = self.fuser(ABCD)
+
+        return fused
+
+class PreweightedGatedFusion(nn.Module):
+    def __init__(self, n_classes):
+        super(UncertaintyGatedFusion, self).__init__()
+        self.bottleneck = nn.Conv2d(
+            2 * n_channels,
+            n_channels // compression_rate,
+            3,
+            stride=1,
+            padding=1,
+            bias=False,
+            dilation=1
+        )
+
+        self.gate = nn.Conv2d(
+            n_channels // compression_rate,
+            2 * n_channels,
+            3,
+            stride=1,
+            padding=1,
+            bias=False,
+            dilation=1
+        )
+
+        conv_mod = nn.Conv2d(
+            2 * n_channels,
+            n_channels,
+            3,
+            stride=1,
+            padding=1,
+            bias=False,
+            dilation=1
+        )
+
+        self.fuser = nn.Sequential(conv_mod, nn.BatchNorm2d(int(n_channels)))
+        self.sigmoid = nn.Sigmoid()
+        self.n_classes = n_classes
+
+    def forward(self, rgb, d, rgb_var, d_var):
+
+        rgb_var = 1 / (rgb_var + 1e-5)
+        d_var = 1 / (d_var + 1e-5)
+
+        for n in range(rgb.shape[1]):
+            rgb[:, n, :, :] = rgb[:, n, :, :] * rgb_var
+            d[:, n, :, :] = d[:, n, :, :] * d_var
+
+        AB = torch.cat([rgb, d], dim=1)
+
+        G = self.bottleneck(AB)
+        G = F.relu(G)
+        G = self.gate(G)
+        G = self.sigmoid(G)
+
+        AB = AB * G
+
+        fused = self.fuser(fusion)
 
         return fused
 

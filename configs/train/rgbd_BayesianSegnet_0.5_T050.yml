@@ -52,7 +52,7 @@ data:
     noisy_type: None 
 training:
     train_iters: 100000
-    batch_size: 4
+    batch_size: 2
     val_interval: 5000 #5000
     n_workers: 2
     print_interval: 50

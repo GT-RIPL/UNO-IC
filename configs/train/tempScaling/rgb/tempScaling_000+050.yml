@@ -9,7 +9,7 @@ models:
         reduction: 1.0
         mcdo_passes: 6 # Number of Passes
         dropoutP: 0.5 # Dropout Probability
-        resume: None
+        resume: ./runs/train/tempScaling/rgb/tempScaling_000+050.yml/rgb_segnet_mcdo_airsim_best_model.pkl
     #d:
     #    in_channels: 3
     #    start_layer: down1
@@ -51,12 +51,12 @@ data:
     path: datasets/airsim_data_async #../../ros/data/airsim_03-30-2019/airsim_data_async
     noisy_type: None 
 training:
-    train_iters: 200000
+    train_iters: 150000
     batch_size: 2
     val_interval: 10000
     n_workers: 8
     print_interval: 50
-    png_frames: 5000
+    png_frames: 50
     optimizer:
         name: 'adam'
         lr: 1.0e-5

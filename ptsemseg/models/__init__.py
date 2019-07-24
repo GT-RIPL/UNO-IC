@@ -10,6 +10,7 @@ from ptsemseg.models.icnet import *
 from ptsemseg.models.linknet import *
 from ptsemseg.models.frrn import *
 from ptsemseg.models.fusion.SSMA import SSMA
+from ptsemseg.models.fusion.deeplab import DeepLab
 from ptsemseg.models.fusion.CAFnet import CAFnet
 
 
@@ -117,7 +118,7 @@ def get_model(model_dict,
 
     elif name == "SSMA":
         model = model(backbone='resnet', output_stride=16, num_classes=n_classes, sync_bn=True, freeze_bn=False)
-    elif name == "DeepNet":
+    elif name == "DeepLab":
         model = model(backbone='resnet', output_stride=16, num_classes=n_classes, sync_bn=True, freeze_bn=False)
     else:
         model = model(n_classes=n_classes, **param_dict)
@@ -140,10 +141,9 @@ def _get_model_instance(name):
             "linknet": linknet,
             "frrnA": frrn,
             "frrnB": frrn,
-            "fused_segnet": fused_segnet,
             "CAFnet": CAFnet,
             "SSMA": SSMA,
-            "DeepNet": DeepNet
+            "DeepNet": DeepLab
         }[name]
     except:
         raise ("Model {} not available".format(name))

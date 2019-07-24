@@ -55,7 +55,7 @@ training:
     val_interval: 25000
     n_workers: 8
     print_interval: 50
-    png_frames: 5000
+    png_frames: 50
     optimizer:
         name: 'adam'
         lr: 1.0e-5

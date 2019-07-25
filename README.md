@@ -9,7 +9,10 @@
 - symbolic link ./datasets/airsim_data_async to dataset (airsim_03-30-2019/airsim_data_async)
 - no trailing backslash in path variable
 - folder should contain subfolders of modalities: (depth, depth_encoded, pose, scene, segmentation)
-2. Install: follow original readme installation instructions
+2. Install: 
+```conda env create -f environment.yml
+conda activate semseg
+pip install -f requirements.txt```
 3. Adjust configuration: configs/XXX.yml file
 4. Train:
 

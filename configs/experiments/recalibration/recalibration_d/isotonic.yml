@@ -8,11 +8,8 @@ models:
         end_layer: up1
         reduction: 1.0
         mcdo_passes: 6
-        mask_dir: models/DropoutMasks/Random 
-        masks: [0,1,2,3,4,5] 
-        fixed_mcdo: No
         dropoutP: 0.5
-        resume: models/d_BayesianSegnet_0.5_T000/d_segnet_mcdo_airsim_best_model.pkl
+        resume: models/Segnet/d_Segnet/d_segnet_mcdo_airsim_T000.pkl
 fusion: None #{None,None}
 recal: afterMCDO #{None,afterMCDO,beforeMCDO}
 recalibrator: Isotonic #{Histogram,Polynomial_X}

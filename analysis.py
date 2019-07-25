@@ -18,7 +18,7 @@ include = args.include[0] if args.include else []
 match = args.match[0] if args.match else []
 
 runs = {}
-for i,file in enumerate(glob.glob("./runs/experiments/**/*tfevents*",recursive=True)):
+for i,file in enumerate(glob.glob("./runs/**/*tfevents*",recursive=True)):
 
 
     directory = "/".join(file.split("/")[:-1])

@@ -8,22 +8,16 @@ models:
         end_layer: up1
         reduction: 1.0
         mcdo_passes: 6 # Number of Passes
-        mask_dir: models/DropoutMasks/Random # Directory of Indexed Masks
-        masks: [0,1,2,3,4,5] # Number Mask Indices Should Equal Number of MCDO Passes
-        fixed_mcdo: No # Yes: Fixed Masks per Pass; No: Randomized Masks per Pass
         dropoutP: 0.5 # Dropout Probability
-        resume: models/rgb_BayesianSegnet_0.5_T000/rgb_segnet_mcdo_airsim_best_model.pkl
+        resume: models/Segnet/rgb_Segnet/rgb_segnet_mcdo_airsim_T000.pkl
     d:
         in_channels: 3
         start_layer: down1
         end_layer: up1
         reduction: 1.0
         mcdo_passes: 6
-        mask_dir: models/DropoutMasks/Random 
-        masks: [0,1,2,3,4,5] 
-        fixed_mcdo: No
         dropoutP: 0.5
-        resume: models/d_BayesianSegnet_0.5_T000/d_segnet_mcdo_airsim_best_model.pkl
+        resume: models/Segnet/d_Segnet/d_segnet_mcdo_airsim_T000.pkl
 fusion: SoftmaxAverage #{None,SoftmaxMultiply}
 recal: afterMCDO #{None,afterMCDO,beforeMCDO}
 recalibrator: HistogramLinear #{Histogram,Polynomial_X}

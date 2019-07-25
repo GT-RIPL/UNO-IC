@@ -9,16 +9,16 @@ models:
         reduction: 1.0
         mcdo_passes: 6 # Number of Passes
         dropoutP: 0.5 # Dropout Probability
-        resume: models/rgb_BayesianSegnet_0.5_T000/rgb_segnet_mcdo_airsim_best_model.pkl
+        resume: models/Segnet/rgb_Segnet/rgb_segnet_mcdo_airsim_T000.pkl
         freeze: True
     d:
         in_channels: 3
         start_layer: down1
         end_layer: up1
         reduction: 1.0
-        mcdo_passes: 6
-        dropoutP: 0.5
-        resume: models/d_BayesianSegnet_0.5_T000/d_segnet_mcdo_airsim_best_model.pkl
+        mcdo_passes: 6 # Number of Passes
+        dropoutP: 0.5 # Dropout Probability
+        resume: models/Segnet/d_Segnet/d_segnet_mcdo_airsim_T000.pkl
         freeze: True
 fusion: SoftmaxMultiply #{None,SoftmaxMultiply}
 recal: None #{None,afterMCDO,beforeMCDO}

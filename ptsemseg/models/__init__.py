@@ -143,7 +143,7 @@ def _get_model_instance(name):
             "frrnB": frrn,
             "CAFnet": CAFnet,
             "SSMA": SSMA,
-            "DeepNet": DeepLab
+            "DeepLab": DeepLab
         }[name]
     except:
         raise ("Model {} not available".format(name))

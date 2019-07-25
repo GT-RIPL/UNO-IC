@@ -24,9 +24,7 @@ from ptsemseg.metrics import runningScore, averageMeter
 from ptsemseg.schedulers import get_scheduler
 from ptsemseg.optimizers import get_optimizer
 from ptsemseg.degredations import *
-
 from tensorboardX import SummaryWriter
-from scipy.misc import imsave
 
 from functools import partial
 from collections import defaultdict

@@ -23,7 +23,7 @@ models:
         masks: [0,1,2,3,4,5] 
         fixed_mcdo: No
         dropoutP: 0.5
-        resume: None
+        resume: /home/wcheung8/Desktop/pytorch-semseg/runs/train/tempScaling/d/tempScaling_000+050.yml/d_segnet_mcdo_airsim_best_model.pkl
 fusion: None #{None,SoftmaxMultiply}
 recal: None #{None,afterMCDO,beforeMCDO}
 recalibrator: None #{Histogram,Polynomial_X}

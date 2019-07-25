@@ -1,4 +1,4 @@
-id: rgbd_BayesianSegnet_SoftmaxMult
+id: rgbd_BayesianSegnet_SoftmaxMult_T000+T050
 model:
     arch: segnet_mcdo
 models:
@@ -9,7 +9,7 @@ models:
         reduction: 1.0
         mcdo_passes: 6 # Number of Passes
         dropoutP: 0.5 # Dropout Probability
-        resume: models/joint/rgb_BayesianSegnet_0.5_T000+T050/rgb_segnet_mcdo_airsim_best_model.pkl
+        resume: models/Segnet/rgb_Segnet/rgb_segnet_mcdo_airsim_T000+T050.pkl
     d:
         in_channels: 3
         start_layer: down1
@@ -17,7 +17,7 @@ models:
         reduction: 1.0
         mcdo_passes: 6
         dropoutP: 0.5
-        resume: models/joint/d_BayesianSegnet_0.5_T000+T050/d_segnet_mcdo_airsim_best_model.pkl
+        resume: models/Segnet/d_Segnet/d_segnet_mcdo_airsim_T000+T050.pkl
 fusion: SoftmaxMultiply #{None,SoftmaxMultiply}
 recal: None #{None,afterMCDO,beforeMCDO}
 recalibrator: None #{Histogram,Polynomial_X}

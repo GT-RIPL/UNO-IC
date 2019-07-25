@@ -164,13 +164,12 @@ def train(cfg, writer, logger, logdir):
 
     best_iou = -100.0
     i = start_iter
-    print(i)
-    while i <= cfg["training"]["train_iters"]:
+    print("Beginning Training at iteration: {}".format(i))
+    while i < cfg["training"]["train_iters"]:
 
         print("=" * 10, "TRAINING", "=" * 10)
         for (images_list, labels_list, aux_list) in loaders['train']:
 
-            i += 1
             #################################################################################
             # Training
             #################################################################################
@@ -324,9 +323,9 @@ def train(cfg, writer, logger, logdir):
                             gt = labels_val.data.cpu().numpy()
 
                             if i_val % cfg["training"]["png_frames"] == 0:
-                                plotPrediction(logdir, cfg, n_classes, i, i_val, k, inputs, pred, gt)
+                                plotPrediction(logdir, cfg, n_classes, i + 1, i_val, k, inputs, pred, gt)
                                 for m in cfg["models"].keys():
-                                    plotMeansVariances(logdir, cfg, n_classes, i, i_val, m, k + "/" + m, inputs,
+                                    plotMeansVariances(logdir, cfg, n_classes, i + 1, i_val, m, k + "/" + m, inputs,
                                                        pred, gt, mean[m], variance[m])
 
                             running_metrics_val[k].update(gt, pred)
@@ -355,9 +354,6 @@ def train(cfg, writer, logger, logdir):
                     for m in cfg["models"].keys():
                         val_loss_meter[m][env].reset()
                     running_metrics_val[env].reset()
-
-                if i > cfg["training"]["train_iters"]:
-                    break
 
                 # save best model
                 for m in optimizers.keys():
@@ -394,7 +390,9 @@ def train(cfg, writer, logger, logdir):
 
                             torch.save(state, save_path)
 
-            if i > cfg["training"]["train_iters"]:
+            i += 1
+            
+            if i >= cfg["training"]["train_iters"]:
                 break
 
 

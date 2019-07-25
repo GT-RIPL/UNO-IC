@@ -142,15 +142,15 @@ for k,v in runs.items():
     model = list(c['models'].keys())[0]
 
 
-    v['std_config']['reduction'] = c['models'][model]['reduction']    
+    # v['std_config']['reduction'] = c['models'][model]['reduction']    
     # v['std_config']['start_layers'] = c['start_layers']
-    v['std_config']['mcdo_passes'] = c['models'][model]['mcdo_passes']
-    v['std_config']['fuse_mech'] = "ModeSummed" if "fuse" in c['models'].keys() and c['models']['fuse']['in_channels']==-1 else "ModeStacked"
-    #v['std_config']['mcdo_start_iter'] = c['models'][model]['mcdo_start_iter']
-    #v['std_config']['multipass_backprop'] = c['models'][model]['mcdo_backprop']
-    #v['std_config']['learned_uncertainty'] = True if c['models'][model]['learned_uncertainty']=='yes' else False
-    v['std_config']['dropoutP'] = c['models'][model]['dropoutP']
-    v['std_config']['pretrained'] = str(c['models'][model]['resume']) != "None"
+    # v['std_config']['mcdo_passes'] = c['models'][model]['mcdo_passes']
+    # v['std_config']['fuse_mech'] = "ModeSummed" if "fuse" in c['models'].keys() and c['models']['fuse']['in_channels']==-1 else "ModeStacked"
+    # v['std_config']['mcdo_start_iter'] = c['models'][model]['mcdo_start_iter']
+    # v['std_config']['multipass_backprop'] = c['models'][model]['mcdo_backprop']
+    # v['std_config']['learned_uncertainty'] = True if c['models'][model]['learned_uncertainty']=='yes' else False
+    # v['std_config']['dropoutP'] = c['models'][model]['dropoutP']
+    # v['std_config']['pretrained'] = str(c['models'][model]['resume']) != "None"
 
 scopes = ["Mean_Acc____"] \
         +["Mean_IoU____"] \
@@ -242,7 +242,9 @@ for run in runs.keys():
 
 df = pd.DataFrame(data)
 
-
+if len(data) == 0:
+    print("No Runs Found")
+    exit()
 df = df[(df.cls=="Mean_IoU____")]
 data_fields = ['test','mean','std','raw','iter']+list(set(runs[list(runs)[0]]['std_config']))
 id_fields = ['test']+list(set(runs[list(runs)[0]]['std_config']))

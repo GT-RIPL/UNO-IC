@@ -1,4 +1,4 @@
-id: CAFSegnet_T000
+id: CAFSegnet_T050_v1.3
 model:
     arch: CAF_segnet
 models:
@@ -10,6 +10,7 @@ models:
         mcdo_passes: 6
         dropoutP: 0.5
         resume: None
+        fusion_module: 1.3
 fusion: None #{None,SoftmaxMultiply}
 recal: None #{None,afterMCDO,beforeMCDO}
 recalibrator: None #{Histogram,Polynomial_X}
@@ -17,12 +18,10 @@ bins: 20
 data:
     dataset: airsim
     train_split: train
-    train_subsplit: ['async_fog_000_clear',
-                     'async_fog_050_clear']
+    train_subsplit: ['async_fog_050_clear']
     train_reduction: 1.0    
     recal_split: recal
-    recal_subsplit: ['async_fog_000_clear',
-                     'async_fog_050_clear']
+    recal_subsplit: ['async_fog_050_clear']
     recal_reduction: 0.5
     val_split: val
     val_subsplit: [
@@ -39,7 +38,7 @@ data:
     path: datasets/airsim_data_async #../../ros/data/airsim_03-30-2019/airsim_data_async
     noisy_type: None 
 training:
-    train_iters: 50000
+    train_iters: 25000
     batch_size: 2
     val_interval: 5000
     n_workers: 8
@@ -53,3 +52,4 @@ training:
         size_average: False
     lr_schedule:
     resume: None
+

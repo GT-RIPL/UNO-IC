@@ -7,6 +7,7 @@ from ptsemseg.models.segnet_mcdo import *
 
 class CAFnet(nn.Module):
     def __init__(self,
+                 backbone="segnet",
                  n_classes=21,
                  in_channels=3,
                  is_unpooling=True,
@@ -23,9 +24,9 @@ class CAFnet(nn.Module):
                  recalibrator="None",
                  temperatureScaling=False,
                  bins=0,
-                 fusion="CAF",
-                 resumeRGB="./models/joint/rgb_BayesianSegnet_0.5_T000+T050/rgb_segnet_mcdo_airsim_best_model.pkl",
-                 resumeD="./models/joint/d_BayesianSegnet_0.5_T000+T050/d_segnet_mcdo_airsim_best_model.pkl"
+                 fusion_module="1.1",
+                 resumeRGB="./models/Segnet/rgb_Segnet/rgb_segnet_mcdo_airsim_T000+T050.pkl",
+                 resumeD="./models/Segnet/d_Segnet/d_segnet_mcdo_airsim_T000+T050.pkl"
                  ):
         super(CAFnet, self).__init__()
 
@@ -52,12 +53,12 @@ class CAFnet(nn.Module):
         for param in self.d_segnet.parameters():
             param.requires_grad = False
         """
-        
-        if fusion == "ConditionalAttentionFusion":
+        print(fusion_module)
+        if fusion_module == "ConditionalAttentionFusion" or str(fusion_module) == '1.1':
             self.gatedFusion = ConditionalAttentionFusion(n_classes)
-        elif fusion == "PreweightGatedFusion":
+        elif fusion_module == "PreweightGatedFusion" or str(fusion_module) == '1.2':
             self.gatedFusion = PreweightGatedFusion(n_classes)
-        elif fusion == "UncertaintyGatedFusion":
+        elif fusion_module == "UncertaintyGatedFusion" or str(fusion_module) == '1.3':
             self.gatedFusion = UncertaintyGatedFusion(n_classes)
         else:
             raise NotImplementedError

@@ -32,6 +32,7 @@ def get_model(model_dict,
               temperatureScaling=False,
               varianceScaling=False,
               freeze=False,
+              fusion_module="1.1",
               bins=0,
               device="cpu"):
     name = model_dict['arch']
@@ -68,12 +69,11 @@ def get_model(model_dict,
                       recalibrator=recalibrator,
                       temperatureScaling=temperatureScaling,
                       freeze=freeze,
-                      bins=bins,
-                      **param_dict)
+                      bins=bins)
         vgg16 = models.vgg16(pretrained=True)
         model.init_vgg16_params(vgg16)
 
-    elif name == "CAFnet":
+    elif name == "CAFnet" or name == "CAF_segnet":
         model = model(backbone="segnet",
                       n_classes=n_classes,
                       input_size=input_size,
@@ -89,13 +89,11 @@ def get_model(model_dict,
                       device=device,
                       recalibrator=recalibrator,
                       temperatureScaling=temperatureScaling,
-                      varianceScaling=varianceScaling,
                       bins=bins,
-                      **param_dict)
+                      fusion_module=fusion_module)
 
     elif name == "fused_segnet":
-        model = model(n_classes=n_classes,
-                      **param_dict)
+        model = model(n_classes=n_classes)
         vgg16 = models.vgg16(pretrained=True)
         model.rgb_segnet.init_vgg16_params(vgg16)
         model.d_segnet.init_vgg16_params(vgg16)
@@ -142,6 +140,7 @@ def _get_model_instance(name):
             "frrnA": frrn,
             "frrnB": frrn,
             "CAFnet": CAFnet,
+            "CAF_segnet": CAFnet,
             "SSMA": SSMA,
             "DeepLab": DeepLab
         }[name]

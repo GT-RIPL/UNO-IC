@@ -84,6 +84,7 @@ def train(cfg, writer, logger, logdir):
                                   temperatureScaling=cfg['temperatureScaling'],
                                   varianceScaling=cfg['varianceScaling'],
                                   freeze=attr['freeze'],
+                                  fusion_module=attr['fusion_module'],
                                   bins=cfg['bins']).to(device)
 
         models[model] = torch.nn.DataParallel(models[model], device_ids=range(torch.cuda.device_count()))
@@ -390,10 +391,10 @@ def train(cfg, writer, logger, logdir):
 
                             torch.save(state, save_path)
 
-            i += 1
-            
-            if i >= cfg["training"]["train_iters"]:
-                break
+                i += 1
+                
+                if i >= cfg["training"]["train_iters"]:
+                    break
 
 
 

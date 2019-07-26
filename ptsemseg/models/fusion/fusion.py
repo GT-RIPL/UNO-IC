@@ -152,8 +152,8 @@ class UncertaintyGatedFusion(nn.Module):
     def __init__(self, n_channels, compression_rate=1):
         super(UncertaintyGatedFusion, self).__init__()
         self.bottleneck = nn.Conv2d(
-            2 * n_channels,
-            n_channels // compression_rate,
+            2,
+            1,
             3,
             stride=1,
             padding=1,
@@ -163,7 +163,7 @@ class UncertaintyGatedFusion(nn.Module):
         
         
         self.gate = nn.Conv2d(
-            n_channels // compression_rate,
+            1,
             2 * n_channels,
             3,
             stride=1,
@@ -198,7 +198,7 @@ class UncertaintyGatedFusion(nn.Module):
 
         AB = AB * G
         
-        fused = self.fuser(fusion)
+        fused = self.fuser(AB)
 
         return fused
         

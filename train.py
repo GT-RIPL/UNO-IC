@@ -391,10 +391,10 @@ def train(cfg, writer, logger, logdir):
 
                             torch.save(state, save_path)
 
-                i += 1
-                
-                if i >= cfg["training"]["train_iters"]:
-                    break
+            i += 1
+            
+            if i >= cfg["training"]["train_iters"]:
+                break
 
 
 

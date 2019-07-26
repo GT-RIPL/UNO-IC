@@ -301,17 +301,17 @@ def train(cfg, writer, logger, logdir):
 
                             # Fusion Type
                             if cfg["fusion"] == "None":
-                                outputs = mean[list(cfg["models"].keys())[0]]
+                                outputs = torch.nn.Softmax(dim=1)(mean[list(cfg["models"].keys())[0]])
                             elif cfg["fusion"] == "SoftmaxMultiply":
-                                outputs = mean["rgb"] * mean["d"]
+                                outputs = torch.nn.Softmax(dim=1)(mean["rgb"]) * torch.nn.Softmax(dim=1)(mean["d"])
                             elif cfg["fusion"] == "SoftmaxAverage":
-                                outputs = mean["rgb"] + mean["d"]
+                                outputs = torch.nn.Softmax(dim=1)(mean["rgb"]) + torch.nn.Softmax(dim=1)(mean["d"])
                             elif cfg["fusion"] == "WeightedVariance":
                                 rgb_var = 1 / (torch.mean(variance["rgb"], 1) + 1e-5)
                                 d_var = 1 / (torch.mean(variance["d"], 1) + 1e-5)
 
-                                rgb = mean["rgb"]
-                                d = mean["d"]
+                                rgb = torch.nn.Softmax(dim=1)(mean["rgb"])
+                                d = torch.nn.Softmax(dim=1)(mean["d"])
                                 for n in range(n_classes):
                                     rgb[:, n, :, :] = rgb[:, n, :, :] * rgb_var
                                     d[:, n, :, :] = d[:, n, :, :] * d_var

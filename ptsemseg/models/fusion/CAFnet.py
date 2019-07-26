@@ -1,7 +1,7 @@
 import torch.nn as nn
 from torch.autograd import Variable
 
-from .fusion import PreweightedGatedFusion, ConditionalAttentionFusion, UncertaintyGatedFusion
+from .fusion import PreweightedGatedFusion, ConditionalAttentionFusion, UncertaintyGatedFusion, ConditionalAttentionFusionv2, PreweightedUncertaintyFusionv2
 from ptsemseg.models.recalibrator import *
 from ptsemseg.models.segnet_mcdo import *
 
@@ -57,9 +57,13 @@ class CAFnet(nn.Module):
         if fusion_module == "ConditionalAttentionFusion" or str(fusion_module) == '1.1':
             self.gatedFusion = ConditionalAttentionFusion(n_classes)
         elif fusion_module == "PreweightGatedFusion" or str(fusion_module) == '1.2':
-            self.gatedFusion = PreweightGatedFusion(n_classes)
+            self.gatedFusion = PreweightedGatedFusion(n_classes)
         elif fusion_module == "UncertaintyGatedFusion" or str(fusion_module) == '1.3':
             self.gatedFusion = UncertaintyGatedFusion(n_classes)
+        elif fusion_module == "ConditionalAttentionFusionv2" or str(fusion_module) == '2.1':
+            self.gatedFusion = ConditionalAttentionFusionv2(n_classes)
+        elif fusion_module == "PreweightedUncertaintyFusionv2" or str(fusion_module) == '2.2':
+            self.gatedFusion = PreweightedUncertaintyFusionv2(n_classes)
         else:
             raise NotImplementedError
 
@@ -73,7 +77,7 @@ class CAFnet(nn.Module):
         s = var_rgb.shape
         
         var_rgb = torch.mean(var_rgb, 1).view(-1, 1, s[2], s[3])
-        var_d = torch.mean(var_d, 1).view(-1, 1, s[2], s[3])
+        var_d = torch.mean(var_d, 1).view(-1, 1, s[2], s[3]) 
 
         x = self.gatedFusion(mean_rgb, mean_d, var_rgb, var_d)
 

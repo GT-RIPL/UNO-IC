@@ -1,4 +1,4 @@
-id: CAFSegnet_T000+T050_v1.1
+id: CAFSegnet_T000+T050_v2.1
 model:
     arch: CAF_segnet
 models:
@@ -10,7 +10,7 @@ models:
         mcdo_passes: 6
         dropoutP: 0.5
         resume: None
-        fusion_module: 1.1
+        fusion_module: 2.1
 fusion: None #{None,SoftmaxMultiply}
 recal: None #{None,afterMCDO,beforeMCDO}
 recalibrator: None #{Histogram,Polynomial_X}
@@ -27,12 +27,12 @@ data:
     recal_reduction: 0.5
     val_split: val
     val_subsplit: [
-                   'async_fog_000_clear',      
+                   'async_fog_000_clear',
                    'async_fog_050_clear',
                    'async_fog_100_clear',
                    "async_fog_100_clear__{'channel':'rgb','type':'blackoutNoise','value':'20'}",
                    "async_fog_100_clear__{'channel':'d','type':'blackoutNoise','value':'20'}",
-                   "async_fog_100_clear__{'channel':'rgbd','type':'blackoutNoise','value':'20'}",              
+                   "async_fog_100_clear__{'channel':'rgbd','type':'blackoutNoise','value':'20'}",                   
                   ]    
     val_reduction: 1.0
     img_rows: 512

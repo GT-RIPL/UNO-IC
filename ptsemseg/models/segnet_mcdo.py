@@ -189,7 +189,7 @@ class segnet_mcdo(nn.Module):
         return x
 
 
-    def forwardMCDO(self, inputs, recalType="None"):
+    def forwardMCDO(self, inputs, recalType="None", softmax=False):
 
         for i in range(self.mcdo_passes):
             if i == 0:
@@ -214,11 +214,15 @@ class segnet_mcdo(nn.Module):
             plt.close(fig)
         """
 
-        mean = self.softmaxMCDO(x).mean(-1)
-        variance = self.softmaxMCDO(x).std(-1)
+        mean = x.mean(-1)
+        variance = x.std(-1)
 
         # Uncalibrated Softmax Mean and Variance
         if recalType != "None":
+
+            mean = self.softmaxMCDO(x).mean(-1)
+            variance = self.softmaxMCDO(x).std(-1)
+
             if recalType == "beforeMCDO":
                 for c in range(self.n_classes):
                     x[:, c, :, :, :] = self.calibrationPerClass[c].predict(x[:, c, :, :, :].reshape(-1)).reshape(

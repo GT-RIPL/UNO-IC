@@ -1,7 +1,7 @@
 import torch.nn as nn
 from torch.autograd import Variable
 
-from .fusion import PreweightedGatedFusion, ConditionalAttentionFusion, UncertaintyGatedFusion, ConditionalAttentionFusionv2, PreweightedUncertaintyFusionv2
+from .fusion import PreweightedGatedFusion, ConditionalAttentionFusion, UncertaintyGatedFusion, ConditionalAttentionFusionv2
 from ptsemseg.models.recalibrator import *
 from ptsemseg.models.segnet_mcdo import *
 
@@ -62,8 +62,6 @@ class CAFnet(nn.Module):
             self.gatedFusion = UncertaintyGatedFusion(n_classes)
         elif fusion_module == "ConditionalAttentionFusionv2" or str(fusion_module) == '2.1':
             self.gatedFusion = ConditionalAttentionFusionv2(n_classes)
-        elif fusion_module == "PreweightedUncertaintyFusionv2" or str(fusion_module) == '2.2':
-            self.gatedFusion = PreweightedUncertaintyFusionv2(n_classes)
         else:
             raise NotImplementedError
 

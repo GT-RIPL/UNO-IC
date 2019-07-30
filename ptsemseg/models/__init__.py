@@ -34,6 +34,8 @@ def get_model(model_dict,
               freeze=False,
               fusion_module="1.1",
               bins=0,
+              resume_rgb=None,
+              resume_d=None,
               device="cpu"):
     name = model_dict['arch']
     model = _get_model_instance(name)
@@ -90,6 +92,8 @@ def get_model(model_dict,
                       recalibrator=recalibrator,
                       temperatureScaling=temperatureScaling,
                       bins=bins,
+                      resume_rgb=resume_rgb,
+                      resume_d=resume_d,
                       fusion_module=fusion_module)
 
     elif name == "fused_segnet":

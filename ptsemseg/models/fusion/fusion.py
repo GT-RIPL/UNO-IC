@@ -13,7 +13,7 @@ class GatedFusion(nn.Module):
             1,
             stride=1,
             padding=0,
-            bias=False,
+            bias=True,
             dilation=1
         )
         self.sigmoid = nn.Sigmoid()

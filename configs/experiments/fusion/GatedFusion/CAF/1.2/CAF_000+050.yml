@@ -1,4 +1,4 @@
-id: CAFSegnet_T000+T050_v1.2
+id: CAFSegnet_T000+T050_v1.3
 model:
     arch: CAF_segnet
 models:
@@ -10,7 +10,9 @@ models:
         mcdo_passes: 6
         dropoutP: 0.5
         resume: None
-        fusion_module: 1.2
+        fusion_module: 1.3
+        resume_rgb: ./models/Segnet/rgb_Segnet/rgb_segnet_mcdo_airsim_T000+T050.pkl
+        resume_d: ./models/Segnet/d_Segnet/d_segnet_mcdo_airsim_T000+T050.pkl
 fusion: None #{None,SoftmaxMultiply}
 recal: None #{None,afterMCDO,beforeMCDO}
 recalibrator: None #{Histogram,Polynomial_X}
@@ -48,9 +50,10 @@ training:
     png_frames: 50
     optimizer:
         name: 'adam'
-        lr: 1.0e-6
+        lr: 1.0e-7
     loss:
         name: 'cross_entropy'
         size_average: False
     lr_schedule:
     resume: None
+

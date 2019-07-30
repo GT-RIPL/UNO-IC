@@ -92,9 +92,9 @@ def get_loaders(name, cfg):
                                        num_workers=cfg['training']['n_workers']) for key in v_loader.keys()}
 
     # add training samples to validation sweep
-    valloaders = {**valloaders, 'train': data.DataLoader(tv_loader,
-                                                         batch_size=cfg['training']['batch_size'],
-                                                         num_workers=cfg['training']['n_workers'])}
+    # valloaders = {**valloaders, 'train': data.DataLoader(tv_loader,
+                                                         # batch_size=cfg['training']['batch_size'],
+                                                         # num_workers=cfg['training']['n_workers'])}
 
     return {
             'train': data.DataLoader(t_loader,

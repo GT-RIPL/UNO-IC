@@ -13,8 +13,10 @@ import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument('--include', action='append', nargs='+')
 parser.add_argument('--match', action='append', nargs='+')
+parser.add_argument('--baselines', action='store_true')
 args = parser.parse_args()
 include = args.include[0] if args.include else []
+baselines = args.baselines
 match = args.match[0] if args.match else []
 
 runs = {}
@@ -63,48 +65,49 @@ for i,file in enumerate(glob.glob("./runs/**/*tfevents*",recursive=True)):
                     runs[directory][value.tag]['step'].append(event.step)
                     runs[directory][value.tag]['time'].append(event.wall_time)
                     runs[directory][value.tag]['value'].append(value.simple_value)
+print(baselines)
+if baselines:
+    for i, file in enumerate(glob.glob("./runs/baselines/**/*tfevents*", recursive=True)):
 
-for i, file in enumerate(glob.glob("./runs/baselines/**/*tfevents*", recursive=True)):
+        directory = "/".join(file.split("/")[:-1])
 
-    directory = "/".join(file.split("/")[:-1])
+        # yaml_file = "{}/pspnet_airsim.yml".format(directory)
+        # yaml_file = "{}/segnet_airsim_normal.yml".format(directory)
+        yaml_file = glob.glob("{}/*.yml".format(directory))[0]
 
-    # yaml_file = "{}/pspnet_airsim.yml".format(directory)
-    # yaml_file = "{}/segnet_airsim_normal.yml".format(directory)
-    yaml_file = glob.glob("{}/*.yml".format(directory))[0]
+        if not os.path.isfile(yaml_file):
+            continue
 
-    if not os.path.isfile(yaml_file):
-        continue
+        with open(yaml_file, "r") as f:
+            configs = yaml.load(f, Loader=yaml.FullLoader)
 
-    with open(yaml_file, "r") as f:
-        configs = yaml.load(f, Loader=yaml.FullLoader)
+        name = configs['id']
+        # if any([e==name for e in exclude]):
+        #     continue
 
-    name = configs['id']
-    # if any([e==name for e in exclude]):
-    #     continue
+        # print("Reading: {}".format(name))
 
-    # print("Reading: {}".format(name))
+        for event in tf.train.summary_iterator(file):
 
-    for event in tf.train.summary_iterator(file):
+            for value in event.summary.value:
 
-        for value in event.summary.value:
+                if not directory in runs:
+                    runs[directory] = {}
+                    runs[directory]['raw_config'] = configs.copy()
+                    runs[directory]['raw_config']['file'] = file
+                    runs[directory]['raw_config']['file_only'] = file.split("/")[-2]
 
-            if not directory in runs:
-                runs[directory] = {}
-                runs[directory]['raw_config'] = configs.copy()
-                runs[directory]['raw_config']['file'] = file
-                runs[directory]['raw_config']['file_only'] = file.split("/")[-2]
+                if not value.tag in runs[directory]:
+                    runs[directory][value.tag] = {}
+                    runs[directory][value.tag]['step'] = []
+                    runs[directory][value.tag]['time'] = []
+                    runs[directory][value.tag]['value'] = []
 
-            if not value.tag in runs[directory]:
-                runs[directory][value.tag] = {}
-                runs[directory][value.tag]['step'] = []
-                runs[directory][value.tag]['time'] = []
-                runs[directory][value.tag]['value'] = []
-
-            if value.HasField('simple_value'):
-                # if len(runs[directory][value.tag]['step'])>0 and event.step<runs[directory][value.tag]['step'][-1]:
-                runs[directory][value.tag]['step'].append(event.step)
-                runs[directory][value.tag]['time'].append(event.wall_time)
-                runs[directory][value.tag]['value'].append(value.simple_value)
+                if value.HasField('simple_value'):
+                    # if len(runs[directory][value.tag]['step'])>0 and event.step<runs[directory][value.tag]['step'][-1]:
+                    runs[directory][value.tag]['step'].append(event.step)
+                    runs[directory][value.tag]['time'].append(event.wall_time)
+                    runs[directory][value.tag]['value'].append(value.simple_value)
 
 #standardize config
 #del_runs = []

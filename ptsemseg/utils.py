@@ -348,17 +348,19 @@ def plotPrediction(logdir, cfg, n_classes, i, i_val, k, inputs, pred, gt):
 
     gt_norm = gt[0, :, :].copy()
     pred_norm = pred[0, :, :].copy()
-
+    
     # Ensure each mask has same min and max value for matplotlib normalization
     gt_norm[0, 0] = 0
     gt_norm[0, 1] = n_classes
     pred_norm[0, 0] = 0
     pred_norm[0, 1] = n_classes
 
-    axes[0, 0].imshow(inputs['rgb'][0, :, :, :].permute(1, 2, 0).cpu().numpy()[:, :, 0])
+
+    # BGR -> RGB and normalize
+    axes[0, 0].imshow(inputs['rgb'][0, :, :, :].permute(1, 2, 0).cpu().numpy()[:, :, ::-1]/255)
     axes[0, 0].set_title("RGB")
 
-    axes[0, 1].imshow(inputs['d'][0, :, :, :].permute(1, 2, 0).cpu().numpy())
+    axes[0, 1].imshow(inputs['d'][0, :, :, :].permute(1, 2, 0).cpu().numpy()[:, :, 2])
     axes[0, 1].set_title("D")
 
     axes[0, 2].imshow(gt_norm)
@@ -366,7 +368,7 @@ def plotPrediction(logdir, cfg, n_classes, i, i_val, k, inputs, pred, gt):
 
     axes[0, 3].imshow(pred_norm)
     axes[0, 3].set_title("Pred")
-
+    
     # axes[2,0].imshow(conf[0,:,:])
     # axes[2,0].set_title("Conf")
 
@@ -398,7 +400,7 @@ def plotPrediction(logdir, cfg, n_classes, i, i_val, k, inputs, pred, gt):
     plt.tight_layout()
     plt.savefig("{}/{}_{}.png".format(path, i_val, i))
     plt.close(fig)
-
+    import ipdb; ipdb.set_trace() # BREAKPOINT
 
 def plotMeansVariances(logdir, cfg, n_classes, i, i_val, m, k, inputs, pred, gt, mean, variance):
     fig, axes = plt.subplots(4, n_classes // 2 + 1)

@@ -616,14 +616,14 @@ class airsimLoader(data.Dataset):
 
         :param index:
         """
-        img_list = [] 
+        input_list = {'rgb':[], 
+                      'd': [],
+                      'rgb_display': [],
+                      'd_display': []}
         lbl_list = []
-        aux_list = []
         start_ts = time.time()
 
         for camera in self.cam_pos:
-
-            #start_ts = time.time()
 
             img_path, mask_path = self.imgs[self.split][camera]['scene'][index], self.imgs[self.split][camera]['segmentation'][index]
             img, mask = np.array(cv2.imread(img_path),dtype=np.uint8)[:,:,:3], np.array(cv2.imread(mask_path),dtype=np.uint8)[:,:,:3]
@@ -638,11 +638,6 @@ class airsimLoader(data.Dataset):
             else:
                 depth_path = self.imgs[self.split][camera]['depth'][index]
                 depth = np.array(cv2.imread(depth_path),dtype=np.uint8)[:,:,:3]
-            
-            #print('read time',time.time()-start_ts)
-
-            #start_ts = time.time()
-
 
             degradation = self.dgrd[self.split][camera]['scene'][index]
             if not degradation is None:
@@ -658,16 +653,16 @@ class airsimLoader(data.Dataset):
                 img, lbl, aux = self.augmentations(img, lbl, aux)
 
             if self.is_transform:
-                img, lbl, aux = self.transform(img, lbl, aux)
-            #print('transform time',time.time()-start_ts)
-            #start_ts = time.time()
-
-            img_list.append(img)
+                img, lbl, aux, img_display, aux_display = self.transform(img, lbl, aux)
+            
+            input_list['rgb'].append(img)
+            input_list['d'].append(aux)
+            input_list['rgb_display'].append(img_display)
+            input_list['d_display'].append(aux_display)
+            
             lbl_list.append(lbl)
-            aux_list.append(aux)
-            #print('append time',time.time()-start_ts)
 
-        return img_list, lbl_list, aux_list
+        return input_list, lbl_list
 
 
     def degradation(self, degradation, img, depth):
@@ -696,18 +691,21 @@ class airsimLoader(data.Dataset):
         img = img[:, :, ::-1]  # RGB -> BGR
         img = img.astype(np.float64)
         aux = aux.astype(np.float64)
-        # img -= self.mean[:3]
-        # aux -= self.mean[3:]
+        
+        img_display = img
+        aux_display = aux
+        
         if self.img_norm:
-
             img = np.divide((img.astype(float) - self.mean[:3]),self.std[:3])
             aux = np.divide((aux.astype(float) - self.mean[3:]),self.std[3:])
 
         # NHWC -> NCHW
         img = img.transpose(2, 0, 1)
-
+        img_display = img_display.transpose(2, 0, 1)
+        
         if not any(['depth_encoded'==mode for mode in self.image_modes]):
             aux = aux.transpose(2, 0, 1)
+            aux_display = aux_display.transpose(2, 0, 1)
 
         classes = np.unique(lbl)
         lbl = lbl.astype(float)
@@ -727,9 +725,11 @@ class airsimLoader(data.Dataset):
 
         img = torch.from_numpy(img).float()
         aux = torch.from_numpy(aux).float()
+        img_display = torch.from_numpy(img_display).float()
+        aux_display = torch.from_numpy(aux_display).float()
         lbl = torch.from_numpy(lbl).long()
 
-        return img, lbl, aux
+        return img, lbl, aux, img_display, aux_display
 
 
     def decode_segmap(self, temp):

@@ -25,8 +25,8 @@ class CAFnet(nn.Module):
                  temperatureScaling=False,
                  bins=0,
                  fusion_module="1.1",
-                 resumeRGB="./models/Segnet/rgb_Segnet/rgb_segnet_mcdo_airsim_T000+T050.pkl",
-                 resumeD="./models/Segnet/d_Segnet/d_segnet_mcdo_airsim_T000+T050.pkl"
+                 resume_rgb="./models/Segnet/rgb_Segnet/rgb_segnet_mcdo_airsim_T000+T050.pkl",
+                 resume_d="./models/Segnet/d_Segnet/d_segnet_mcdo_airsim_T000+T050.pkl"
                  ):
         super(CAFnet, self).__init__()
 
@@ -43,18 +43,21 @@ class CAFnet(nn.Module):
 
 
         # initialize segnet weights
-        self.loadModel(self.rgb_segnet, resumeRGB)
-        self.loadModel(self.d_segnet, resumeD)
+        if resume_rgb:
+            self.loadModel(self.rgb_segnet, resume_rgb)
+        if resume_d:
+            self.loadModel(self.d_segnet, resume_d)
 
         # freeze segnet networks
-        """
         for param in self.rgb_segnet.parameters():
             param.requires_grad = False
         for param in self.d_segnet.parameters():
             param.requires_grad = False
-        """
+        
         print(fusion_module)
-        if fusion_module == "ConditionalAttentionFusion" or str(fusion_module) == '1.1':
+        if fusion_module == "GatedFusion" or str(fusion_module) == '1.0':
+            self.gatedFusion = GatedFusion(n_classes)
+        elif fusion_module == "ConditionalAttentionFusion" or str(fusion_module) == '1.1':
             self.gatedFusion = ConditionalAttentionFusion(n_classes)
         elif fusion_module == "PreweightGatedFusion" or str(fusion_module) == '1.2':
             self.gatedFusion = PreweightedGatedFusion(n_classes)
@@ -66,6 +69,7 @@ class CAFnet(nn.Module):
             raise NotImplementedError
 
     def forward(self, inputs):
+    
         inputs_rgb = inputs[:, :3, :, :]
         inputs_d = inputs[:, 3:, :, :]
 

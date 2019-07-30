@@ -85,6 +85,8 @@ def train(cfg, writer, logger, logdir):
                                   varianceScaling=cfg['varianceScaling'],
                                   freeze=attr['freeze'],
                                   fusion_module=attr['fusion_module'],
+                                  resume_rgb=attr['resume_rgb'],
+                                  resume_d=attr['resume_d'],
                                   bins=cfg['bins']).to(device)
 
         models[model] = torch.nn.DataParallel(models[model], device_ids=range(torch.cuda.device_count()))
@@ -167,15 +169,15 @@ def train(cfg, writer, logger, logdir):
     i = start_iter
     print("Beginning Training at iteration: {}".format(i))
     while i < cfg["training"]["train_iters"]:
-
+    
+        #################################################################################
+        # Training
+        #################################################################################
         print("=" * 10, "TRAINING", "=" * 10)
-        for (images_list, labels_list, aux_list) in loaders['train']:
-
-            #################################################################################
-            # Training
-            #################################################################################
-            inputs, labels = parseEightCameras(images_list, labels_list, aux_list, device)
-
+        for (input_list, labels_list) in loaders['train']:
+            
+            inputs, labels = parseEightCameras(input_list['rgb'], labels_list, input_list['d'], device)
+            
             # Read batch from only one camera
             bs = cfg['training']['batch_size']
             images = {m: inputs[m][:bs, :, :, :] for m in cfg["models"].keys()}
@@ -244,8 +246,9 @@ def train(cfg, writer, logger, logdir):
                             (len(loaders['recal']) * bs, cfg['data']['img_rows'], cfg['data']['img_cols']), dtype=torch.long)
 
                         with torch.no_grad():
-                            for i_recal, (images_list, labels_list, aux_list) in tqdm(enumerate(loaders['recal'])):
-                                inputs, labels = parseEightCameras(images_list, labels_list, aux_list, device)
+                            for i_recal, (input_list, labels_list) in tqdm(enumerate(loaders['recal'])):
+                                
+                                inputs, labels = parseEightCameras(input_list['rgb'], labels_list, input_list['d'], device)
 
                                 # Read batch from only one camera
                                 images_recal = inputs[m][:bs, :, :, :]
@@ -270,12 +273,15 @@ def train(cfg, writer, logger, logdir):
 
                 with torch.no_grad():
                     for k, valloader in loaders['val'].items():
-                        for i_val, (images_list, labels_list, aux_list) in tqdm(enumerate(valloader)):
+                        for i_val, (input_list, labels_list) in tqdm(enumerate(valloader)):
 
-                            inputs, labels = parseEightCameras(images_list, labels_list, aux_list, device)
-
+                            inputs, labels = parseEightCameras(input_list['rgb'], labels_list, input_list['d'], device)
+                            inputs_display, _ = parseEightCameras(input_list['rgb_display'], labels_list, input_list['d_display'], device)
+                            
+                            # import ipdb; ipdb.set_trace() # BREAKPOINT
                             # Read batch from only one camera
                             bs = cfg['training']['batch_size']
+                            
                             images_val = {m: inputs[m][:bs, :, :, :] for m in cfg["models"].keys()}
                             labels_val = labels[:bs, :, :]
 
@@ -297,7 +303,6 @@ def train(cfg, writer, logger, logdir):
                                     mean[m] = models[m](images_val[m])
                                     variance[m] = torch.zeros(mean[m].shape)
                                 val_loss[m] = loss_fn(input=mean[m], target=labels_val)
-
 
                             # Fusion Type
                             if cfg["fusion"] == "None":
@@ -324,9 +329,9 @@ def train(cfg, writer, logger, logdir):
                             gt = labels_val.data.cpu().numpy()
 
                             if i_val % cfg["training"]["png_frames"] == 0:
-                                plotPrediction(logdir, cfg, n_classes, i + 1, i_val, k, inputs, pred, gt)
+                                plotPrediction(logdir, cfg, n_classes, i + 1, i_val, k, inputs_display, pred, gt)
                                 for m in cfg["models"].keys():
-                                    plotMeansVariances(logdir, cfg, n_classes, i + 1, i_val, m, k + "/" + m, inputs,
+                                    plotMeansVariances(logdir, cfg, n_classes, i + 1, i_val, m, k + "/" + m, inputs_display,
                                                        pred, gt, mean[m], variance[m])
 
                             running_metrics_val[k].update(gt, pred)
@@ -334,8 +339,8 @@ def train(cfg, writer, logger, logdir):
                             for m in cfg["models"].keys():
                                 val_loss_meter[m][k].update(val_loss[m].item())
 
-                            del mean[m]
-                            del variance[m]
+                                del mean[m]
+                                del variance[m]
 
                     for m in cfg["models"].keys():
                         for k in loaders['val'].keys():

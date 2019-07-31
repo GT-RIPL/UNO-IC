@@ -1,4 +1,4 @@
-id: CAFSegnet_T050_v1.1
+id: CAFSegnet_T050_v1.3
 model:
     arch: CAF_segnet
 models:
@@ -9,9 +9,9 @@ models:
         reduction: 1.0
         mcdo_passes: 6
         dropoutP: 0.5
-        resume_rgb: ./models/Segnet/rgb_Segnet/rgb_segnet_mcdo_airsim_T050.pkl
-        resume_d: ./models/Segnet/d_Segnet/d_segnet_mcdo_airsim_T050.pkl
-        fusion_module: 1.1
+        resume_rgb: ./models/Segnet/rgb_Segnet/temperatureScaling/rgb_segnet_mcdo_airsim_T050.pkl
+        resume_d: ./models/Segnet/d_Segnet/temperatureScaling/d_segnet_mcdo_airsim_T050.pkl
+        fusion_module: 1.3
 fusion: None #{None,SoftmaxMultiply}
 recal: None #{None,afterMCDO,beforeMCDO}
 recalibrator: None #{Histogram,Polynomial_X}

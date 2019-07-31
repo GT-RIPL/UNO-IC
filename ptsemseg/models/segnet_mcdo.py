@@ -198,22 +198,6 @@ class segnet_mcdo(nn.Module):
             else:
                 x = torch.cat((x, self.forward(inputs).unsqueeze(-1)), -1)
 
-        """
-        points = ((0,50,50), (0,100,100))
-        # plot the distribution of passes
-        for n, i, j in points:
-            fig, axes = plt.subplots(3, self.n_classes // 3 + 1)
-            for c in range(self.n_classes):
-                xx = x[n, c, i, j, :]
-                axes[(c + 1) // (self.n_classes // 3 + 1), (c + 1) % (self.n_classes // 3 + 1)].hist(xx)
-                axes[(c + 1) // (self.n_classes // 3 + 1), (c + 1) % (self.n_classes // 3 + 1)].set_title("Class: {}".format(c))
-                del xx
-
-            plt.tight_layout()
-            plt.savefig("./{}_{}x{}.png".format(n, i, j))
-            plt.close(fig)
-        """
-
         mean = x.mean(-1)
         variance = x.std(-1)
 

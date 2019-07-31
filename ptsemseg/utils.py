@@ -400,7 +400,7 @@ def plotPrediction(logdir, cfg, n_classes, i, i_val, k, inputs, pred, gt):
     plt.tight_layout()
     plt.savefig("{}/{}_{}.png".format(path, i_val, i))
     plt.close(fig)
-    import ipdb; ipdb.set_trace() # BREAKPOINT
+
 
 def plotMeansVariances(logdir, cfg, n_classes, i, i_val, m, k, inputs, pred, gt, mean, variance):
     fig, axes = plt.subplots(4, n_classes // 2 + 1)

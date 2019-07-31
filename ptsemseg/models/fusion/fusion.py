@@ -18,7 +18,7 @@ class GatedFusion(nn.Module):
         )
         self.sigmoid = nn.Sigmoid()
 
-    def forward(self, rgb, d):
+    def forward(self, rgb, d, rgb_var, d_var):
 
         fusion = torch.cat([rgb, d], dim=1)
 

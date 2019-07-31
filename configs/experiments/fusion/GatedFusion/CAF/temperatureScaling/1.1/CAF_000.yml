@@ -1,4 +1,4 @@
-id: CAFSegnet_T050_v1.1
+id: CAFSegnet_T000_v1.1
 model:
     arch: CAF_segnet
 models:
@@ -9,8 +9,8 @@ models:
         reduction: 1.0
         mcdo_passes: 6
         dropoutP: 0.5
-        resume_rgb: ./models/Segnet/rgb_Segnet/rgb_segnet_mcdo_airsim_T050.pkl
-        resume_d: ./models/Segnet/d_Segnet/d_segnet_mcdo_airsim_T050.pkl
+        resume_rgb: ./models/Segnet/rgb_Segnet/temperatureScaling/rgb_segnet_mcdo_airsim_T000.pkl
+        resume_d: ./models/Segnet/d_Segnet/temperatureScaling/d_segnet_mcdo_airsim_T000.pkl
         fusion_module: 1.1
 fusion: None #{None,SoftmaxMultiply}
 recal: None #{None,afterMCDO,beforeMCDO}
@@ -19,10 +19,10 @@ bins: 20
 data:
     dataset: airsim
     train_split: train
-    train_subsplit: ['async_fog_050_clear']
+    train_subsplit: ['async_fog_000_clear']
     train_reduction: 1.0    
     recal_split: recal
-    recal_subsplit: ['async_fog_050_clear']
+    recal_subsplit: ['async_fog_000_clear']
     recal_reduction: 0.5
     val_split: val
     val_subsplit: [
@@ -39,7 +39,7 @@ data:
     path: datasets/airsim_data_async #../../ros/data/airsim_03-30-2019/airsim_data_async
     noisy_type: None 
 training:
-    train_iters: 25000
+    train_iters: 50000
     batch_size: 2
     val_interval: 5000
     n_workers: 8
@@ -53,4 +53,3 @@ training:
         size_average: False
     lr_schedule:
     resume: None
-

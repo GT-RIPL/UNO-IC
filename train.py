@@ -411,6 +411,13 @@ if __name__ == "__main__":
         default="configs/train/rgbd_BayesianSegnet_0.5_T000.yml",
         help="Configuration file to use",
     )
+    parser.add_argument(
+        "--tag",
+        nargs="?",
+        type=str,
+        default="",
+        help="Unique identifier for different runs",
+    )
 
     args = parser.parse_args()
 
@@ -418,7 +425,13 @@ if __name__ == "__main__":
     with open(args.config) as fp:
         cfg = defaultdict(lambda: None, yaml.load(fp))
 
-    logdir = "/".join(["runs"] + args.config.split("/")[1:])
+    
+    logdir = "/".join(["runs"] + args.config.split("/")[1:])[:-4]
+    
+    if args.tag:
+        logdir += "/" + args.tag 
+    
+    
     writer = SummaryWriter(logdir)
 
     path = shutil.copy(args.config, logdir)

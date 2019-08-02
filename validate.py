@@ -17,7 +17,7 @@ import cv2
 from ptsemseg.models import get_model
 from ptsemseg.loss import get_loss_function
 from ptsemseg.loader import get_loaders
-from ptsemseg.utils import get_logger, parseEightCameras, plotPrediction, plotMeansVariances, plotEntropy, plotMutualInfo
+from ptsemseg.utils import get_logger, parseEightCameras, plotPrediction, plotMeansVariances#, plotEntropy, plotMutualInfo
 from ptsemseg.metrics import runningScore, averageMeter
 from ptsemseg.schedulers import get_scheduler
 from ptsemseg.optimizers import get_optimizer
@@ -47,13 +47,13 @@ def train(cfg, writer, logger, logdir):
     running_metrics_val = {env: runningScore(n_classes) for env in loaders['val'].keys()}
 
     # Setup Meters
-    #val_loss_meter = {m: {env: averageMeter() for env in loaders['val'].keys()} for m in cfg["models"].keys()}
-    #val_CE_loss_meter = {env: averageMeter() for env in loaders['val'].keys()}
-    #val_REG_loss_meter = {env: averageMeter() for env in loaders['val'].keys()}
-    #variance_meter = {m: {env: averageMeter() for env in loaders['val'].keys()} for m in cfg["models"].keys()}
-    #entropy_meter = {m: {env: averageMeter() for env in loaders['val'].keys()} for m in cfg["models"].keys()}
-    #mutual_info_meter = {m: {env: averageMeter() for env in loaders['val'].keys()} for m in cfg["models"].keys()}
-    #time_meter = averageMeter()
+    val_loss_meter = {m: {env: averageMeter() for env in loaders['val'].keys()} for m in cfg["models"].keys()}
+    val_CE_loss_meter = {env: averageMeter() for env in loaders['val'].keys()}
+    val_REG_loss_meter = {env: averageMeter() for env in loaders['val'].keys()}
+    variance_meter = {m: {env: averageMeter() for env in loaders['val'].keys()} for m in cfg["models"].keys()}
+    entropy_meter = {m: {env: averageMeter() for env in loaders['val'].keys()} for m in cfg["models"].keys()}
+    mutual_info_meter = {m: {env: averageMeter() for env in loaders['val'].keys()} for m in cfg["models"].keys()}
+    time_meter = averageMeter()
 
     start_iter = 0
     models = {}
@@ -89,17 +89,17 @@ def train(cfg, writer, logger, logdir):
         models[model] = torch.nn.DataParallel(models[model], device_ids=range(torch.cuda.device_count()))
 
         # Setup optimizer, lr_scheduler and loss function
-        #optimizer_cls = get_optimizer(cfg)
-        #optimizer_params = {k: v for k, v in cfg['training']['optimizer'].items()
-        #                    if k != 'name'}
+        optimizer_cls = get_optimizer(cfg)
+        optimizer_params = {k: v for k, v in cfg['training']['optimizer'].items()
+                           if k != 'name'}
 
-        #optimizers[model] = optimizer_cls(models[model].parameters(), **optimizer_params)
-        #logger.info("Using optimizer {}".format(optimizers[model]))
+        optimizers[model] = optimizer_cls(models[model].parameters(), **optimizer_params)
+        logger.info("Using optimizer {}".format(optimizers[model]))
 
-        #schedulers[model] = get_scheduler(optimizers[model], cfg['training']['lr_schedule'])
+        schedulers[model] = get_scheduler(optimizers[model], cfg['training']['lr_schedule'])
 
-        #loss_fn = get_loss_function(cfg)
-        #logger.info("Using loss {}".format(loss_fn))
+        loss_fn = get_loss_function(cfg)
+        logger.info("Using loss {}".format(loss_fn))
 
         # Load pretrained weights
         if str(attr['resume']) is not "None" and not "caffemodel" in attr['resume']:
@@ -187,9 +187,10 @@ def train(cfg, writer, logger, logdir):
 
     with torch.no_grad():
         for k, valloader in loaders['val'].items():
-            for i_val, (images_list, labels_list, aux_list) in tqdm(enumerate(valloader)):
+            for i_val, (input_list, labels_list) in tqdm(enumerate(valloader)):
 
-                inputs, labels = parseEightCameras(images_list, labels_list, aux_list, device)
+                inputs, labels = parseEightCameras(input_list['rgb'], labels_list, input_list['d'], device)
+                inputs_display, _ = parseEightCameras(input_list['rgb_display'], labels_list, input_list['d_display'], device)
 
                 # Read batch from only one camera
                 bs = cfg['training']['batch_size']
@@ -204,6 +205,7 @@ def train(cfg, writer, logger, logdir):
                 variance = {}
                 entropy = {}
                 mutual_info = {}
+                val_loss = {}
 
                 for m in cfg["models"].keys():
                     if hasattr(models[m].module, 'forwardMCDO'):
@@ -212,7 +214,7 @@ def train(cfg, writer, logger, logdir):
                     else:
                         mean[m] = models[m](images_val[m])
                         variance[m] = torch.zeros(mean[m].shape)
-                    #val_loss[m] = loss_fn(input=mean[m], target=labels_val)
+                    val_loss[m] = loss_fn(input=mean[m], target=labels_val)
 
                 #import ipdb;ipdb.set_trace()
                 # Fusion Type
@@ -246,15 +248,34 @@ def train(cfg, writer, logger, logdir):
                 gt = labels_val.data.cpu().numpy()
                 #import ipdb;ipdb.set_trace()
                 if i_val % cfg["training"]["png_frames"] == 0:
-                    plotPrediction(logdir, cfg, n_classes, i, i_val, k, inputs, pred, gt)
+                    plotPrediction(logdir, cfg, n_classes, i, i_val, k, inputs_display, pred, gt)
                     for m in cfg["models"].keys():
-                        plotMeansVariances(logdir, cfg, n_classes, i + 1, i_val, m, k + "/" + m, inputs,
+                        plotMeansVariances(logdir, cfg, n_classes, i + 1, i_val, m, k + "/" + m, inputs_display,
                                            pred, gt, mean[m], variance[m])
-                        plotEntropy(logdir, i, i_val, k + "/" + m, pred, entropy[m])
-                        plotMutualInfo(logdir, i, i_val, k + "/" + m, pred, mutual_info[m])
+                        # plotEntropy(logdir, i, i_val, k + "/" + m, pred, entropy[m])
+                        # plotMutualInfo(logdir, i, i_val, k + "/" + m, pred, mutual_info[m])
                         
-
+                running_metrics_val[k].update(gt, pred)
             
+        for m in cfg["models"].keys():
+            for k in loaders['val'].keys():
+                writer.add_scalar('loss/val_loss/{}/{}'.format(m, k), val_loss_meter[m][k].avg, i + 1)
+                logger.info("%s %s Iter %d Loss: %.4f" % (m, k, i + 1, val_loss_meter[m][k].avg))
+
+    for env, valloader in loaders['val'].items():
+        score, class_iou = running_metrics_val[env].get_scores()
+        for k, v in score.items():
+            logger.info('{}: {}'.format(k, v))
+            writer.add_scalar('val_metrics/{}/{}'.format(env, k), v, i + 1)
+
+        for k, v in class_iou.items():
+            logger.info('{}: {}'.format(k, v))
+            writer.add_scalar('val_metrics/{}/cls_{}'.format(env, k), v, i + 1)
+
+        for m in cfg["models"].keys():
+            val_loss_meter[m][env].reset()
+        running_metrics_val[env].reset()
+
 
 
 

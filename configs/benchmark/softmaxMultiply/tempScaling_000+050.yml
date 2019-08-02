@@ -1,4 +1,4 @@
-id: rgbd_BayesianSegnet_SoftmaxMult_tempScaling_T000+T050
+id: rgbd_BayesianSegnet_SoftmaxMult_T000+T050_tempScaling
 model:
     arch: segnet_mcdo
 models:
@@ -9,7 +9,7 @@ models:
         reduction: 1.0
         mcdo_passes: 6 # Number of Passes
         dropoutP: 0.5 # Dropout Probability
-        resume: models/Segnet/rgb_Segnet/rgb_segnet_mcdo_airsim_T000+T050.pkl
+        resume: models/Segnet/rgb_Segnet/temperatureScaling/rgb_segnet_mcdo_airsim_T000+T050.pkl
     d:
         in_channels: 3
         start_layer: down1
@@ -17,7 +17,7 @@ models:
         reduction: 1.0
         mcdo_passes: 6
         dropoutP: 0.5
-        resume: models/Segnet/d_Segnet/d_segnet_mcdo_airsim_T000+T050.pkl
+        resume: models/Segnet/d_Segnet/temperatureScaling/d_segnet_mcdo_airsim_T000+T050.pkl
 fusion: SoftmaxMultiply #{None,SoftmaxMultiply}
 recal: None #{None,afterMCDO,beforeMCDO}
 recalibrator: None #{Histogram,Polynomial_X}
@@ -57,6 +57,6 @@ training:
         lr: 1.0e-5
     loss:
         name: 'cross_entropy'
-        size_average: False
+        size_average: True
     lr_schedule:
     resume: None

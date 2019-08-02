@@ -1,4 +1,5 @@
 id: CAFSegnet_T000+T050_v1.3
+seed:
 model:
     arch: CAF_segnet
 models:
@@ -9,8 +10,8 @@ models:
         reduction: 1.0
         mcdo_passes: 6
         dropoutP: 0.5
-        resume_rgb: ./models/Segnet/rgb_Segnet/temperatureScaling/temperatureScaling/rgb_segnet_mcdo_airsim_T000+T050.pkl
-        resume_d: ./models/Segnet/d_Segnet/temperatureScaling/temperatureScaling/d_segnet_mcdo_airsim_T000+T050.pkl
+        resume_rgb: ./models/Segnet/rgb_Segnet/temperatureScaling/rgb_segnet_mcdo_airsim_T000+T050.pkl
+        resume_d: ./models/Segnet/d_Segnet/temperatureScaling/d_segnet_mcdo_airsim_T000+T050.pkl
         fusion_module: 1.3
 fusion: None #{None,SoftmaxMultiply}
 recal: None #{None,afterMCDO,beforeMCDO}
@@ -21,7 +22,7 @@ data:
     train_split: train
     train_subsplit: ['async_fog_000_clear',
                      'async_fog_050_clear']
-    train_reduction: 1.0    
+    train_reduction: 1.0
     recal_split: recal
     recal_subsplit: ['async_fog_000_clear',
                      'async_fog_050_clear']
@@ -33,15 +34,15 @@ data:
                    'async_fog_100_clear',
                    "async_fog_100_clear__{'channel':'rgb','type':'blackoutNoise','value':'20'}",
                    "async_fog_100_clear__{'channel':'d','type':'blackoutNoise','value':'20'}",
-                   "async_fog_100_clear__{'channel':'rgbd','type':'blackoutNoise','value':'20'}",                   
-                  ]    
+                   "async_fog_100_clear__{'channel':'rgbd','type':'blackoutNoise','value':'20'}",
+                  ]
     val_reduction: 1.0
     img_rows: 512
     img_cols: 512
     path: datasets/airsim_data_async #../../ros/data/airsim_03-30-2019/airsim_data_async
     noisy_type: None
 training:
-    train_iters: 10000
+    train_iters: 5000
     batch_size: 2
     val_interval: 1000
     n_workers: 8

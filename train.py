@@ -1,5 +1,5 @@
-
 import matplotlib
+
 matplotlib.use('Agg')
 
 import os
@@ -28,11 +28,10 @@ from tensorboardX import SummaryWriter
 
 from functools import partial
 from collections import defaultdict
-
+import time
 # SWAG lib imports
 from ptsemseg.posteriors import SWAG
 from ptsemseg.utils import bn_update, mem_report
-
 
 
 def train(cfg, writer, logger, logdir):
@@ -103,15 +102,14 @@ def train(cfg, writer, logger, logdir):
 
         loss_fn = get_loss_function(cfg)
         logger.info("Using loss {}".format(loss_fn))
-        
-        
+
         # setup swa training
         if cfg['swa']:
             print('SWAG training')
             swag_models[model] = SWAG(models[model],
-                              no_cov_mat=False,
-                              max_num_models=20)
-            
+                                      no_cov_mat=False,
+                                      max_num_models=20)
+
             swag_models[model].to(device)
         else:
             print('SGD training')
@@ -164,20 +162,19 @@ def train(cfg, writer, logger, logdir):
                 print("No checkpoint found at '{}'".format(model_pkl))
                 exit()
 
-
     best_iou = -100.0
     i = start_iter
     print("Beginning Training at iteration: {}".format(i))
     while i < cfg["training"]["train_iters"]:
-    
+
         #################################################################################
         # Training
         #################################################################################
         print("=" * 10, "TRAINING", "=" * 10)
         for (input_list, labels_list) in loaders['train']:
-            
+
             inputs, labels = parseEightCameras(input_list['rgb'], labels_list, input_list['d'], device)
-            
+
             # Read batch from only one camera
             bs = cfg['training']['batch_size']
             images = {m: inputs[m][:bs, :, :, :] for m in cfg["models"].keys()}
@@ -216,16 +213,16 @@ def train(cfg, writer, logger, logdir):
                     logger.info(print_str)
                     writer.add_scalar('loss/train_loss/' + m, loss[m].item(), i + 1)
                 time_meter.reset()
-                
+
             # collect parameters for swa
             if cfg['swa'] and (i + 1 - cfg['swa']['start']) % cfg['swa']['c_iterations'] == 0:
-                print('Saving SWA model at iteration: ', i+1)
+                print('Saving SWA model at iteration: ', i + 1)
                 swag_models[m].collect_model(models[m])
-            
+
             if (i + 1) % cfg["training"]["val_interval"] == 0 or (i + 1) >= cfg["training"]["train_iters"]:
 
                 [models[m].eval() for m in models.keys()]
-                
+
                 if cfg['swa']:
                     print('Updating SWA model')
                     swag_models[m].sample(0.0)
@@ -243,12 +240,13 @@ def train(cfg, writer, logger, logdir):
                         output_all = torch.zeros(
                             (len(loaders['recal']) * bs, n_classes, cfg['data']['img_rows'], cfg['data']['img_cols']))
                         labels_all = torch.zeros(
-                            (len(loaders['recal']) * bs, cfg['data']['img_rows'], cfg['data']['img_cols']), dtype=torch.long)
+                            (len(loaders['recal']) * bs, cfg['data']['img_rows'], cfg['data']['img_cols']),
+                            dtype=torch.long)
 
                         with torch.no_grad():
                             for i_recal, (input_list, labels_list) in tqdm(enumerate(loaders['recal'])):
-                                
-                                inputs, labels = parseEightCameras(input_list['rgb'], labels_list, input_list['d'], device)
+                                inputs, labels = parseEightCameras(input_list['rgb'], labels_list, input_list['d'],
+                                                                   device)
 
                                 # Read batch from only one camera
                                 images_recal = inputs[m][:bs, :, :, :]
@@ -276,12 +274,13 @@ def train(cfg, writer, logger, logdir):
                         for i_val, (input_list, labels_list) in tqdm(enumerate(valloader)):
 
                             inputs, labels = parseEightCameras(input_list['rgb'], labels_list, input_list['d'], device)
-                            inputs_display, _ = parseEightCameras(input_list['rgb_display'], labels_list, input_list['d_display'], device)
-                            
+                            inputs_display, _ = parseEightCameras(input_list['rgb_display'], labels_list,
+                                                                  input_list['d_display'], device)
+
                             # import ipdb; ipdb.set_trace() # BREAKPOINT
                             # Read batch from only one camera
                             bs = cfg['training']['batch_size']
-                            
+
                             images_val = {m: inputs[m][:bs, :, :, :] for m in cfg["models"].keys()}
                             labels_val = labels[:bs, :, :]
 
@@ -331,7 +330,8 @@ def train(cfg, writer, logger, logdir):
                             if i_val % cfg["training"]["png_frames"] == 0:
                                 plotPrediction(logdir, cfg, n_classes, i + 1, i_val, k, inputs_display, pred, gt)
                                 for m in cfg["models"].keys():
-                                    plotMeansVariances(logdir, cfg, n_classes, i + 1, i_val, m, k + "/" + m, inputs_display,
+                                    plotMeansVariances(logdir, cfg, n_classes, i + 1, i_val, m, k + "/" + m,
+                                                       inputs_display,
                                                        pred, gt, mean[m], variance[m])
 
                             running_metrics_val[k].update(gt, pred)
@@ -397,10 +397,9 @@ def train(cfg, writer, logger, logdir):
                             torch.save(state, save_path)
 
             i += 1
-            
+
             if i >= cfg["training"]["train_iters"]:
                 break
-
 
 
 if __name__ == "__main__":
@@ -422,9 +421,20 @@ if __name__ == "__main__":
     logdir = "/".join(["runs"] + args.config.split("/")[1:])
     writer = SummaryWriter(logdir)
 
-    print("RUNDIR: {}".format(logdir))
-    shutil.copy(args.config, logdir)
+    path = shutil.copy(args.config, logdir)
 
+    # generate seed if none present
+    if cfg['seed'] is None:
+        seed = int(time.time())
+        cfg['seed'] = seed
+
+        # modify file to reflect seed
+        with open(path, 'r') as original:
+            data = original.read()
+        with open(path, 'w') as modified:
+            modified.write("seed: {}\n".format(seed) + data)
+
+    print("RUNDIR: {}".format(logdir))
     logger = get_logger(logdir)
 
     # baseline train (concatenation, warping baselines)

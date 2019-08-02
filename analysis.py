@@ -168,15 +168,11 @@ data = []
 # exit()
 
 for run in runs.keys():
-    #print(run)
 
-
+    print(run)
     conditions = runs[run]['std_config']
 
     name = ", ".join(["{}{}".format(k,v) for k,v in conditions.items()])
-
-
-
 
     for full in [k for k in runs[run].keys() if "config" not in k]:
         #print(full)
@@ -221,9 +217,13 @@ for run in runs.keys():
 
         # RESULTS
         # avg + std of last 50k iterations
-        i = -1 #x.index(int(500*(x[-1] // 500))-5000)
-        avg = np.mean(y)
-        std = np.std(y)
+        i = -1  #x.index(int(500*(x[-1] // 500))-5000)
+        avg = np.mean(y[i:])
+        std = np.std(y[i:])
+
+        avg = y[-1]
+        std = 0
+
 
         test_pretty = filter(None,test.split("_"))
         test_pretty = [s for s in test_pretty if s not in ["8camera","dense"]]
@@ -237,10 +237,7 @@ for run in runs.keys():
                         "test":test_pretty,
                         "mean":avg,
                         "std":std},
-                        "iter":x[-1]})
-
-
-
+                        "iter":x[i]})
 
 
 df = pd.DataFrame(data)
@@ -258,15 +255,6 @@ df = df[data_fields]
 df['unique_id'] = (df.groupby(id_fields).cumcount()) 
 df['full'] = df['pretty']
 df = df.sort_values(by=id_fields)
-
-df = df[ 
-        (
-            (df['size'] != "")
-        ) | ( 
-            (df['size'] == "")
-
-        )]
-
 
 df = df.set_index(["test"])
 df = df.pivot_table(index=df.index, values='mean', columns='full', aggfunc='first')

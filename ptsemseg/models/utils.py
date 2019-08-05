@@ -169,7 +169,6 @@ class conv2DBatchNormRelu(nn.Module):
                                           nn.ReLU(inplace=True))
         else:
             self.cbr_unit = nn.Sequential(conv_mod, nn.ReLU(inplace=True))
-            
 
     def forward(self, inputs):
         # print(inputs[0].shape)
@@ -333,6 +332,7 @@ class segnetDown3MCDO(nn.Module):
         outputs = dropout_scale * self.dropout(outputs)
         return outputs, indices, unpooled_shape
 
+
 class segnetUp2MCDONoRelu(nn.Module):
     def __init__(self, in_size, out_size, pMCDO=0.1, relu=True):
         super(segnetUp2MCDO, self).__init__()
@@ -361,6 +361,7 @@ class segnetUp2MCDONoRelu(nn.Module):
         outputs = self.conv2(outputs)
         outputs = dropout_scale * self.dropout(outputs)
         return outputs
+
 
 class segnetUp2MCDO(nn.Module):
     def __init__(self, in_size, out_size, pMCDO=0.1):
@@ -448,6 +449,7 @@ class segnetDown3(nn.Module):
         unpooled_shape = outputs.size()
         outputs, indices = self.maxpool_with_argmax(outputs)
         return outputs, indices, unpooled_shape
+
 
 class segnetUp2(nn.Module):
     def __init__(self, in_size, out_size, relu=True):
@@ -1049,3 +1051,76 @@ def get_upsampling_weight(in_channels, out_channels, kernel_size):
                       dtype=np.float64)
     weight[range(in_channels), range(out_channels), :, :] = filt
     return torch.from_numpy(weight).float()
+
+
+class TemperatureScaling(nn.Module):
+    def __init__(self):
+        super(TemperatureScaling, self).__init__()
+        self.temperature = torch.nn.Parameter(torch.ones(1))
+
+    def forward(self, inputs):
+        inputs = inputs / self.temperature
+        return inputs
+
+
+class SpatialTemperatureScaling(nn.Module):
+    def __init__(self, in_size, out_size):
+        super(SpatialTemperatureScaling, self).__init__()
+        self.conv1 = conv2DBatchNormRelu(in_size, out_size, 3, 1, 1)
+        self.conv2 = conv2DBatchNormRelu(out_size, out_size, 3, 1, 1)
+        # self.maxpool_with_argmax = nn.MaxPool2d(2, 2, return_indices=True)
+        self.meanpool = nn.AvgPool2d(2, 2, return_indices=False)
+
+    def forward(self, inputs):
+        outputs = self.conv1(inputs)
+        outputs = self.conv2(outputs)
+        unpooled_shape = outputs.size()
+        outputs, indices = self.maxpool_with_argmax(outputs)
+        return outputs, indices, unpooled_shape
+
+
+def predictive_entropy(pred):
+    # pred [batch,11,512,512,num_passes]
+    # return [batch,512,512]
+    PEtropy = []
+    for b in range(pred.shape[0]):
+        avg = pred[b, :, :, :, :].mean(-1)  # [11,512,512]
+        entropy = avg * torch.log(avg)  # [11,512,512]
+        entropy = -entropy.sum(0)  # [512,512]
+        PEtropy.append(entropy.unsqueeze(0))
+    PEtropy = torch.cat(PEtropy)
+    return PEtropy
+
+
+def mutul_information(pred):
+    # pred [batch,11,512,512,num_passes]
+    # return [batch,512,512]
+    MI = []
+    for b in range(pred.shape[0]):
+        avg = pred[b, :, :, :, :].mean(-1)  # [11,512,512]
+        entropy = avg * torch.log(avg)  # [11,512,512]
+        entropy = -entropy.sum(0)  # [512,512]
+        expect = pred[b, :, :, :, :] * torch.log(pred[b, :, :, :, :])  # [11,512,512,10]
+        expect = expect.sum(0).mean(-1)  # (512,512)
+        MI.append((entropy + expect).unsqueeze(0))
+    MI = torch.cat(MI)
+    return MI
+
+
+def mutualinfo_entropy(pred):
+    # pred [batch,11,512,512,num_passes]
+    # return [batch,512,512]
+    MI = []
+    PEtropy = []
+    for b in range(pred.shape[0]):
+        avg = pred[b, :, :, :, :].mean(-1)  # [11,512,512]
+        entropy = avg * torch.log(avg)  # [11,512,512]
+        entropy = -entropy.sum(0)  # [512,512]
+        PEtropy.append(entropy.unsqueeze(0))
+        expect = pred[b, :, :, :, :] * torch.log(pred[b, :, :, :, :])  # [11,512,512,10]
+        expect = expect.sum(0).mean(-1)  # (512,512)
+        MI.append((entropy + expect).unsqueeze(0))
+    PEtropy = torch.cat(PEtropy)
+    MI = torch.cat(MI)
+    # import ipdb;ipdb.set_trace()
+    return PEtropy, MI

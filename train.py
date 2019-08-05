@@ -19,7 +19,7 @@ import cv2
 from ptsemseg.models import get_model
 from ptsemseg.loss import get_loss_function
 from ptsemseg.loader import get_loaders
-from ptsemseg.utils import get_logger, parseEightCameras, plotPrediction, plotMeansVariances
+from ptsemseg.utils import get_logger, parseEightCameras, plotPrediction, plotMeansVariances, plotEntropy, plotMutualInfo
 from ptsemseg.metrics import runningScore, averageMeter
 from ptsemseg.schedulers import get_scheduler
 from ptsemseg.optimizers import get_optimizer
@@ -54,6 +54,9 @@ def train(cfg, writer, logger, logdir):
     val_loss_meter = {m: {env: averageMeter() for env in loaders['val'].keys()} for m in cfg["models"].keys()}
     val_CE_loss_meter = {env: averageMeter() for env in loaders['val'].keys()}
     val_REG_loss_meter = {env: averageMeter() for env in loaders['val'].keys()}
+    variance_meter = {m: {env: averageMeter() for env in loaders['val'].keys()} for m in cfg["models"].keys()}
+    entropy_meter = {m: {env: averageMeter() for env in loaders['val'].keys()} for m in cfg["models"].keys()}
+    mutual_info_meter = {m: {env: averageMeter() for env in loaders['val'].keys()} for m in cfg["models"].keys()}
     time_meter = averageMeter()
 
     start_iter = 0
@@ -253,8 +256,7 @@ def train(cfg, writer, logger, logdir):
                                 labels_recal = labels[:bs, :, :]
 
                                 # Run Models
-                                mean, variance = models[m].module.forwardMCDO(images_recal)
-
+                                mean, variance, entropy, mutual_info = models[m].module.forwardMCDO(logdir, k, i_val, i, images_val[m], cfg["recal"])
                                 # concat results
                                 output_all[bs * i_recal:bs * (i_recal + 1), :, :, :] = torch.nn.Softmax(dim=1)(mean)
                                 labels_all[bs * i_recal:bs * (i_recal + 1), :, :] = labels_recal
@@ -274,8 +276,7 @@ def train(cfg, writer, logger, logdir):
                         for i_val, (input_list, labels_list) in tqdm(enumerate(valloader)):
 
                             inputs, labels = parseEightCameras(input_list['rgb'], labels_list, input_list['d'], device)
-                            inputs_display, _ = parseEightCameras(input_list['rgb_display'], labels_list,
-                                                                  input_list['d_display'], device)
+                            inputs_display, _ = parseEightCameras(input_list['rgb_display'], labels_list, input_list['d_display'], device)
 
                             # import ipdb; ipdb.set_trace() # BREAKPOINT
                             # Read batch from only one camera
@@ -290,6 +291,8 @@ def train(cfg, writer, logger, logdir):
                             # Run Models
                             mean = {}
                             variance = {}
+                            entropy = {}
+                            mutual_info = {}
                             val_loss = {}
 
                             for m in cfg["models"].keys():
@@ -297,7 +300,7 @@ def train(cfg, writer, logger, logdir):
                                     mean[m] = swag_models[m](images_val[m])
                                     variance[m] = torch.zeros(mean[m].shape)
                                 elif hasattr(models[m].module, 'forwardMCDO'):
-                                    mean[m], variance[m] = models[m].module.forwardMCDO(images_val[m], cfg["recal"])
+                                    mean[m], variance[m], entropy[m], mutual_info[m] = models[m].module.forwardMCDO(logdir, k, i_val, i, images_val[m], cfg["recal"])
                                 else:
                                     mean[m] = models[m](images_val[m])
                                     variance[m] = torch.zeros(mean[m].shape)
@@ -330,17 +333,18 @@ def train(cfg, writer, logger, logdir):
                             if i_val % cfg["training"]["png_frames"] == 0:
                                 plotPrediction(logdir, cfg, n_classes, i + 1, i_val, k, inputs_display, pred, gt)
                                 for m in cfg["models"].keys():
-                                    plotMeansVariances(logdir, cfg, n_classes, i + 1, i_val, m, k + "/" + m,
-                                                       inputs_display,
+                                    plotMeansVariances(logdir, cfg, n_classes, i, i_val, k + "/" + m, inputs,
                                                        pred, gt, mean[m], variance[m])
+                                    plotEntropy(logdir, i, i_val, k + "/" + m, pred, entropy[m])
+                                    plotMutualInfo(logdir, i, i_val, k + "/" + m, pred, mutual_info[m])
 
                             running_metrics_val[k].update(gt, pred)
 
                             for m in cfg["models"].keys():
                                 val_loss_meter[m][k].update(val_loss[m].item())
-
-                                del mean[m]
-                                del variance[m]
+                                variance_meter[m][k].update(torch.mean(variance[m]).item())
+                                entropy_meter[m][k].update(torch.mean(entropy[m]).item())
+                                mutual_info_meter[m][k].update(torch.mean(mutual_info[m]).item())
 
                     for m in cfg["models"].keys():
                         for k in loaders['val'].keys():
@@ -359,6 +363,9 @@ def train(cfg, writer, logger, logdir):
 
                     for m in cfg["models"].keys():
                         val_loss_meter[m][env].reset()
+                        variance_meter[m][env].reset()
+                        entropy_meter[m][env].reset()
+                        mutual_info_meter[m][env].reset()
                     running_metrics_val[env].reset()
 
                 # save best model
@@ -367,7 +374,7 @@ def train(cfg, writer, logger, logdir):
                     optimizer = optimizers[m]
                     scheduler = schedulers[m]
 
-                    if score["Mean IoU : \t"] >= best_iou:
+                    if score["Mean IoU : \t"] >= best_iou or cfg['temperatureScaling']:
                         best_iou = score["Mean IoU : \t"]
                         state = {
                             "epoch": i,
@@ -425,13 +432,11 @@ if __name__ == "__main__":
     with open(args.config) as fp:
         cfg = defaultdict(lambda: None, yaml.load(fp))
 
-    
     logdir = "/".join(["runs"] + args.config.split("/")[1:])[:-4]
-    
+
     if args.tag:
-        logdir += "/" + args.tag 
-    
-    
+        logdir += "/" + args.tag
+
     writer = SummaryWriter(logdir)
 
     path = shutil.copy(args.config, logdir)

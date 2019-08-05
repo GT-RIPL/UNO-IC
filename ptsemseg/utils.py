@@ -18,7 +18,9 @@ import datetime
 import numpy as np
 import gc
 
+from pandas import DataFrame
 from collections import OrderedDict
+
 
 def recursive_glob(rootdir=".", suffix=""):
     """Performs recursive glob with given suffix and rootdir 
@@ -61,34 +63,38 @@ def convert_state_dict(state_dict):
 def get_logger(logdir):
     logger = logging.getLogger('ptsemseg')
     ts = str(datetime.datetime.now()).split('.')[0].replace(" ", "_")
-    ts = ts.replace(":", "_").replace("-","_")
+    ts = ts.replace(":", "_").replace("-", "_")
     file_path = os.path.join(logdir, 'run_{}.log'.format(ts))
     hdlr = logging.FileHandler(file_path)
     formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
     hdlr.setFormatter(formatter)
-    logger.addHandler(hdlr) 
+    logger.addHandler(hdlr)
     logger.setLevel(logging.INFO)
     return logger
 
+
 def flatten(lst):
-    tmp = [i.contiguous().view(-1,1) for i in lst]
+    tmp = [i.contiguous().view(-1, 1) for i in lst]
     return torch.cat(tmp).view(-1)
+
 
 def unflatten_like(vector, likeTensorList):
     # Takes a flat torch.tensor and unflattens it to a list of torch.tensors
     #    shaped like likeTensorList
     outList = []
-    i=0
+    i = 0
     for tensor in likeTensorList:
-        #n = module._parameters[name].numel()
+        # n = module._parameters[name].numel()
         n = tensor.numel()
-        outList.append(vector[:,i:i+n].view(tensor.shape))
-        i+=n
+        outList.append(vector[:, i:i + n].view(tensor.shape))
+        i += n
     return outList
-    
-def LogSumExp(x,dim=0):
-    m,_ = torch.max(x,dim=dim,keepdim=True)
-    return m + torch.log((x - m).exp().sum(dim=dim,keepdim=True))
+
+
+def LogSumExp(x, dim=0):
+    m, _ = torch.max(x, dim=dim, keepdim=True)
+    return m + torch.log((x - m).exp().sum(dim=dim, keepdim=True))
+
 
 def adjust_learning_rate(optimizer, lr):
     for param_group in optimizer.param_groups:
@@ -128,11 +134,11 @@ def train_epoch(loader, model, criterion, optimizer, cuda=True, regression=False
             target = target.cuda(non_blocking=True)
 
         loss, output = criterion(model, input, target)
-        
+
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-            
+
         loss_sum += loss.data.item() * input.size(0)
 
         if not regression:
@@ -147,7 +153,7 @@ def train_epoch(loader, model, criterion, optimizer, cuda=True, regression=False
                 correct / num_objects_current * 100.0
             ))
             verb_stage += 1
-    
+
     return {
         'loss': loss_sum / num_objects_current,
         'accuracy': None if regression else correct / num_objects_current * 100.0
@@ -259,9 +265,9 @@ def bn_update(loader, model, m='rgbd', verbose=False, subset=None, **kwargs):
     model.apply(lambda module: _get_momenta(module, momenta))
     n = 0
     num_batches = len(loader)
-    
+
     with torch.no_grad():
-            
+
         for (images_list, labels_list, aux_list) in loader:
 
             inputs, _ = parseEightCameras(images_list, labels_list, aux_list)
@@ -276,12 +282,14 @@ def bn_update(loader, model, m='rgbd', verbose=False, subset=None, **kwargs):
 
     model.apply(lambda module: _set_momenta(module, momenta))
 
-def inv_softmax(x, eps = 1e-10):
-    return torch.log(x/(1.0 - x + eps))
+
+def inv_softmax(x, eps=1e-10):
+    return torch.log(x / (1.0 - x + eps))
+
 
 def predictions(test_loader, model, seed=None, cuda=True, regression=False, **kwargs):
-    #will assume that model is already in eval mode
-    #model.eval()
+    # will assume that model is already in eval mode
+    # model.eval()
     preds = []
     targets = []
     for input, target in test_loader:
@@ -297,6 +305,7 @@ def predictions(test_loader, model, seed=None, cuda=True, regression=False, **kw
             preds.append(probs.cpu().data.numpy())
         targets.append(target.numpy())
     return np.vstack(preds), np.concatenate(targets)
+
 
 def schedule(epoch, lr_init, epochs, swa, swa_start=None, swa_lr=None):
     t = (epoch) / (swa_start if swa else epochs)
@@ -348,16 +357,15 @@ def plotPrediction(logdir, cfg, n_classes, i, i_val, k, inputs, pred, gt):
 
     gt_norm = gt[0, :, :].copy()
     pred_norm = pred[0, :, :].copy()
-    
+
     # Ensure each mask has same min and max value for matplotlib normalization
     gt_norm[0, 0] = 0
     gt_norm[0, 1] = n_classes
     pred_norm[0, 0] = 0
     pred_norm[0, 1] = n_classes
 
-
     # BGR -> RGB and normalize
-    axes[0, 0].imshow(inputs['rgb'][0, :, :, :].permute(1, 2, 0).cpu().numpy()[:, :, ::-1]/255)
+    axes[0, 0].imshow(inputs['rgb'][0, :, :, :].permute(1, 2, 0).cpu().numpy()[:, :, ::-1] / 255)
     axes[0, 0].set_title("RGB")
 
     axes[0, 1].imshow(inputs['d'][0, :, :, :].permute(1, 2, 0).cpu().numpy()[:, :, 2])
@@ -368,7 +376,7 @@ def plotPrediction(logdir, cfg, n_classes, i, i_val, k, inputs, pred, gt):
 
     axes[0, 3].imshow(pred_norm)
     axes[0, 3].set_title("Pred")
-    
+
     # axes[2,0].imshow(conf[0,:,:])
     # axes[2,0].set_title("Conf")
 
@@ -402,7 +410,7 @@ def plotPrediction(logdir, cfg, n_classes, i, i_val, k, inputs, pred, gt):
     plt.close(fig)
 
 
-def plotMeansVariances(logdir, cfg, n_classes, i, i_val, m, k, inputs, pred, gt, mean, variance):
+def plotMeansVariances(logdir, cfg, n_classes, i, i_val, k, inputs, pred, gt, mean, variance):
     fig, axes = plt.subplots(4, n_classes // 2 + 1)
     [axi.set_axis_off() for axi in axes.ravel()]
 
@@ -432,6 +440,47 @@ def plotMeansVariances(logdir, cfg, n_classes, i, i_val, m, k, inputs, pred, gt,
     plt.close(fig)
 
 
+def plotEntropy(logdir, i, i_val, k, pred, variance):
+    path = "{}/{}".format(logdir, k)
+    fig, axes = plt.subplots(1, 2)
+    axes[0].imshow(variance[0, :, :].cpu().numpy())
+    axes[1].imshow(pred[0])
+    if not os.path.exists(path):
+        os.makedirs(path)
+    # import ipdb;ipdb.set_trace()
+    plt.savefig("{}/{}_{}_entropy.png".format(path, i_val, i))
+    plt.close(fig)
+
+
+def plotMutualInfo(logdir, i, i_val, k, pred, variance):
+    path = "{}/{}".format(logdir, k)
+    fig, axes = plt.subplots(1, 2)
+    axes[0].imshow(variance[0, :, :].cpu().numpy())
+    axes[1].imshow(pred[0])
+    if not os.path.exists(path):
+        os.makedirs(path)
+    plt.savefig("{}/{}_{}_mutual_info.png".format(path, i_val, i))
+    plt.close(fig)
+
+
+def save_pred(logdir, loc, k, i_val, i, pred, mutual_info, entropy):
+    # pred [batch,11,512,512,num_passes]
+    # loc [row,col]
+    pred = pred.cpu().numpy()
+    path = "{}/{}/{}".format(logdir, k, 'dist')
+    if not os.path.exists(path):
+        os.makedirs(path)
+    prediction = {}
+    for ps in range(pred.shape[-1]):
+        prediction['pass' + str(ps)] = pred[0, :, loc[0], loc[1], ps]
+    prediction['Entropy'] = [entropy] + [0] * (pred.shape[1] - 1)
+    prediction['mutual_info'] = [mutual_info] + [0] * (pred.shape[1] - 1)
+
+    classes = ['class' + str(cl) for cl in range(pred.shape[1])]
+    df = DataFrame(prediction, index=classes)
+    # print(df)
+    df.to_excel('{}/{}_{}_{}_{}.xlsx'.format(path, i_val, i, loc[0], loc[1]), index=True, header=True)
+
 
 ## MEM utils ##
 def mem_report():
@@ -446,8 +495,8 @@ def mem_report():
         Args:
             - tensors: the tensors of specified type
             - mem_type: 'CPU' or 'GPU' in current implementation '''
-        print('Storage on %s' %(mem_type))
-        print('-'*LEN)
+        print('Storage on %s' % (mem_type))
+        print('-' * LEN)
         total_numel = 0
         total_mem = 0
         visited_data = []
@@ -463,7 +512,7 @@ def mem_report():
             numel = tensor.storage().size()
             total_numel += numel
             element_size = tensor.storage().element_size()
-            mem = numel*element_size /1024/1024 # 32bit=4Byte, MByte
+            mem = numel * element_size / 1024 / 1024  # 32bit=4Byte, MByte
             total_mem += mem
             element_type = type(tensor).__name__
             size = tuple(tensor.size())
@@ -471,18 +520,18 @@ def mem_report():
             print('%s\t\t%s\t\t%.2f' % (
                 element_type,
                 size,
-                mem) )
-        print('-'*LEN)
-        print('Total Tensors: %d \tUsed Memory Space: %.2f MBytes' % (total_numel, total_mem) )
-        print('-'*LEN)
+                mem))
+        print('-' * LEN)
+        print('Total Tensors: %d \tUsed Memory Space: %.2f MBytes' % (total_numel, total_mem))
+        print('-' * LEN)
 
     LEN = 65
-    print('='*LEN)
+    print('=' * LEN)
     objects = gc.get_objects()
-    print('%s\t%s\t\t\t%s' %('Element type', 'Size', 'Used MEM(MBytes)') )
+    print('%s\t%s\t\t\t%s' % ('Element type', 'Size', 'Used MEM(MBytes)'))
     tensors = [obj for obj in objects if torch.is_tensor(obj)]
     cuda_tensors = [t for t in tensors if t.is_cuda]
     host_tensors = [t for t in tensors if not t.is_cuda]
     _mem_report(cuda_tensors, 'GPU')
     _mem_report(host_tensors, 'CPU')
-    print('='*LEN)
+    print('=' * LEN)

@@ -5,7 +5,7 @@ from ptsemseg.models.recalibrator import *
 from ptsemseg.utils import save_pred
 
 
-class segnet_mcdo(nn.Module):
+class tempnet(nn.Module):
     def __init__(self,
                  n_classes=21,
                  in_channels=3,
@@ -25,7 +25,7 @@ class segnet_mcdo(nn.Module):
                  freeze=False,
                  bins=0
                  ):
-        super(segnet_mcdo, self).__init__()
+        super(tempnet, self).__init__()
 
         self.in_channels = in_channels
         self.is_unpooling = is_unpooling
@@ -92,7 +92,20 @@ class segnet_mcdo(nn.Module):
             }
 
         if self.temperatureScaling:
-            self.temperature = torch.nn.Parameter(torch.ones(1))
+            # self.temperature = torch.nn.Parameter(torch.ones(1))
+            # self.tempScale = TemperatureScaling()
+            self.tempScale = {
+                "down1": segnetDown2(self.in_channels, 64),
+                "down2": segnetDown2(64, 128),
+                # "down3": segnetDown3(128, 256),
+                # "down4": segnetDown3(256, 512),
+                # "down5": segnetDown3(512, 512),
+                # "up5": segnetUp3(512, 512),
+                # "up4": segnetUp3(512, 256),
+                # "up3": segnetUp3(256, 128),
+                "up2": segnetUp2(128, 64),
+                "up1": segnetUp2(64, 1),
+            }
 
         if freeze:
             for layer in self.layers.values():
@@ -101,7 +114,7 @@ class segnet_mcdo(nn.Module):
 
         self.softmaxMCDO = torch.nn.Softmax(dim=1)
 
-        for k, v in self.layers.items():
+        for k, v in self.layers.items() + self.tempScale.items():
             setattr(self, k, v)
 
     def init_vgg16_params(self, vgg16):
@@ -151,6 +164,8 @@ class segnet_mcdo(nn.Module):
 
     def forward(self, inputs, mcdo=True):
 
+        [self.layers[k].eval() for k in self.layers.keys()]
+
         if self.full_mcdo:
             down1, indices_1, unpool_shape1 = self.layers["down1"](inputs, MCDO=mcdo)
             down2, indices_2, unpool_shape2 = self.layers["down2"](down1, MCDO=mcdo)
@@ -173,10 +188,21 @@ class segnet_mcdo(nn.Module):
             up2 = self.layers["up2"](up3, indices_2, unpool_shape2)
             up1 = self.layers["up1"](up2, indices_1, unpool_shape1)
 
-        if self.temperatureScaling:
-            up1 = up1 / self.temperature
+        # up1 = up1 / self.temperature
+        # up1 = self.tempScale(up1)
+        tdown1, tindices_1, tunpool_shape1 = self.tempScale["down1"](inputs)
+        tdown2, tindices_2, tunpool_shape2 = self.tempScale["down2"](tdown1)
+        # tdown3, tindices_3, tunpool_shape3 = self.tempScale["down3"](tdown2)
+        # tdown4, tindices_4, tunpool_shape4 = self.tempScale["down4"](tdown3)
+        # tdown5, tindices_5, tunpool_shape5 = self.tempScale["down5"](tdown4)
+        # tup5 = self.tempScale["up5"](tdown5, tindices_5, tunpool_shape5)
+        # tup4 = self.tempScale["up4"](tup5, tindices_4, tunpool_shape4)
+        # tup3 = self.tempScale["up3"](tup4, tindices_3, tunpool_shape3)
+        tup2 = self.tempScale["up2"](tdown2, tindices_2, tunpool_shape2)
+        tup1 = self.tempScale["up1"](tup2, tindices_1, tunpool_shape1)
+        tup1.masked_fill(tup1 < 0.01, 0.01)
 
-        return up1
+        return up1 * tup1
 
     def forwardAvg(self, inputs):
 

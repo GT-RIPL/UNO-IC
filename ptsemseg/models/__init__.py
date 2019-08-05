@@ -168,7 +168,7 @@ def _get_model_instance(name):
             "CAF_segnet": CAFnet,
             "SSMA": SSMA,
             "DeepLab": DeepLab,
-            "Tempnet": tempnet,
+            "tempnet": tempnet,
         }[name]
     except:
         raise ("Model {} not available".format(name))

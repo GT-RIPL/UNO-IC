@@ -43,10 +43,10 @@ data:
     noisy_type: None
 training:
     train_iters: 5000
-    batch_size: 2
-    val_interval: 1000
+    batch_size: 4
+    val_interval: 500
     n_workers: 8
-    print_interval: 10
+    print_interval: 5
     png_frames: 50
     optimizer:
         name: 'adam'

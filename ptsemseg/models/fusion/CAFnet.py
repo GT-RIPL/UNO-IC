@@ -73,8 +73,8 @@ class CAFnet(nn.Module):
         inputs_rgb = inputs[:, :3, :, :]
         inputs_d = inputs[:, 3:, :, :]
 
-        mean_rgb, var_rgb = self.rgb_segnet.module.forwardMCDO(inputs_rgb)
-        mean_d, var_d = self.d_segnet.module.forwardMCDO(inputs_d)
+        mean_rgb, var_rgb, entropy_rgb, MI_rgb = self.rgb_segnet.module.forwardMCDO(inputs_rgb)
+        mean_d, var_d, entropy_rgb, MI_rgb = self.d_segnet.module.forwardMCDO(inputs_d)
         
         s = var_rgb.shape
         

@@ -15,7 +15,8 @@ import cv2
 from ptsemseg.models import get_model
 from ptsemseg.loss import get_loss_function
 from ptsemseg.loader import get_loaders
-from ptsemseg.utils import get_logger, parseEightCameras, plotPrediction, plotMeansVariances, plotEntropy, plotMutualInfo
+from ptsemseg.utils import get_logger, parseEightCameras, plotPrediction, plotMeansVariances, plotEntropy, \
+    plotMutualInfo
 from ptsemseg.metrics import runningScore, averageMeter
 from ptsemseg.schedulers import get_scheduler
 from ptsemseg.optimizers import get_optimizer
@@ -55,6 +56,7 @@ def train(cfg, writer, logger, logdir):
 
     start_iter = 0
     models = {}
+    swag_models = {}
     optimizers = {}
     schedulers = {}
 
@@ -187,7 +189,8 @@ def train(cfg, writer, logger, logdir):
             for i_val, (input_list, labels_list) in tqdm(enumerate(valloader)):
 
                 inputs, labels = parseEightCameras(input_list['rgb'], labels_list, input_list['d'], device)
-                inputs_display, _ = parseEightCameras(input_list['rgb_display'], labels_list, input_list['d_display'], device)
+                inputs_display, _ = parseEightCameras(input_list['rgb_display'], labels_list, input_list['d_display'],
+                                                      device)
 
                 # Read batch from only one camera
                 bs = cfg['training']['batch_size']
@@ -205,12 +208,18 @@ def train(cfg, writer, logger, logdir):
                 val_loss = {}
 
                 for m in cfg["models"].keys():
-                    if hasattr(models[m].module, 'forwardMCDO'):
-                        mean[m], variance[m], entropy[m], mutual_info[m] = models[m].module.forwardMCDO(images_val[m], cfg["recal"])
-                        # mean[m], variance[m] = models[m].module.forwardMCDO(images_val[m], cfg["recal"])
+
+                    variance[m] = torch.zeros(labels_val.shape)
+                    entropy[m] = torch.zeros(labels_val.shape)
+                    mutual_info[m] = torch.zeros(labels_val.shape)
+
+                    if cfg['swa']:
+                        mean[m] = swag_models[m](images_val[m])
+                    elif hasattr(models[m].module, 'forwardMCDO'):
+                        mean[m], variance[m], entropy[m], mutual_info[m] = models[m].module.forwardMCDO(
+                            images_val[m], recalType=cfg["recal"])
                     else:
                         mean[m] = models[m](images_val[m])
-                        variance[m] = torch.zeros(mean[m].shape)
                     val_loss[m] = loss_fn(input=mean[m], target=labels_val)
 
                 # import ipdb;ipdb.set_trace()
@@ -284,11 +293,40 @@ if __name__ == "__main__":
         help="Configuration file to use",
     )
 
+    parser.add_argument(
+        "--run",
+        nargs="?",
+        type=str,
+        default="",
+        help="Directory to rerun",
+    )
+
     args = parser.parse_args()
 
     # cfg is a  with two-level dictionary ['training','data','model']['batch_size']
-    with open(args.config) as fp:
-        cfg = defaultdict(lambda: None, yaml.load(fp))
+    if len(args.run) > 0:
+
+        # find and load config
+        for root, dirs, files in os.walk(args.run):
+            for f in files:
+                if '.yml' in f:
+                    path = root+f
+
+        with open(path) as fp:
+            cfg = defaultdict(lambda: None, yaml.load(fp))
+
+        # find and load saved best models
+        for m in cfg['models'].keys():
+
+            for root, dirs, files in os.walk(args.run):
+                for f in files:
+                    if m in f and '.pkl' in f:
+                        cfg['models'][m]['resume'] = f
+
+
+    else:
+        with open(args.config) as fp:
+            cfg = defaultdict(lambda: None, yaml.load(fp))
 
     logdir = os.path.join("runs", cfg['id'])
     writer = SummaryWriter(logdir)

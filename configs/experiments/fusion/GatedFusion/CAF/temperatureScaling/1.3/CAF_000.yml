@@ -38,19 +38,20 @@ data:
     img_rows: 512
     img_cols: 512
     path: datasets/airsim_data_async #../../ros/data/airsim_03-30-2019/airsim_data_async
-    noisy_type: None 
+    noisy_type: None
 training:
-    train_iters: 50000
-    batch_size: 2
-    val_interval: 5000
+    train_iters: 5000
+    batch_size: 4
+    val_interval: 500
     n_workers: 8
-    print_interval: 50
+    print_interval: 5
     png_frames: 50
     optimizer:
         name: 'adam'
-        lr: 1.0e-5
+        lr: 1.0e-7
     loss:
         name: 'cross_entropy'
         size_average: True
     lr_schedule:
     resume: None
+

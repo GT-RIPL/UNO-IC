@@ -19,7 +19,8 @@ import cv2
 from ptsemseg.models import get_model
 from ptsemseg.loss import get_loss_function
 from ptsemseg.loader import get_loaders
-from ptsemseg.utils import get_logger, parseEightCameras, plotPrediction, plotMeansVariances, plotEntropy, plotMutualInfo
+from ptsemseg.utils import get_logger, parseEightCameras, plotPrediction, plotMeansVariances, plotEntropy, \
+    plotMutualInfo
 from ptsemseg.metrics import runningScore, averageMeter
 from ptsemseg.schedulers import get_scheduler
 from ptsemseg.optimizers import get_optimizer
@@ -256,7 +257,9 @@ def train(cfg, writer, logger, logdir):
                                 labels_recal = labels[:bs, :, :]
 
                                 # Run Models
-                                mean, variance, entropy, mutual_info = models[m].module.forwardMCDO(images_val[m], logdir, k, i_val, i, cfg["recal"])
+                                mean, variance, entropy, mutual_info = models[m].module.forwardMCDO(images_val[m],
+                                                                                                    logdir, k, i_val, i,
+                                                                                                    cfg["recal"])
                                 # concat results
                                 output_all[bs * i_recal:bs * (i_recal + 1), :, :, :] = torch.nn.Softmax(dim=1)(mean)
                                 labels_all[bs * i_recal:bs * (i_recal + 1), :, :] = labels_recal
@@ -276,7 +279,8 @@ def train(cfg, writer, logger, logdir):
                         for i_val, (input_list, labels_list) in tqdm(enumerate(valloader)):
 
                             inputs, labels = parseEightCameras(input_list['rgb'], labels_list, input_list['d'], device)
-                            inputs_display, _ = parseEightCameras(input_list['rgb_display'], labels_list, input_list['d_display'], device)
+                            inputs_display, _ = parseEightCameras(input_list['rgb_display'], labels_list,
+                                                                  input_list['d_display'], device)
 
                             # import ipdb; ipdb.set_trace() # BREAKPOINT
                             # Read batch from only one camera
@@ -296,14 +300,18 @@ def train(cfg, writer, logger, logdir):
                             val_loss = {}
 
                             for m in cfg["models"].keys():
+
+                                variance[m] = torch.zeros(labels_val.shape)
+                                entropy[m] = torch.zeros(labels_val.shape)
+                                mutual_info[m] = torch.zeros(labels_val.shape)
+
                                 if cfg['swa']:
                                     mean[m] = swag_models[m](images_val[m])
-                                    variance[m] = torch.zeros(mean[m].shape)
                                 elif hasattr(models[m].module, 'forwardMCDO'):
-                                    mean[m], variance[m], entropy[m], mutual_info[m] = models[m].module.forwardMCDO(images_val[m], recalType=cfg["recal"])
+                                    mean[m], variance[m], entropy[m], mutual_info[m] = models[m].module.forwardMCDO(
+                                        images_val[m], recalType=cfg["recal"])
                                 else:
                                     mean[m] = models[m](images_val[m])
-                                    variance[m] = torch.zeros(mean[m].shape)
                                 val_loss[m] = loss_fn(input=mean[m], target=labels_val)
 
                             # Fusion Type
@@ -374,7 +382,7 @@ def train(cfg, writer, logger, logdir):
                     optimizer = optimizers[m]
                     scheduler = schedulers[m]
 
-                    if score["Mean IoU : \t"] >= best_iou or cfg['temperatureScaling']:
+                    if score["Mean IoU : \t"] >= best_iou:
                         best_iou = score["Mean IoU : \t"]
                         state = {
                             "epoch": i,
@@ -426,11 +434,39 @@ if __name__ == "__main__":
         help="Unique identifier for different runs",
     )
 
+    parser.add_argument(
+        "--run",
+        nargs="?",
+        type=str,
+        default="",
+        help="Directory to rerun",
+    )
     args = parser.parse_args()
 
     # cfg is a  with two-level dictionary ['training','data','model']['batch_size']
-    with open(args.config) as fp:
-        cfg = defaultdict(lambda: None, yaml.load(fp))
+    if len(args.run) > 0:
+
+        # find and load config
+        for root, dirs, files in os.walk(args.run):
+            for f in files:
+                if '.yml' in f:
+                    path = root + f
+                    args.config = path
+
+        with open(path) as fp:
+            cfg = defaultdict(lambda: None, yaml.load(fp))
+
+        # find and load saved best models
+        for m in cfg['models'].keys():
+
+            for root, dirs, files in os.walk(args.run):
+                for f in files:
+                    if m in f and '.pkl' in f:
+                        cfg['models'][m]['resume'] = f
+
+    else:
+        with open(args.config) as fp:
+            cfg = defaultdict(lambda: None, yaml.load(fp))
 
     logdir = "/".join(["runs"] + args.config.split("/")[1:])[:-4]
 
@@ -450,6 +486,7 @@ if __name__ == "__main__":
         with open(path, 'r') as original:
             data = original.read()
         with open(path, 'w') as modified:
+            data.replace(cfg['id'], cfg['id'] + str(seed))
             modified.write("seed: {}\n".format(seed) + data)
 
     print("RUNDIR: {}".format(logdir))

@@ -206,7 +206,7 @@ def train(cfg, writer, logger, logdir):
 
                 for m in cfg["models"].keys():
                     if hasattr(models[m].module, 'forwardMCDO'):
-                        mean[m], variance[m], entropy[m], mutual_info[m] = models[m].module.forwardMCDO(logdir, k, i_val, i, images_val[m], cfg["recal"])
+                        mean[m], variance[m], entropy[m], mutual_info[m] = models[m].module.forwardMCDO(images_val[m], cfg["recal"])
                         # mean[m], variance[m] = models[m].module.forwardMCDO(images_val[m], cfg["recal"])
                     else:
                         mean[m] = models[m](images_val[m])

@@ -410,7 +410,7 @@ def plotPrediction(logdir, cfg, n_classes, i, i_val, k, inputs, pred, gt):
     plt.close(fig)
 
 
-def plotMeansVariances(logdir, cfg, n_classes, i, i_val, k, inputs, pred, gt, mean, variance):
+def plotMeansVariances(logdir, cfg, n_classes, i, i_val, m, k, inputs, pred, gt, mean, variance):
     fig, axes = plt.subplots(4, n_classes // 2 + 1)
     [axi.set_axis_off() for axi in axes.ravel()]
 

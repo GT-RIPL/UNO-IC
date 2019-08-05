@@ -333,7 +333,7 @@ def train(cfg, writer, logger, logdir):
                             if i_val % cfg["training"]["png_frames"] == 0:
                                 plotPrediction(logdir, cfg, n_classes, i + 1, i_val, k, inputs_display, pred, gt)
                                 for m in cfg["models"].keys():
-                                    plotMeansVariances(logdir, cfg, n_classes, i, i_val, k + "/" + m, inputs,
+                                    plotMeansVariances(logdir, cfg, n_classes, i, i_val, m, k + "/" + m, inputs,
                                                        pred, gt, mean[m], variance[m])
                                     plotEntropy(logdir, i, i_val, k + "/" + m, pred, entropy[m])
                                     plotMutualInfo(logdir, i, i_val, k + "/" + m, pred, mutual_info[m])

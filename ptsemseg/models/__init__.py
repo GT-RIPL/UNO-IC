@@ -12,6 +12,7 @@ from ptsemseg.models.frrn import *
 from ptsemseg.models.fusion.SSMA import SSMA
 from ptsemseg.models.fusion.deeplab import DeepLab
 from ptsemseg.models.fusion.CAFnet import CAFnet
+from ptsemseg.models.tempnet import tempnet
 
 
 def get_model(model_dict,
@@ -56,6 +57,26 @@ def get_model(model_dict,
         model.init_vgg16_params(vgg16)
 
     elif name == "segnet_mcdo":
+        model = model(n_classes=n_classes,
+                      input_size=input_size,
+                      batch_size=batch_size,
+                      version=version,
+                      reduction=reduction,
+                      mcdo_passes=mcdo_passes,
+                      dropoutP=dropoutP,
+                      full_mcdo=full_mcdo,
+                      in_channels=in_channels,
+                      start_layer=start_layer,
+                      end_layer=end_layer,
+                      device=device,
+                      recalibrator=recalibrator,
+                      temperatureScaling=temperatureScaling,
+                      freeze=freeze,
+                      bins=bins)
+        vgg16 = models.vgg16(pretrained=True)
+        model.init_vgg16_params(vgg16)
+
+    elif name == "tempnet":
         model = model(n_classes=n_classes,
                       input_size=input_size,
                       batch_size=batch_size,
@@ -146,7 +167,8 @@ def _get_model_instance(name):
             "CAFnet": CAFnet,
             "CAF_segnet": CAFnet,
             "SSMA": SSMA,
-            "DeepLab": DeepLab
+            "DeepLab": DeepLab,
+            "Tempnet": tempnet,
         }[name]
     except:
         raise ("Model {} not available".format(name))

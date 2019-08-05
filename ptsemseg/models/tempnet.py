@@ -95,16 +95,16 @@ class tempnet(nn.Module):
             # self.temperature = torch.nn.Parameter(torch.ones(1))
             # self.tempScale = TemperatureScaling()
             self.tempScale = {
-                "down1": segnetDown2(self.in_channels, 64),
-                "down2": segnetDown2(64, 128),
-                # "down3": segnetDown3(128, 256),
-                # "down4": segnetDown3(256, 512),
-                # "down5": segnetDown3(512, 512),
-                # "up5": segnetUp3(512, 512),
-                # "up4": segnetUp3(512, 256),
-                # "up3": segnetUp3(256, 128),
-                "up2": segnetUp2(128, 64),
-                "up1": segnetUp2(64, 1),
+                "tdown1": segnetDown2(self.in_channels, 64),
+                "tdown2": segnetDown2(64, 128),
+                # "tdown3": segnetDown3(128, 256),
+                # "tdown4": segnetDown3(256, 512),
+                # "tdown5": segnetDown3(512, 512),
+                # "tup5": segnetUp3(512, 512),
+                # "tup4": segnetUp3(512, 256),
+                # "tup3": segnetUp3(256, 128),
+                "tup2": segnetUp2(128, 64),
+                "tup1": segnetUp2(64, 1),
             }
 
         if freeze:

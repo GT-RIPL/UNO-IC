@@ -114,7 +114,10 @@ class tempnet(nn.Module):
 
         self.softmaxMCDO = torch.nn.Softmax(dim=1)
 
-        for k, v in self.layers.items() + self.tempScale.items():
+        for k, v in self.layers.items():
+            setattr(self, k, v)
+
+        for k, v in self.tempScale.items():
             setattr(self, k, v)
 
     def init_vgg16_params(self, vgg16):

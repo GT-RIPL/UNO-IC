@@ -220,7 +220,7 @@ class tempnet(nn.Module):
         x = x / self.mcdo_passes
         return x
 
-    def forwardMCDO(self, inputs, logdir, k, i_val, itr, recalType="None", softmax=False):
+    def forwardMCDO(self, inputs, recalType="None", softmax=False):
 
         for i in range(self.mcdo_passes):
             if i == 0:
@@ -253,27 +253,6 @@ class tempnet(nn.Module):
         # entropy = predictive_entropy(prob)
         # mutual_info = mutul_information(prob)
         entropy, mutual_info = mutualinfo_entropy(prob)  # (2,512,512)
-        mutual_info_argmin = mutual_info[0, :, :].argmin()
-        mutual_info_argmax = mutual_info[0, :, :].argmax()
-        entropy_argmin = entropy[0, :, :].argmin()
-        entropy_argmax = entropy[0, :, :].argmax()
-
-        if i_val % self.png_frames == 0:
-            save_pred(logdir, [mutual_info_argmin // 512, mutual_info_argmin % 512],
-                      k, i_val, itr, prob, mutual_info[0, mutual_info_argmin // 512, mutual_info_argmin % 512],
-                      entropy[0, mutual_info_argmin // 512, mutual_info_argmin % 512])
-            save_pred(logdir, [mutual_info_argmax // 512, mutual_info_argmax % 512],
-                      k, i_val, itr, prob, mutual_info[0, mutual_info_argmax // 512, mutual_info_argmax % 512],
-                      entropy[0, mutual_info_argmax // 512, mutual_info_argmax % 512])
-            save_pred(logdir, [entropy_argmin // 512, entropy_argmin % 512],
-                      k, i_val, itr, prob, mutual_info[0, entropy_argmin // 512, entropy_argmin % 512],
-                      entropy[0, entropy_argmin // 512, entropy_argmin % 512])
-            save_pred(logdir, [entropy_argmax // 512, entropy_argmax % 512],
-                      k, i_val, itr, prob, mutual_info[0, entropy_argmax // 512, entropy_argmax % 512],
-                      entropy[0, 170, 256])
-            save_pred(logdir, [170, 256],
-                      k, i_val, itr, prob, mutual_info[0, 170, 256],
-                      entropy[0, 170, 256])
         return mean, variance, entropy, mutual_info
 
     def applyCalibration(self, output):

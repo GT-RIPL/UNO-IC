@@ -3,6 +3,7 @@ import torch.nn as nn
 import numpy as np
 import torch.nn.functional as F
 
+
 class GatedFusion(nn.Module):
     def __init__(self, n_classes):
         super(GatedFusion, self).__init__()
@@ -19,7 +20,6 @@ class GatedFusion(nn.Module):
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, rgb, d, rgb_var, d_var):
-
         fusion = torch.cat([rgb, d], dim=1)
 
         G = self.conv(fusion)
@@ -34,25 +34,25 @@ class GatedFusion(nn.Module):
         P_fusion = P_rgb + P_d
 
         return P_fusion
- 
+
+
 # 1.1
 class ConditionalAttentionFusion(nn.Module):
     def __init__(self, n_channels):
         super(ConditionalAttentionFusion, self).__init__()
         self.gate = nn.Sequential(nn.Conv2d(2 * n_channels + 2,
-                                    n_channels,
-                                    3,
-                                    stride=1,
-                                    padding=1,
-                                    bias=True,
-                                    dilation=1),
-                                    nn.Sigmoid())
+                                            n_channels,
+                                            3,
+                                            stride=1,
+                                            padding=1,
+                                            bias=True,
+                                            dilation=1),
+                                  nn.Sigmoid())
 
     def forward(self, rgb, d, rgb_var, d_var):
-
         AB = torch.cat([rgb, d], dim=1)
         ABCD = torch.cat([rgb, d, rgb_var, d_var], dim=1)
-        
+
         G = self.gate(ABCD)
         # fused = self.fuser(G)
 
@@ -67,21 +67,21 @@ class ConditionalAttentionFusion(nn.Module):
 
         return P_fusion
 
+
 # 1.2
 class PreweightedGatedFusion(nn.Module):
     def __init__(self, n_channels):
         super(PreweightedGatedFusion, self).__init__()
         self.gate = nn.Sequential(nn.Conv2d(2 * n_channels,
-                                    n_channels,
-                                    3,
-                                    stride=1,
-                                    padding=1,
-                                    bias=True,
-                                    dilation=1),
-                                    nn.Sigmoid())
+                                            n_channels,
+                                            3,
+                                            stride=1,
+                                            padding=1,
+                                            bias=True,
+                                            dilation=1),
+                                  nn.Sigmoid())
 
     def forward(self, rgb, d, rgb_var, d_var):
-
         rgb_var = 1 / (rgb_var + 1e-5)
         d_var = 1 / (d_var + 1e-5)
 
@@ -90,7 +90,7 @@ class PreweightedGatedFusion(nn.Module):
             d[:, n, :, :] = d[:, n, :, :] * d_var
 
         AB = torch.cat([rgb, d], dim=1)
-        
+
         G = self.gate(AB)
 
         G_rgb = G
@@ -102,23 +102,24 @@ class PreweightedGatedFusion(nn.Module):
         P_fusion = P_rgb + P_d
 
         return P_fusion
+
+
 # 1.3
 class UncertaintyGatedFusion(nn.Module):
     def __init__(self, n_channels):
         super(UncertaintyGatedFusion, self).__init__()
         self.gate = nn.Sequential(nn.Conv2d(2,
-                                    n_channels,
-                                    3,
-                                    stride=1,
-                                    padding=1,
-                                    bias=True,
-                                    dilation=1),
-                                    nn.Sigmoid())
+                                            n_channels,
+                                            3,
+                                            stride=1,
+                                            padding=1,
+                                            bias=True,
+                                            dilation=1),
+                                  nn.Sigmoid())
 
     def forward(self, rgb, d, rgb_var, d_var):
-
         CD = torch.cat([rgb_var, d_var], dim=1)
-       
+
         G = self.gate(CD)
         G_rgb = G
         G_d = torch.ones(G.shape, dtype=torch.float, device=G.device) - G
@@ -130,7 +131,8 @@ class UncertaintyGatedFusion(nn.Module):
 
         return P_fusion
 
-#2.1
+
+# 2.1
 class ConditionalAttentionFusionv2(nn.Module):
     def __init__(self, n_channels):
         super(ConditionalAttentionFusionv2, self).__init__()
@@ -138,40 +140,39 @@ class ConditionalAttentionFusionv2(nn.Module):
         self.uncertainty_fusion = []
         self.total_fusion = []
         for n in range(n_channels):
-        
             self.uncertainty_fusion.append(nn.Conv2d(2,
-                                        1,
-                                        3,
-                                        stride=1,
-                                        padding=1,
-                                        bias=False,
-                                        dilation=1).cuda())
-                                        
+                                                     1,
+                                                     3,
+                                                     stride=1,
+                                                     padding=1,
+                                                     bias=False,
+                                                     dilation=1).cuda())
+
             self.probability_fusion.append(nn.Conv2d(2,
-                                        1,
-                                        1,
-                                        stride=1,
-                                        padding=0,
-                                        bias=False,
-                                        dilation=1).cuda())
+                                                     1,
+                                                     1,
+                                                     stride=1,
+                                                     padding=0,
+                                                     bias=False,
+                                                     dilation=1).cuda())
 
             self.total_fusion.append(nn.Conv2d(2,
-                                                1,
-                                                1,
-                                                stride=1,
-                                                padding=0,
-                                                bias=False,
-                                                dilation=1).cuda())
-                     
+                                               1,
+                                               1,
+                                               stride=1,
+                                               padding=0,
+                                               bias=False,
+                                               dilation=1).cuda())
+
         self.fuser = nn.Sequential(nn.Conv2d(n_channels,
-                                    n_channels,
-                                    1,
-                                    stride=1,
-                                    padding=0,
-                                    bias=False,
-                                    dilation=1),
-                                    nn.BatchNorm2d(int(n_channels)))
-                                    
+                                             n_channels,
+                                             1,
+                                             stride=1,
+                                             padding=0,
+                                             bias=False,
+                                             dilation=1),
+                                   nn.BatchNorm2d(int(n_channels)))
+
         self.n_channels = n_channels
 
     def forward(self, rgb, d, rgb_var, d_var):
@@ -179,17 +180,16 @@ class ConditionalAttentionFusionv2(nn.Module):
         AB = torch.cat([rgb, d], dim=1)
         CD = torch.cat([rgb_var, d_var], dim=1)
         G = torch.zeros(rgb.shape, device=AB.device)
-        
+
         for n in range(self.n_channels):
-        
             A = rgb[:, n, :, :].view(-1, 1, rgb.shape[2], rgb.shape[3])
             B = d[:, n, :, :].view(-1, 1, d.shape[2], d.shape[3])
-            
+
             _AB = self.probability_fusion[n](torch.cat([A, B], dim=1))
             _CD = self.uncertainty_fusion[n](CD)
-            
+
             G[:, n, :, :] = torch.squeeze(self.total_fusion[n](torch.cat([_AB, _CD], dim=1)))
-        
+
         # fused = self.fuser(G)
 
         # return fused

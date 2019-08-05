@@ -218,7 +218,11 @@ class segnet_mcdo(nn.Module):
                     mean[:, c, :, :] = self.calibrationPerClass[c].predict(mean[:, c, :, :].reshape(-1)).reshape(
                         mean[:, c, :, :].shape)
 
-        return mean, variance
+        prob = self.softmaxMCDO(x)
+        # entropy = predictive_entropy(prob)
+        # mutual_info = mutul_information(prob)
+        entropy, mutual_info = mutualinfo_entropy(prob)  # (2,512,512)
+        return mean, variance, entropy, mutual_info
 
     def applyCalibration(self, output):
 

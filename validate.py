@@ -1,5 +1,3 @@
-
-
 import os
 import yaml
 import time
@@ -17,7 +15,7 @@ import cv2
 from ptsemseg.models import get_model
 from ptsemseg.loss import get_loss_function
 from ptsemseg.loader import get_loaders
-from ptsemseg.utils import get_logger, parseEightCameras, plotPrediction, plotMeansVariances#, plotEntropy, plotMutualInfo
+from ptsemseg.utils import get_logger, parseEightCameras, plotPrediction, plotMeansVariances, plotEntropy, plotMutualInfo
 from ptsemseg.metrics import runningScore, averageMeter
 from ptsemseg.schedulers import get_scheduler
 from ptsemseg.optimizers import get_optimizer
@@ -91,7 +89,7 @@ def train(cfg, writer, logger, logdir):
         # Setup optimizer, lr_scheduler and loss function
         optimizer_cls = get_optimizer(cfg)
         optimizer_params = {k: v for k, v in cfg['training']['optimizer'].items()
-                           if k != 'name'}
+                            if k != 'name'}
 
         optimizers[model] = optimizer_cls(models[model].parameters(), **optimizer_params)
         logger.info("Using optimizer {}".format(optimizers[model]))
@@ -142,7 +140,6 @@ def train(cfg, writer, logger, logdir):
     best_iou = -100.0
     i = start_iter
     print(i)
-
 
     [models[m].eval() for m in models.keys()]
 
@@ -209,14 +206,14 @@ def train(cfg, writer, logger, logdir):
 
                 for m in cfg["models"].keys():
                     if hasattr(models[m].module, 'forwardMCDO'):
-                        # mean[m], variance[m], entropy[m], mutual_info[m] = models[m].module.forwardMCDO(logdir,k,i_val,i,images_val[m], cfg["recal"])
-                        mean[m], variance[m] = models[m].module.forwardMCDO(images_val[m], cfg["recal"])
+                        mean[m], variance[m], entropy[m], mutual_info[m] = models[m].module.forwardMCDO(logdir, k, i_val, i, images_val[m], cfg["recal"])
+                        # mean[m], variance[m] = models[m].module.forwardMCDO(images_val[m], cfg["recal"])
                     else:
                         mean[m] = models[m](images_val[m])
                         variance[m] = torch.zeros(mean[m].shape)
                     val_loss[m] = loss_fn(input=mean[m], target=labels_val)
 
-                #import ipdb;ipdb.set_trace()
+                # import ipdb;ipdb.set_trace()
                 # Fusion Type
                 if cfg["fusion"] == "None":
                     outputs = torch.nn.Softmax(dim=1)(mean[list(cfg["models"].keys())[0]])
@@ -227,14 +224,14 @@ def train(cfg, writer, logger, logdir):
                 elif cfg["fusion"] == "WeightedVariance":
                     rgb_var = 1 / (torch.mean(variance["rgb"], 1) + 1e-5)
                     d_var = 1 / (torch.mean(variance["d"], 1) + 1e-5)
-                    
+
                     rgb = torch.nn.Softmax(dim=1)(mean["rgb"])
                     d = torch.nn.Softmax(dim=1)(mean["d"])
                     for n in range(n_classes):
                         rgb[:, n, :, :] = rgb[:, n, :, :] * rgb_var
                         d[:, n, :, :] = d[:, n, :, :] * d_var
                     outputs = rgb + d
-                 
+
                 elif cfg["fusion"] == "FuzzyLogic":
                     outputs = torch.max(torch.nn.Softmax(dim=1)(mean["rgb"]),
                                         torch.nn.Softmax(dim=1)(mean["d"]))
@@ -246,17 +243,17 @@ def train(cfg, writer, logger, logdir):
                 # plot ground truth vs mean/variance of outputs
                 pred = outputs.argmax(1).cpu().numpy()
                 gt = labels_val.data.cpu().numpy()
-                #import ipdb;ipdb.set_trace()
+                # import ipdb;ipdb.set_trace()
                 if i_val % cfg["training"]["png_frames"] == 0:
                     plotPrediction(logdir, cfg, n_classes, i, i_val, k, inputs_display, pred, gt)
                     for m in cfg["models"].keys():
                         plotMeansVariances(logdir, cfg, n_classes, i + 1, i_val, m, k + "/" + m, inputs_display,
                                            pred, gt, mean[m], variance[m])
-                        # plotEntropy(logdir, i, i_val, k + "/" + m, pred, entropy[m])
-                        # plotMutualInfo(logdir, i, i_val, k + "/" + m, pred, mutual_info[m])
-                        
+                        plotEntropy(logdir, i, i_val, k + "/" + m, pred, entropy[m])
+                        plotMutualInfo(logdir, i, i_val, k + "/" + m, pred, mutual_info[m])
+
                 running_metrics_val[k].update(gt, pred)
-            
+
         for m in cfg["models"].keys():
             for k in loaders['val'].keys():
                 writer.add_scalar('loss/val_loss/{}/{}'.format(m, k), val_loss_meter[m][k].avg, i + 1)
@@ -277,8 +274,6 @@ def train(cfg, writer, logger, logdir):
         running_metrics_val[env].reset()
 
 
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="config")
     parser.add_argument(
@@ -295,7 +290,7 @@ if __name__ == "__main__":
     with open(args.config) as fp:
         cfg = defaultdict(lambda: None, yaml.load(fp))
 
-    logdir = os.path.join("runs",cfg['id'])
+    logdir = os.path.join("runs", cfg['id'])
     writer = SummaryWriter(logdir)
 
     print("RUNDIR: {}".format(logdir))

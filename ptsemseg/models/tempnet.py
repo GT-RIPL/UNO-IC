@@ -191,21 +191,23 @@ class tempnet(nn.Module):
             up2 = self.layers["up2"](up3, indices_2, unpool_shape2)
             up1 = self.layers["up1"](up2, indices_1, unpool_shape1)
 
-        # up1 = up1 / self.temperature
-        # up1 = self.tempScale(up1)
-        tdown1, tindices_1, tunpool_shape1 = self.tempScale["tdown1"](inputs)
-        tdown2, tindices_2, tunpool_shape2 = self.tempScale["tdown2"](tdown1)
-        # tdown3, tindices_3, tunpool_shape3 = self.tempScale["tdown3"](tdown2)
-        # tdown4, tindices_4, tunpool_shape4 = self.tempScale["tdown4"](tdown3)
-        # tdown5, tindices_5, tunpool_shape5 = self.tempScale["tdown5"](tdown4)
-        # tup5 = self.tempScale["tup5"](tdown5, tindices_5, tunpool_shape5)
-        # tup4 = self.tempScale["tup4"](tup5, tindices_4, tunpool_shape4)
-        # tup3 = self.tempScale["tup3"](tup4, tindices_3, tunpool_shape3)
-        tup2 = self.tempScale["tup2"](tdown2, tindices_2, tunpool_shape2)
-        tup1 = self.tempScale["tup1"](tup2, tindices_1, tunpool_shape1)
-        tup1.masked_fill(tup1 < 0.01, 0.01)
+        if self.temperatureScaling:
+            # up1 = up1 / self.temperature
+            # up1 = self.tempScale(up1)
+            tdown1, tindices_1, tunpool_shape1 = self.tempScale["tdown1"](inputs)
+            tdown2, tindices_2, tunpool_shape2 = self.tempScale["tdown2"](tdown1)
+            # tdown3, tindices_3, tunpool_shape3 = self.tempScale["tdown3"](tdown2)
+            # tdown4, tindices_4, tunpool_shape4 = self.tempScale["tdown4"](tdown3)
+            # tdown5, tindices_5, tunpool_shape5 = self.tempScale["tdown5"](tdown4)
+            # tup5 = self.tempScale["tup5"](tdown5, tindices_5, tunpool_shape5)
+            # tup4 = self.tempScale["tup4"](tup5, tindices_4, tunpool_shape4)
+            # tup3 = self.tempScale["tup3"](tup4, tindices_3, tunpool_shape3)
+            tup2 = self.tempScale["tup2"](tdown2, tindices_2, tunpool_shape2)
+            tup1 = self.tempScale["tup1"](tup2, tindices_1, tunpool_shape1)
+            tup1.masked_fill(tup1 < 0.01, 0.01)
 
-        return up1 * tup1
+            return up1 * tup1
+        return up1
 
     def forwardAvg(self, inputs):
 

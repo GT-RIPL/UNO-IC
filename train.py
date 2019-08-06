@@ -302,17 +302,18 @@ def train(cfg, writer, logger, logdir):
 
                             for m in cfg["models"].keys():
 
-                                variance[m] = torch.zeros(labels_val.shape)
                                 entropy[m] = torch.zeros(labels_val.shape)
                                 mutual_info[m] = torch.zeros(labels_val.shape)
 
                                 if cfg['swa']:
                                     mean[m] = swag_models[m](images_val[m])
+                                    variance[m] = torch.zeros(mean[m].shape)
                                 elif hasattr(models[m].module, 'forwardMCDO'):
                                     mean[m], variance[m], entropy[m], mutual_info[m] = models[m].module.forwardMCDO(
                                         images_val[m], recalType=cfg["recal"])
                                 else:
                                     mean[m] = models[m](images_val[m])
+                                    variance[m] = torch.zeros(mean[m].shape)
                                 val_loss[m] = loss_fn(input=mean[m], target=labels_val)
 
                             # Fusion Type

@@ -387,8 +387,8 @@ def train(cfg, writer, logger, logdir):
                         best_iou = score["Mean IoU : \t"]
 
                         # save best model
-                        if not os.path.exists(writer.file_writer.get_logdir() + "/best"):
-                            os.makedirs(writer.file_writer.get_logdir() + "/best")
+                        if not os.path.exists(writer.file_writer.get_logdir() + "/best_model"):
+                            os.makedirs(writer.file_writer.get_logdir() + "/best_model")
                             
                         if score["Mean IoU : \t"] >= best_iou:
                             best_iou = score["Mean IoU : \t"]
@@ -508,10 +508,11 @@ if __name__ == "__main__":
         with open(args.config) as fp:
             cfg = defaultdict(lambda: None, yaml.load(fp))
 
+        logdir = "/".join(["runs"] + args.config.split("/")[1:])[:-4]
+        
         # append tag 
         if args.tag:
             logdir += "/" + args.tag
-        logdir = "/".join(["runs"] + args.config.split("/")[1:])[:-4]
         
     # baseline train (concatenation, warping baselines)
     writer = SummaryWriter(logdir)
@@ -532,6 +533,7 @@ if __name__ == "__main__":
     train(cfg, writer, logger, logdir)
     
     # validate best model when done
+    print('VALIDATING BEST MODEL')
     logdir = logdir + '/best_model'
     writer = SummaryWriter(logdir)
     logger = get_logger(logdir)

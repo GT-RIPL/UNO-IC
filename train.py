@@ -10,7 +10,7 @@ import torch
 import random
 import argparse
 import numpy as np
-
+from validate import validate
 from torch.utils import data
 from tqdm import tqdm
 import cv2
@@ -177,6 +177,8 @@ def train(cfg, writer, logger, logdir):
         print("=" * 10, "TRAINING", "=" * 10)
         for (input_list, labels_list) in loaders['train']:
 
+            i += 1
+            
             inputs, labels = parseEightCameras(input_list['rgb'], labels_list, input_list['d'], device)
 
             # Read batch from only one camera
@@ -223,7 +225,7 @@ def train(cfg, writer, logger, logdir):
                 print('Saving SWA model at iteration: ', i + 1)
                 swag_models[m].collect_model(models[m])
 
-            if (i + 1) % cfg["training"]["val_interval"] == 0 or (i + 1) >= cfg["training"]["train_iters"]:
+            if i % cfg["training"]["val_interval"] == 0 or i >= cfg["training"]["train_iters"]:
 
                 [models[m].eval() for m in models.keys()]
 
@@ -282,7 +284,6 @@ def train(cfg, writer, logger, logdir):
                             inputs_display, _ = parseEightCameras(input_list['rgb_display'], labels_list,
                                                                   input_list['d_display'], device)
 
-                            # import ipdb; ipdb.set_trace() # BREAKPOINT
                             # Read batch from only one camera
                             bs = cfg['training']['batch_size']
 
@@ -339,7 +340,7 @@ def train(cfg, writer, logger, logdir):
                             gt = labels_val.data.cpu().numpy()
 
                             if i_val % cfg["training"]["png_frames"] == 0:
-                                plotPrediction(logdir, cfg, n_classes, i + 1, i_val, k, inputs_display, pred, gt)
+                                plotPrediction(logdir, cfg, n_classes, i, i_val, k, inputs_display, pred, gt)
                                 for m in cfg["models"].keys():
                                     plotMeansVariances(logdir, cfg, n_classes, i, i_val, m, k + "/" + m, inputs,
                                                        pred, gt, mean[m], variance[m])
@@ -357,17 +358,17 @@ def train(cfg, writer, logger, logdir):
                     for m in cfg["models"].keys():
                         for k in loaders['val'].keys():
                             writer.add_scalar('loss/val_loss/{}/{}'.format(m, k), val_loss_meter[m][k].avg, i + 1)
-                            logger.info("%s %s Iter %d Loss: %.4f" % (m, k, i + 1, val_loss_meter[m][k].avg))
+                            logger.info("%s %s Iter %d Loss: %.4f" % (m, k, i, val_loss_meter[m][k].avg))
 
                 for env, valloader in loaders['val'].items():
                     score, class_iou = running_metrics_val[env].get_scores()
                     for k, v in score.items():
                         logger.info('{}: {}'.format(k, v))
-                        writer.add_scalar('val_metrics/{}/{}'.format(env, k), v, i + 1)
+                        writer.add_scalar('val_metrics/{}/{}'.format(env, k), v, i)
 
                     for k, v in class_iou.items():
                         logger.info('{}: {}'.format(k, v))
-                        writer.add_scalar('val_metrics/{}/cls_{}'.format(env, k), v, i + 1)
+                        writer.add_scalar('val_metrics/{}/cls_{}'.format(env, k), v, i)
 
                     for m in cfg["models"].keys():
                         val_loss_meter[m][env].reset()
@@ -376,14 +377,52 @@ def train(cfg, writer, logger, logdir):
                         mutual_info_meter[m][env].reset()
                     running_metrics_val[env].reset()
 
-                # save best model
-                for m in optimizers.keys():
-                    model = models[m]
-                    optimizer = optimizers[m]
-                    scheduler = schedulers[m]
-
-                    if score["Mean IoU : \t"] >= best_iou:
+                # save models
+                if i <= cfg["training"]["train_iters"]:
+                    
+                    for m in optimizers.keys():
+                        model = models[m]
+                        optimizer = optimizers[m]
+                        scheduler = schedulers[m]
                         best_iou = score["Mean IoU : \t"]
+
+                        # save best model
+                        if not os.path.exists(writer.file_writer.get_logdir() + "/best"):
+                            os.makedirs(writer.file_writer.get_logdir() + "/best")
+                            
+                        if score["Mean IoU : \t"] >= best_iou:
+                            best_iou = score["Mean IoU : \t"]
+                            state = {
+                                "epoch": i,
+                                "model_state": model.state_dict(),
+                                "optimizer_state": optimizer.state_dict(),
+                                "scheduler_state": scheduler.state_dict(),
+                                "best_iou": best_iou,
+                            }
+                            save_path = os.path.join(writer.file_writer.get_logdir(),
+                                                     "best_model",
+                                                     "{}_{}_{}_best_model.pkl".format(
+                                                         m,
+                                                         cfg['model']['arch'],
+                                                         cfg['data']['dataset']))
+                            torch.save(state, save_path)
+
+                            if cfg['swa'] and i > cfg['swa']['start']:
+                                state = {
+                                    "epoch": i,
+                                    "model_state": swag_models[m].state_dict(),
+                                    "best_iou": best_iou,
+                                }
+                                save_path = os.path.join(writer.file_writer.get_logdir(),
+                                                         "best_model",
+                                                         "{}_{}_{}_swag.pkl".format(
+                                                             m,
+                                                             cfg['model']['arch'],
+                                                             cfg['data']['dataset']))
+
+                                torch.save(state, save_path)
+
+                        # save current model
                         state = {
                             "epoch": i,
                             "model_state": model.state_dict(),
@@ -402,6 +441,7 @@ def train(cfg, writer, logger, logdir):
                             state = {
                                 "epoch": i,
                                 "model_state": swag_models[m].state_dict(),
+                                "best_iou": best_iou,
                             }
                             save_path = os.path.join(writer.file_writer.get_logdir(),
                                                      "{}_{}_{}_swag.pkl".format(
@@ -411,11 +451,8 @@ def train(cfg, writer, logger, logdir):
 
                             torch.save(state, save_path)
 
-            i += 1
-
             if i >= cfg["training"]["train_iters"]:
                 break
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="config")
@@ -426,6 +463,7 @@ if __name__ == "__main__":
         default="configs/train/rgbd_BayesianSegnet_0.5_T000.yml",
         help="Configuration file to use",
     )
+    
     parser.add_argument(
         "--tag",
         nargs="?",
@@ -441,10 +479,11 @@ if __name__ == "__main__":
         default="",
         help="Directory to rerun",
     )
+
     args = parser.parse_args()
 
     # cfg is a  with two-level dictionary ['training','data','model']['batch_size']
-    if len(args.run) > 0:
+    if args.run != "":
 
         # find and load config
         for root, dirs, files in os.walk(args.run):
@@ -458,25 +497,27 @@ if __name__ == "__main__":
 
         # find and load saved best models
         for m in cfg['models'].keys():
-
             for root, dirs, files in os.walk(args.run):
                 for f in files:
                     if m in f and '.pkl' in f:
-                        cfg['models'][m]['resume'] = f
+                        cfg['models'][m]['resume'] = root + f 
 
+        logdir = args.run
+        
     else:
         with open(args.config) as fp:
             cfg = defaultdict(lambda: None, yaml.load(fp))
 
-    logdir = "/".join(["runs"] + args.config.split("/")[1:])[:-4]
-
-    if args.tag:
-        logdir += "/" + args.tag
-
+        # append tag 
+        if args.tag:
+            logdir += "/" + args.tag
+        logdir = "/".join(["runs"] + args.config.split("/")[1:])[:-4]
+        
+    # baseline train (concatenation, warping baselines)
     writer = SummaryWriter(logdir)
-
     path = shutil.copy(args.config, logdir)
-
+    logger = get_logger(logdir)
+    
     # generate seed if none present
     if cfg['seed'] is None:
         seed = int(time.time())
@@ -486,14 +527,26 @@ if __name__ == "__main__":
         with open(path, 'r') as original:
             data = original.read()
         with open(path, 'w') as modified:
-            data.replace(cfg['id'], cfg['id'] + str(seed))
             modified.write("seed: {}\n".format(seed) + data)
 
-    print("RUNDIR: {}".format(logdir))
-    logger = get_logger(logdir)
-
-    # baseline train (concatenation, warping baselines)
     train(cfg, writer, logger, logdir)
+    
+    # validate best model when done
+    logdir = logdir + '/best_model'
+    writer = SummaryWriter(logdir)
+    logger = get_logger(logdir)
+    
+    # load best model pkl
+    for m in cfg['models'].keys():
+        for root, dirs, files in os.walk(logdir):
+            for f in files:
+                if m in f and '.pkl' in f:
+                    cfg['models'][m]['resume'] = root + f 
+    
+    print(cfg['models'])
+    
+    validate(cfg, writer, logger, logdir)
+    
     print('done')
     time.sleep(10)
     writer.close()

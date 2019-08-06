@@ -29,7 +29,7 @@ from functools import partial
 from collections import defaultdict
 
 
-def train(cfg, writer, logger, logdir):
+def validate(cfg, writer, logger, logdir):
     # Setup seeds
     torch.manual_seed(cfg.get("seed", 1337))
     torch.cuda.manual_seed(cfg.get("seed", 1337))
@@ -83,9 +83,6 @@ def train(cfg, writer, logger, logdir):
                                   freeze=attr['freeze'],
                                   bins=cfg["bins"]).to(device)
 
-        if "caffemodel" in attr['resume']:
-            models[model].load_pretrained_model(model_path=attr['resume'])
-
         models[model] = torch.nn.DataParallel(models[model], device_ids=range(torch.cuda.device_count()))
 
         # Setup optimizer, lr_scheduler and loss function
@@ -102,7 +99,7 @@ def train(cfg, writer, logger, logdir):
         logger.info("Using loss {}".format(loss_fn))
 
         # Load pretrained weights
-        if str(attr['resume']) is not "None" and not "caffemodel" in attr['resume']:
+        if str(attr['resume']) is not "None":
 
             model_pkl = attr['resume']
             if attr['resume'] == 'same_yaml':
@@ -209,17 +206,20 @@ def train(cfg, writer, logger, logdir):
 
                 for m in cfg["models"].keys():
 
-                    variance[m] = torch.zeros(labels_val.shape)
-                    entropy[m] = torch.zeros(labels_val.shape)
-                    mutual_info[m] = torch.zeros(labels_val.shape)
 
                     if cfg['swa']:
                         mean[m] = swag_models[m](images_val[m])
+                        variance[m] = torch.zeros(mean[m].shape)
+                        entropy[m] = torch.zeros(labels_val.shape)
+                        mutual_info[m] = torch.zeros(labels_val.shape)
                     elif hasattr(models[m].module, 'forwardMCDO'):
                         mean[m], variance[m], entropy[m], mutual_info[m] = models[m].module.forwardMCDO(
                             images_val[m], recalType=cfg["recal"])
                     else:
                         mean[m] = models[m](images_val[m])
+                        variance[m] = torch.zeros(mean[m].shape)
+                        entropy[m] = torch.zeros(labels_val.shape)
+                        mutual_info[m] = torch.zeros(labels_val.shape)
                     val_loss[m] = loss_fn(input=mean[m], target=labels_val)
 
                 # import ipdb;ipdb.set_trace()
@@ -254,12 +254,12 @@ def train(cfg, writer, logger, logdir):
                 gt = labels_val.data.cpu().numpy()
                 # import ipdb;ipdb.set_trace()
                 if i_val % cfg["training"]["png_frames"] == 0:
-                    plotPrediction(logdir, cfg, n_classes, i, i_val, k, inputs_display, pred, gt)
+                    plotPrediction(logdir, cfg, n_classes, i + 1, i_val, k, inputs_display, pred, gt)
                     for m in cfg["models"].keys():
                         plotMeansVariances(logdir, cfg, n_classes, i + 1, i_val, m, k + "/" + m, inputs_display,
                                            pred, gt, mean[m], variance[m])
-                        plotEntropy(logdir, i, i_val, k + "/" + m, pred, entropy[m])
-                        plotMutualInfo(logdir, i, i_val, k + "/" + m, pred, mutual_info[m])
+                        plotEntropy(logdir, i + 1, i_val, k + "/" + m, pred, entropy[m])
+                        plotMutualInfo(logdir, i + 1, i_val, k + "/" + m, pred, mutual_info[m])
 
                 running_metrics_val[k].update(gt, pred)
 
@@ -281,6 +281,7 @@ def train(cfg, writer, logger, logdir):
         for m in cfg["models"].keys():
             val_loss_meter[m][env].reset()
         running_metrics_val[env].reset()
+    
 
 
 if __name__ == "__main__":
@@ -291,6 +292,14 @@ if __name__ == "__main__":
         type=str,
         default="configs/train/rgbd_BayesianSegnet_0.5_T000.yml",
         help="Configuration file to use",
+    )
+    
+    parser.add_argument(
+        "--tag",
+        nargs="?",
+        type=str,
+        default="",
+        help="Unique identifier for different runs",
     )
 
     parser.add_argument(
@@ -310,7 +319,8 @@ if __name__ == "__main__":
         for root, dirs, files in os.walk(args.run):
             for f in files:
                 if '.yml' in f:
-                    path = root+f
+                    path = root + f
+                    args.config = path
 
         with open(path) as fp:
             cfg = defaultdict(lambda: None, yaml.load(fp))
@@ -321,23 +331,39 @@ if __name__ == "__main__":
             for root, dirs, files in os.walk(args.run):
                 for f in files:
                     if m in f and '.pkl' in f:
-                        cfg['models'][m]['resume'] = f
+                        cfg['models'][m]['resume'] = root + f 
 
-
+        logdir = args.run
     else:
         with open(args.config) as fp:
             cfg = defaultdict(lambda: None, yaml.load(fp))
 
-    logdir = os.path.join("runs", cfg['id'])
+        logdir = "/".join(["runs"] + args.config.split("/")[1:])[:-4]
+
+        shutil.copy(args.config, logdir)
+        
+    # generate seed if none present
+    if cfg['seed'] is None:
+        seed = int(time.time())
+        cfg['seed'] = seed
+
+        # modify file to reflect seed
+        with open(path, 'r') as original:
+            data = original.read()
+        with open(path, 'w') as modified:
+            modified.write("seed: {}\n".format(seed) + data)
+
+    # append tag 
+    if args.tag:
+        logdir += "/" + args.tag
     writer = SummaryWriter(logdir)
 
     print("RUNDIR: {}".format(logdir))
-    shutil.copy(args.config, logdir)
-
     logger = get_logger(logdir)
 
-    # baseline train (concatenation, warping baselines)
-    train(cfg, writer, logger, logdir)
+    # validate base model
+    validate(cfg, writer, logger, logdir)
+    
     print('done')
     time.sleep(10)
     writer.close()

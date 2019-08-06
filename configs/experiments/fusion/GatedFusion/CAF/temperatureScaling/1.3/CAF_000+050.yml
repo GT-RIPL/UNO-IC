@@ -50,7 +50,7 @@ training:
     png_frames: 50
     optimizer:
         name: 'adam'
-        lr: 1.0e-7
+        lr: 1.0e-6
     loss:
         name: 'cross_entropy'
         size_average: True

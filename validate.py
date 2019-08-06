@@ -15,16 +15,13 @@ import cv2
 from ptsemseg.models import get_model
 from ptsemseg.loss import get_loss_function
 from ptsemseg.loader import get_loaders
-from ptsemseg.utils import get_logger, parseEightCameras, plotPrediction, plotMeansVariances, plotEntropy, \
-    plotMutualInfo
+from ptsemseg.utils import get_logger, parseEightCameras, plotPrediction, plotMeansVariances, plotEntropy, plotMutualInfo
 from ptsemseg.metrics import runningScore, averageMeter
 from ptsemseg.schedulers import get_scheduler
 from ptsemseg.optimizers import get_optimizer
 from ptsemseg.degredations import *
 
 from tensorboardX import SummaryWriter
-from scipy.misc import imsave
-
 from functools import partial
 from collections import defaultdict
 

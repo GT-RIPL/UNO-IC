@@ -1,4 +1,4 @@
-id: CAFSegnet_T000_v1.3_blackout_training
+id: CAFSegnet_T000_v1.3_blackout_training_tempScaling
 model:
     arch: CAF_segnet
 models:
@@ -15,6 +15,7 @@ models:
 fusion: None #{None,SoftmaxMultiply}
 recal: None #{None,afterMCDO,beforeMCDO}
 recalibrator: None #{Histogram,Polynomial_X}
+temperatureScaling: True
 bins: 20
 data:
     dataset: airsim
@@ -40,12 +41,13 @@ data:
     img_cols: 512
     path: datasets/airsim_data_async #../../ros/data/airsim_03-30-2019/airsim_data_async
     noisy_type: None
+
 training:
-    train_iters: 5000
-    batch_size: 4
-    val_interval: 500
+    train_iters: 10000
+    batch_size: 2
+    val_interval: 1000
     n_workers: 8
-    print_interval: 5
+    print_interval: 10
     png_frames: 50
     optimizer:
         name: 'adam'
@@ -55,4 +57,3 @@ training:
         size_average: True
     lr_schedule:
     resume: None
-

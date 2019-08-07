@@ -10,6 +10,7 @@ models:
         mcdo_passes: 6 # Number of Passes
         dropoutP: 0.5 # Dropout Probability
         resume: models/Segnet/rgb_Segnet/temperatureScaling/rgb_segnet_mcdo_airsim_T000+T050.pkl
+temperatureScaling: True
 fusion: None #{None,SoftmaxMultiply}
 recal: None #{None,afterMCDO,beforeMCDO}
 recalibrator: None #{Histogram,Polynomial_X}

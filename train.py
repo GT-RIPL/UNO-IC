@@ -36,6 +36,12 @@ from ptsemseg.utils import bn_update, mem_report
 
 
 def train(cfg, writer, logger, logdir):
+
+    # log git commit
+    import subprocess
+    label = subprocess.check_output(["git", "describe"]).strip()
+    logger.info("Using commit {}".format(label))
+
     # Setup seeds
     torch.manual_seed(cfg.get("seed", 1337))
     torch.cuda.manual_seed(cfg.get("seed", 1337))
@@ -152,6 +158,7 @@ def train(cfg, writer, logger, logdir):
 
                 # start_iter = 0
                 logger.info("Loaded checkpoint '{}' (iter {})".format(model_pkl, checkpoint["epoch"]))
+
             else:
                 logger.info("No checkpoint found at '{}'".format(model_pkl))
                 print("No checkpoint found at '{}'".format(model_pkl))

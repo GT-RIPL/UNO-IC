@@ -1,4 +1,4 @@
-id: CAFSegnet_T000_v1.0
+id: CAFSegnet_T000_v1.0_tempScaling
 model:
     arch: CAF_segnet
 models:
@@ -12,6 +12,7 @@ models:
         resume_rgb: ./models/Segnet/rgb_Segnet/temperatureScaling/rgb_segnet_mcdo_airsim_T000.pkl
         resume_d: ./models/Segnet/d_Segnet/temperatureScaling/d_segnet_mcdo_airsim_T000.pkl
         fusion_module: 1.0
+temperatureScaling: True
 fusion: None #{None,SoftmaxMultiply}
 recal: None #{None,afterMCDO,beforeMCDO}
 recalibrator: None #{Histogram,Polynomial_X}

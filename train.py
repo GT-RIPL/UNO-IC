@@ -540,6 +540,7 @@ if __name__ == "__main__":
     print('VALIDATING BEST MODEL')
     logdir = logdir + '/best_model/'
     writer = SummaryWriter(logdir)
+    path = shutil.copy(args.config, logdir)
     logger = get_logger(logdir)
     
     # load best model pkl

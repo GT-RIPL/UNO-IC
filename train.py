@@ -543,24 +543,6 @@ if __name__ == "__main__":
 
     train(cfg, writer, logger, logdir)
     
-    # validate best model when done
-    print('VALIDATING BEST MODEL')
-    logdir = logdir + '/best_model/'
-    writer = SummaryWriter(logdir)
-    path = shutil.copy(args.config, logdir)
-    logger = get_logger(logdir)
-    
-    # load best model pkl
-    for m in cfg['models'].keys():
-        for root, dirs, files in os.walk(logdir):
-            for f in files:
-                if m in f and '.pkl' in f:
-                    cfg['models'][m]['resume'] = os.path.join(root, f) 
-    
-    print(cfg['models'])
-    
-    validate(cfg, writer, logger, logdir)
-    
     print('done')
     time.sleep(10)
     writer.close()

@@ -361,6 +361,8 @@ def train(cfg, writer, logger, logdir):
                             writer.add_scalar('loss/val_loss/{}/{}'.format(m, k), val_loss_meter[m][k].avg, i + 1)
                             logger.info("%s %s Iter %d Loss: %.4f" % (m, k, i, val_loss_meter[m][k].avg))
 
+                sum_mean_iou = 0
+
                 for env, valloader in loaders['val'].items():
                     score, class_iou = running_metrics_val[env].get_scores()
                     for k, v in score.items():
@@ -378,6 +380,8 @@ def train(cfg, writer, logger, logdir):
                         mutual_info_meter[m][env].reset()
                     running_metrics_val[env].reset()
 
+                    sum_mean_iou += score["Mean IoU : \t"]
+
                 # save models
                 if i <= cfg["training"]["train_iters"]:
                     
@@ -385,14 +389,13 @@ def train(cfg, writer, logger, logdir):
                         model = models[m]
                         optimizer = optimizers[m]
                         scheduler = schedulers[m]
-                        best_iou = score["Mean IoU : \t"]
 
-                        # save best model
                         if not os.path.exists(writer.file_writer.get_logdir() + "/best_model"):
                             os.makedirs(writer.file_writer.get_logdir() + "/best_model")
-                            
-                        if score["Mean IoU : \t"] >= best_iou:
-                            best_iou = score["Mean IoU : \t"]
+
+                        # save best model (averaging the best overall accuracies on the validation set)
+                        if sum_mean_iou > best_iou:
+                            best_iou = sum_mean_iou
                             state = {
                                 "epoch": i,
                                 "model_state": model.state_dict(),
@@ -429,7 +432,7 @@ def train(cfg, writer, logger, logdir):
                             "model_state": model.state_dict(),
                             "optimizer_state": optimizer.state_dict(),
                             "scheduler_state": scheduler.state_dict(),
-                            "best_iou": best_iou,
+                            "sum_mean_iou": sum_mean_iou,
                         }
                         save_path = os.path.join(writer.file_writer.get_logdir(),
                                                  "{}_{}_{}_best_model.pkl".format(
@@ -442,7 +445,7 @@ def train(cfg, writer, logger, logdir):
                             state = {
                                 "epoch": i,
                                 "model_state": swag_models[m].state_dict(),
-                                "best_iou": best_iou,
+                                "sum_mean_iou": sum_mean_iou,
                             }
                             save_path = os.path.join(writer.file_writer.get_logdir(),
                                                      "{}_{}_{}_swag.pkl".format(

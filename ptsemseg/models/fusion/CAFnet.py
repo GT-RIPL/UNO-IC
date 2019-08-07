@@ -70,6 +70,7 @@ class CAFnet(nn.Module):
 
     def forward(self, inputs):
 
+        # TODO test if this makes a difference
         # self.rgb_segnet.eval()
         # self.d_segnet.eval()
 

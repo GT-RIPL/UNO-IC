@@ -39,7 +39,7 @@ def train(cfg, writer, logger, logdir):
 
     # log git commit
     import subprocess
-    label = subprocess.check_output(["git", "describe"]).strip()
+    label = subprocess.check_output(["git", "describe", "--always"]).strip()
     logger.info("Using commit {}".format(label))
 
     # Setup seeds

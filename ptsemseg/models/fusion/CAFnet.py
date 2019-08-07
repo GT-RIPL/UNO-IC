@@ -69,7 +69,10 @@ class CAFnet(nn.Module):
             raise NotImplementedError
 
     def forward(self, inputs):
-    
+
+        # self.rgb_segnet.eval()
+        # self.d_segnet.eval()
+
         inputs_rgb = inputs[:, :3, :, :]
         inputs_d = inputs[:, 3:, :, :]
 

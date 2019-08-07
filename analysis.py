@@ -37,12 +37,6 @@ for i, file in enumerate(glob.glob("./runs/**/*tfevents*", recursive=True)):
     if not any([i in directory for i in include] + [m == directory.split("/")[-1] for m in match]):
         continue
 
-    # distinguish between best_model validations and full runs
-    if args.best and 'best' not in directory:
-        continue
-    elif 'best' in directory:
-        continue
-
     name = configs['id']
     # if any([e==name for e in exclude]):
     #     continue

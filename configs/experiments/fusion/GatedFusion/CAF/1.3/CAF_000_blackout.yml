@@ -55,4 +55,3 @@ training:
         size_average: True
     lr_schedule:
     resume: None
-

@@ -310,7 +310,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # cfg is a  with two-level dictionary ['training','data','model']['batch_size']
-    if len(args.run) > 0:
+    if args.run != "":
 
         # find and load config
         for root, dirs, files in os.walk(args.run):
@@ -324,21 +324,28 @@ if __name__ == "__main__":
 
         # find and load saved best models
         for m in cfg['models'].keys():
-
             for root, dirs, files in os.walk(args.run):
                 for f in files:
                     if m in f and '.pkl' in f:
-                        cfg['models'][m]['resume'] = root + f 
+                        cfg['models'][m]['resume'] = root + f
 
         logdir = args.run
+
     else:
         with open(args.config) as fp:
             cfg = defaultdict(lambda: None, yaml.load(fp))
 
         logdir = "/".join(["runs"] + args.config.split("/")[1:])[:-4]
 
-        shutil.copy(args.config, logdir)
-        
+        # append tag
+        if args.tag:
+            logdir += "/" + args.tag
+
+    # baseline train (concatenation, warping baselines)
+    writer = SummaryWriter(logdir)
+    path = shutil.copy(args.config, logdir)
+    logger = get_logger(logdir)
+
     # generate seed if none present
     if cfg['seed'] is None:
         seed = int(time.time())
@@ -349,14 +356,6 @@ if __name__ == "__main__":
             data = original.read()
         with open(path, 'w') as modified:
             modified.write("seed: {}\n".format(seed) + data)
-
-    # append tag 
-    if args.tag:
-        logdir += "/" + args.tag
-    writer = SummaryWriter(logdir)
-
-    print("RUNDIR: {}".format(logdir))
-    logger = get_logger(logdir)
 
     # validate base model
     validate(cfg, writer, logger, logdir)

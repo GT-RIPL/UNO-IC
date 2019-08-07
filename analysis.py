@@ -115,16 +115,11 @@ if baselines:
 for k, v in runs.items():
     c = v['raw_config']
 
+    import random
     v['std_config'] = {}
     v['std_config']['size'] = "{}x{}".format(c['data']['img_rows'], c['data']['img_cols'])
     v['std_config']['id'] = v['raw_config']['id']
-    v['std_config']['pretty'] = v['raw_config']['id']
-
-    # Extract comments for run
-    v['std_config']['comments'] = "comments"
-    v['std_config']['run_group'] = 'rungroup'
-
-    model = list(c['models'].keys())[0]
+    v['std_config']['pretty'] = v['raw_config']['id'] + "_" + str(random.random())
 
 scopes = ["Mean_Acc____"] \
     # + ["Mean_IoU____"] \
@@ -141,6 +136,8 @@ for run in runs.keys():
     name = ", ".join(["{}{}".format(k, v) for k, v in conditions.items()])
 
     # find iteration with the best overall validation accuracies
+    best_iter = -1
+    best_value = -1
     if best:
         scores = defaultdict(float)
         for full in [k for k in runs[run].keys() if "config" not in k]:
@@ -157,8 +154,6 @@ for run in runs.keys():
             for i, v in enumerate(runs[run][full]['value']):
                 scores[i] += v
 
-        best_iter = -1
-        best_value = -1
         for i, v in scores.items():
             if best_value < v:
                 best_iter = i

@@ -535,7 +535,7 @@ if __name__ == "__main__":
     
     # validate best model when done
     print('VALIDATING BEST MODEL')
-    logdir = logdir + '/best_model'
+    logdir = logdir + '/best_model/'
     writer = SummaryWriter(logdir)
     logger = get_logger(logdir)
     
@@ -544,7 +544,7 @@ if __name__ == "__main__":
         for root, dirs, files in os.walk(logdir):
             for f in files:
                 if m in f and '.pkl' in f:
-                    cfg['models'][m]['resume'] = root + f 
+                    cfg['models'][m]['resume'] = os.path.join(root, f) 
     
     print(cfg['models'])
     

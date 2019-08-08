@@ -49,10 +49,10 @@ class CAFnet(nn.Module):
             self.loadModel(self.d_segnet, resume_d)
 
         # freeze segnet networks
-        # for param in self.rgb_segnet.parameters():
-            # param.requires_grad = False
-        # for param in self.d_segnet.parameters():
-            # param.requires_grad = False
+        for param in self.rgb_segnet.parameters():
+            param.requires_grad = False
+        for param in self.d_segnet.parameters():
+            param.requires_grad = False
         
         print(fusion_module)
         if fusion_module == "GatedFusion" or str(fusion_module) == '1.0':
@@ -70,9 +70,9 @@ class CAFnet(nn.Module):
 
     def forward(self, inputs):
 
-        # TODO test if this makes a difference
-        # self.rgb_segnet.eval()
-        # self.d_segnet.eval()
+        # Freeze batchnorm
+        self.rgb_segnet.eval()
+        self.d_segnet.eval()
 
         inputs_rgb = inputs[:, :3, :, :]
         inputs_d = inputs[:, 3:, :, :]

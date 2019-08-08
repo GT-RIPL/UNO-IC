@@ -191,6 +191,9 @@ class segnet_mcdo(nn.Module):
 
     def forwardMCDO(self, inputs, recalType="None", softmax=False):
 
+        # print(self.layers["up1"])
+        print(self.temperatureScaling, self.temperature)
+
         for i in range(self.mcdo_passes):
             if i == 0:
                 x_bp = self.forward(inputs)

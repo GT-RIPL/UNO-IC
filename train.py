@@ -210,8 +210,10 @@ def train(cfg, writer, logger, logdir):
 
                 loss[m] = loss_fn(input=outputs[m], target=labels)
                 loss[m].backward()
+                print(models[m].module.rgb_segnet.module.temperature.grad)
+                import ipdb; ipdb.set_trace()
+                
                 optimizers[m].step()
-
             time_meter.update(time.time() - start_ts)
             if (i + 1) % cfg['training']['print_interval'] == 0:
                 for m in cfg["models"].keys():

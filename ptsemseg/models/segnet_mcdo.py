@@ -174,7 +174,7 @@ class segnet_mcdo(nn.Module):
             up1 = self.layers["up1"](up2, indices_1, unpool_shape1)
 
         if self.temperatureScaling:
-            up1 = up1 / self.temperature
+            up1 = up1 / (self.temperature + 1e-5)
 
         return up1
 
@@ -190,9 +190,6 @@ class segnet_mcdo(nn.Module):
         return x
 
     def forwardMCDO(self, inputs, recalType="None", softmax=False):
-
-        # print(self.layers["up1"])
-        print(self.temperatureScaling, self.temperature)
 
         for i in range(self.mcdo_passes):
             if i == 0:

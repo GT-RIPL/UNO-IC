@@ -1,3 +1,4 @@
+seed: 1337
 id: rgb_BayesianSegnet+robustness
 model:
     arch: segnet_mcdo
@@ -93,6 +94,6 @@ training:
         lr: 1.0e-5
     loss:
         name: 'cross_entropy'
-        size_average: False
+        size_average: True
     lr_schedule:
     resume: None

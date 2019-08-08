@@ -38,6 +38,9 @@ class CAFnet(nn.Module):
                                     mcdo_passes, dropoutP, full_mcdo, start_layer,
                                     end_layer, reduction, device, recalibrator, temperatureScaling, bins)
 
+        self.rgb_scaling = torch.nn.Parameter(torch.ones(1))
+        self.d_scaling = torch.nn.Parameter(torch.ones(1))
+
         self.rgb_segnet = torch.nn.DataParallel(self.rgb_segnet, device_ids=range(torch.cuda.device_count()))
         self.d_segnet = torch.nn.DataParallel(self.d_segnet, device_ids=range(torch.cuda.device_count()))
 
@@ -49,10 +52,10 @@ class CAFnet(nn.Module):
             self.loadModel(self.d_segnet, resume_d)
 
         # freeze segnet networks
-        # for param in self.rgb_segnet.parameters():
-            # param.requires_grad = False
-        # for param in self.d_segnet.parameters():
-            # param.requires_grad = False
+        for param in self.rgb_segnet.parameters():
+            param.requires_grad = False
+        for param in self.d_segnet.parameters():
+            param.requires_grad = False
         
         print(fusion_module)
         if fusion_module == "GatedFusion" or str(fusion_module) == '1.0':
@@ -71,8 +74,8 @@ class CAFnet(nn.Module):
     def forward(self, inputs):
 
         # Freeze batchnorm
-        self.rgb_segnet.eval()
-        self.d_segnet.eval()
+        # self.rgb_segnet.eval()
+        # self.d_segnet.eval()
 
         inputs_rgb = inputs[:, :3, :, :]
         inputs_d = inputs[:, 3:, :, :]
@@ -84,6 +87,9 @@ class CAFnet(nn.Module):
         
         var_rgb = torch.mean(var_rgb, 1).view(-1, 1, s[2], s[3])
         var_d = torch.mean(var_d, 1).view(-1, 1, s[2], s[3]) 
+        
+        # mean_d = mean_d / self.d_scaling
+        # mean_rgb = mean_rgb / self.rgb_scaling
 
         x = self.gatedFusion(mean_rgb, mean_d, var_rgb, var_d)
 

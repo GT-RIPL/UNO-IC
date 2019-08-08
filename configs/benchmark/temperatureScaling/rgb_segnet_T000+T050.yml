@@ -1,4 +1,4 @@
-id: rgb_BayesianSegnet_T000+T050temperatureScaling/
+id: rgb_BayesianSegnet_T000+T050_temperatureScaling
 model:
     arch: segnet_mcdo
 models:

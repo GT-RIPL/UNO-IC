@@ -1,4 +1,5 @@
-id: d_BayesianSegnet_0.5_000+050
+seed: 1337
+id: d_BayesianSegnet_0.5_T000+T050
 model:
     arch: segnet_mcdo
 models:
@@ -38,9 +39,9 @@ data:
     path: datasets/airsim_data_async #../../ros/data/airsim_03-30-2019/airsim_data_async
     noisy_type: None 
 training:
-    train_iters: 200000
+    train_iters: 300000
     batch_size: 2
-    val_interval: 10000 #5000
+    val_interval: 50000 #5000
     n_workers: 8
     print_interval: 50
     png_frames: 50 #5000
@@ -49,6 +50,6 @@ training:
         lr: 1.0e-5
     loss:
         name: 'cross_entropy'
-        size_average: False
+        size_average: True
     lr_schedule:
     resume: None

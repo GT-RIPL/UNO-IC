@@ -1,4 +1,5 @@
-id: BayesianSegnet_tempScaling_T000
+seed: 1337
+id: rgb_BayesianSegnet_tempScaling_T000+T050
 model:
     arch: segnet_mcdo
 models:
@@ -9,18 +10,6 @@ models:
         reduction: 1.0
         mcdo_passes: 6 # Number of Passes
         dropoutP: 0.5 # Dropout Probability
-        resume: ./runs/train/tempScaling/rgb/tempScaling_000+050.yml/rgb_segnet_mcdo_airsim_best_model.pkl
-    #d:
-    #    in_channels: 3
-    #    start_layer: down1
-    #    end_layer: up1
-    #    reduction: 1.0
-    #    mcdo_passes: 6
-    #    mask_dir: models/DropoutMasks/Random 
-    #    masks: [0,1,2,3,4,5] 
-    #    fixed_mcdo: No
-    #    dropoutP: 0.5
-    #    resume: None
 fusion: None #{None,SoftmaxMultiply}
 recal: None #{None,afterMCDO,beforeMCDO}
 recalibrator: None #{Histogram,Polynomial_X}
@@ -51,9 +40,9 @@ data:
     path: datasets/airsim_data_async #../../ros/data/airsim_03-30-2019/airsim_data_async
     noisy_type: None 
 training:
-    train_iters: 150000
+    train_iters: 300000
     batch_size: 2
-    val_interval: 10000
+    val_interval: 50000
     n_workers: 8
     print_interval: 50
     png_frames: 50
@@ -62,6 +51,6 @@ training:
         lr: 1.0e-5
     loss:
         name: 'cross_entropy'
-        size_average: False
+        size_average: True
     lr_schedule:
     resume: None

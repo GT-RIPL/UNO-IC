@@ -1,3 +1,4 @@
+seed: 1337
 id: rgb_Tempnet
 model:
     arch: tempnet

@@ -49,10 +49,10 @@ class CAFnet(nn.Module):
             self.loadModel(self.d_segnet, resume_d)
 
         # freeze segnet networks
-        for param in self.rgb_segnet.parameters():
-            param.requires_grad = False
-        for param in self.d_segnet.parameters():
-            param.requires_grad = False
+        # for param in self.rgb_segnet.parameters():
+            # param.requires_grad = False
+        # for param in self.d_segnet.parameters():
+            # param.requires_grad = False
         
         print(fusion_module)
         if fusion_module == "GatedFusion" or str(fusion_module) == '1.0':

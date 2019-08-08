@@ -190,13 +190,13 @@ class segnet_mcdo(nn.Module):
         return x
 
     def forwardMCDO(self, inputs, recalType="None", softmax=False):
-
-        for i in range(self.mcdo_passes):
-            if i == 0:
-                x_bp = self.forward(inputs)
-                x = x_bp.unsqueeze(-1)
-            else:
-                x = torch.cat((x, self.forward(inputs).unsqueeze(-1)), -1)
+        with torch.no_grad():
+            for i in range(self.mcdo_passes):
+                if i == 0:
+                    x_bp = self.forward(inputs)
+                    x = x_bp.unsqueeze(-1)
+                else:
+                    x = torch.cat((x, self.forward(inputs).unsqueeze(-1)), -1)
 
         mean = x.mean(-1)
         variance = x.std(-1)
@@ -222,6 +222,8 @@ class segnet_mcdo(nn.Module):
         # entropy = predictive_entropy(prob)
         # mutual_info = mutul_information(prob)
         entropy, mutual_info = mutualinfo_entropy(prob)  # (2,512,512)
+        
+        
         return mean, variance, entropy, mutual_info
 
     def applyCalibration(self, output):

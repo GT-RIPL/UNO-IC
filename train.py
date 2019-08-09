@@ -71,9 +71,11 @@ def train(cfg, writer, logger, logdir):
     swag_models = {}
     optimizers = {}
     schedulers = {}
-
+    best_iou = {}
     # Setup Model
     for model, attr in cfg['models'].items():
+    
+        best_iou[model] = -100.0
 
         attr = defaultdict(lambda: None, attr)
 
@@ -138,6 +140,8 @@ def train(cfg, writer, logger, logdir):
 
                 pretrained_dict = checkpoint['model_state']
                 model_dict = models[model].state_dict()
+                
+                best_iou[model] = checkpoint['mean_iou']
 
                 # 1. filter out unnecessary keys
                 pretrained_dict = {k: v.resize_(model_dict[k].shape) for k, v in pretrained_dict.items() if (
@@ -172,8 +176,12 @@ def train(cfg, writer, logger, logdir):
                 logger.info("No checkpoint found at '{}'".format(model_pkl))
                 print("No checkpoint found at '{}'".format(model_pkl))
                 exit()
+                
+        # set temperature if not a fusion model
+        if not hasattr(models[model].module, 'loadModel'):
+            models[model] = ModelWithTemperature(models[model])
+            models[model].set_temperature(loaders['recal'])
 
-    best_iou = -100.0
     i = start_iter
     print("Beginning Training at iteration: {}".format(i))
     while i < cfg["training"]["train_iters"]:
@@ -368,7 +376,7 @@ def train(cfg, writer, logger, logdir):
                             writer.add_scalar('loss/val_loss/{}/{}'.format(m, k), val_loss_meter[m][k].avg, i + 1)
                             logger.info("%s %s Iter %d Loss: %.4f" % (m, k, i, val_loss_meter[m][k].avg))
 
-                sum_mean_iou = 0
+                mean_iou = 0
 
                 for env, valloader in loaders['val'].items():
                     score, class_iou = running_metrics_val[env].get_scores()
@@ -387,7 +395,9 @@ def train(cfg, writer, logger, logdir):
                         mutual_info_meter[m][env].reset()
                     running_metrics_val[env].reset()
 
-                    sum_mean_iou += score["Mean IoU : \t"]
+                    mean_iou += score["Mean IoU : \t"]
+
+                mean_iou /= len(loaders['val'])
 
                 # save models
                 if i <= cfg["training"]["train_iters"]:
@@ -401,14 +411,14 @@ def train(cfg, writer, logger, logdir):
                             os.makedirs(writer.file_writer.get_logdir() + "/best_model")
 
                         # save best model (averaging the best overall accuracies on the validation set)
-                        if sum_mean_iou > best_iou:
-                            best_iou = sum_mean_iou
+                        if sum_mean_iou > best_iou[m]:
+                            best_iou[m] = mean_iou
                             state = {
                                 "epoch": i,
                                 "model_state": model.state_dict(),
                                 "optimizer_state": optimizer.state_dict(),
                                 "scheduler_state": scheduler.state_dict(),
-                                "best_iou": best_iou,
+                                "mean_iou": mean_iou,
                             }
                             save_path = os.path.join(writer.file_writer.get_logdir(),
                                                      "best_model",
@@ -422,7 +432,7 @@ def train(cfg, writer, logger, logdir):
                                 state = {
                                     "epoch": i,
                                     "model_state": swag_models[m].state_dict(),
-                                    "best_iou": best_iou,
+                                    "mean_iou": mean_iou,
                                 }
                                 save_path = os.path.join(writer.file_writer.get_logdir(),
                                                          "best_model",
@@ -439,7 +449,7 @@ def train(cfg, writer, logger, logdir):
                             "model_state": model.state_dict(),
                             "optimizer_state": optimizer.state_dict(),
                             "scheduler_state": scheduler.state_dict(),
-                            "sum_mean_iou": sum_mean_iou,
+                            "mean_iou": mean_iou,
                         }
                         save_path = os.path.join(writer.file_writer.get_logdir(),
                                                  "{}_{}_{}_best_model.pkl".format(
@@ -452,7 +462,7 @@ def train(cfg, writer, logger, logdir):
                             state = {
                                 "epoch": i,
                                 "model_state": swag_models[m].state_dict(),
-                                "sum_mean_iou": sum_mean_iou,
+                                "mean_iou": mean_iou,
                             }
                             save_path = os.path.join(writer.file_writer.get_logdir(),
                                                      "{}_{}_{}_swag.pkl".format(

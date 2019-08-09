@@ -10,6 +10,7 @@ models:
         mcdo_passes: 6 # Number of Passes
         dropoutP: 0.5 # Dropout Probability
         resume: models/Segnet/rgb_Segnet/rgb_segnet_mcdo_airsim_T000+T050.pkl
+        # resume: models/Segnet/rgb_Segnet/temperatureScaling/rgb_segnet_mcdo_airsim_T000+T050.pkl
     d:
         in_channels: 3
         start_layer: down1
@@ -18,7 +19,7 @@ models:
         mcdo_passes: 6
         dropoutP: 0.5
         resume: models/Segnet/d_Segnet/d_segnet_mcdo_airsim_T000+T050.pkl
-fusion: SoftmaxMultiply #{None,SoftmaxMultiply}
+        # resume: models/Segnet/d_Segnet/temperatureScaling/d_segnet_mcdo_airsim_T000+T050.pkl
 recal: None #{None,afterMCDO,beforeMCDO}
 recalibrator: None #{Histogram,Polynomial_X}
 bins: 20
@@ -37,12 +38,6 @@ data:
                    'async_fog_100_clear',
                    "async_fog_100_clear__{'channel':'rgb','type':'blackoutNoise','value':'20'}",
                    "async_fog_100_clear__{'channel':'d','type':'blackoutNoise','value':'20'}",
-                   "async_fog_100_clear__{'channel':'rgbd','type':'blackoutNoise','value':'20'}",
-                   "async_fog_100_clear__{'channel':'rgbd','type':'gaussianNoise','value':'3'}",
-                   "async_fog_100_clear__{'channel':'rgbd','type':'shotNoise','value':'3'}",
-                   "async_fog_100_clear__{'channel':'rgbd','type':'impulseNoise','value':'3'}",
-                   "async_fog_100_clear__{'channel':'rgb','type':'brightness','value':'3'}",
-                   "async_fog_100_clear__{'channel':'rgb','type':'motionBlur','value':'3'}",                   
                   ]    
     val_reduction: 1.0
     img_rows: 512

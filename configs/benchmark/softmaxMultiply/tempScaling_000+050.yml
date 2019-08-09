@@ -30,7 +30,7 @@ data:
     train_reduction: 1.0    
     recal_split: recal
     recal_subsplit: ['async_fog_000_clear']
-    recal_reduction: 0.2
+    recal_reduction: 0.5
     val_split: val
     val_subsplit: [
                    'async_fog_000_clear',

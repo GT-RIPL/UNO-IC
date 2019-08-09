@@ -3,27 +3,15 @@ import torch.nn as nn
 import numpy as np
 import torch.nn.functional as F
 
-
-class ScaledMultiply(nn.Module):
-    def __init__(self, n_classes):
-        super(ScaledMultiply, self).__init__()
-
-        
-
-    def forward(self, rgb, d, rgb_var, d_var):
-
-        
-
-        return P_fusion
-
 class ScaledAverage(nn.Module):
     def __init__(self, n_classes):
         super(ScaledAverage, self).__init__()
-
+        self.rgb_scaling = torch.nn.Parameter(torch.ones(1))
+        self.d_scaling = torch.nn.Parameter(torch.ones(1))
 
     def forward(self, rgb, d, rgb_var, d_var):
 
-        return P_fusion
+        return rgb * self.rgb_scaling + d + self.d_scaling
 
 class GatedFusion(nn.Module):
     def __init__(self, n_classes):

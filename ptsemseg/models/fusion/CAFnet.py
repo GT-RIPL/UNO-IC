@@ -38,9 +38,6 @@ class CAFnet(nn.Module):
                                     mcdo_passes, dropoutP, full_mcdo, start_layer,
                                     end_layer, reduction, device, recalibrator, temperatureScaling, bins)
 
-        # self.rgb_scaling = torch.nn.Parameter(torch.ones(1))
-        # self.d_scaling = torch.nn.Parameter(torch.ones(1))
-
         self.rgb_segnet = torch.nn.DataParallel(self.rgb_segnet, device_ids=range(torch.cuda.device_count()))
         self.d_segnet = torch.nn.DataParallel(self.d_segnet, device_ids=range(torch.cuda.device_count()))
 
@@ -74,10 +71,7 @@ class CAFnet(nn.Module):
         s = var_rgb.shape
         
         var_rgb = torch.mean(var_rgb, 1).view(-1, 1, s[2], s[3])
-        var_d = torch.mean(var_d, 1).view(-1, 1, s[2], s[3]) 
-        
-        # mean_d = mean_d / self.d_scaling
-        # mean_rgb = mean_rgb / self.rgb_scaling
+        var_d = torch.mean(var_d, 1).view(-1, 1, s[2], s[3])
 
         x = self.fusion(mean_rgb, mean_d, var_rgb, var_d)
 

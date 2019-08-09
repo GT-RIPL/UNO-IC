@@ -176,11 +176,7 @@ def train(cfg, writer, logger, logdir):
                 logger.info("No checkpoint found at '{}'".format(model_pkl))
                 print("No checkpoint found at '{}'".format(model_pkl))
                 exit()
-                
-        # set temperature if not a fusion model
-        if not hasattr(models[model].module, 'loadModel'):
-            models[model] = ModelWithTemperature(models[model])
-            models[model].set_temperature(loaders['recal'])
+
 
     i = start_iter
     print("Beginning Training at iteration: {}".format(i))
@@ -411,7 +407,7 @@ def train(cfg, writer, logger, logdir):
                             os.makedirs(writer.file_writer.get_logdir() + "/best_model")
 
                         # save best model (averaging the best overall accuracies on the validation set)
-                        if sum_mean_iou > best_iou[m]:
+                        if mean_iou > best_iou[m]:
                             best_iou[m] = mean_iou
                             state = {
                                 "epoch": i,

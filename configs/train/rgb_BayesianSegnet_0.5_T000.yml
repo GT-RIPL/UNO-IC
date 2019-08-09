@@ -48,7 +48,7 @@ data:
                    "async_fog_100_clear__{'channel':'d','type':'blackoutNoise','value':'20'}",
                    "async_fog_100_clear__{'channel':'rgbd','type':'blackoutNoise','value':'20'}",
                   ]    
-    val_reduction: 1.0
+    val_reduction: 0.5
     img_rows: 512
     img_cols: 512
     path: datasets/airsim_data_async #../../ros/data/airsim_03-30-2019/airsim_data_async

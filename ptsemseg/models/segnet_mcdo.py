@@ -199,20 +199,20 @@ class segnet_mcdo(nn.Module):
                     x = torch.cat((x, self.forward(inputs).unsqueeze(-1)), -1)
 
         mean = x.mean(-1)
-        variance = x.std(-1)
+        variance = x.var(-1)
 
         # Uncalibrated Softmax Mean and Variance
         if recalType != "None":
 
             mean = self.softmaxMCDO(x).mean(-1)
-            variance = self.softmaxMCDO(x).std(-1)
+            variance = self.softmaxMCDO(x).var(-1)
 
             if recalType == "beforeMCDO":
                 for c in range(self.n_classes):
                     x[:, c, :, :, :] = self.calibrationPerClass[c].predict(x[:, c, :, :, :].reshape(-1)).reshape(
                         x[:, c, :, :, :].shape)
                 mean = self.softmaxMCDO(x).mean(-1)
-                variance = self.softmaxMCDO(x).std(-1)
+                variance = self.softmaxMCDO(x).var(-1)
             elif recalType == "afterMCDO":
                 for c in range(self.n_classes):
                     mean[:, c, :, :] = self.calibrationPerClass[c].predict(mean[:, c, :, :].reshape(-1)).reshape(

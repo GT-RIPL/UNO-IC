@@ -43,10 +43,10 @@ def train(cfg, writer, logger, logdir):
     logger.info("Using commit {}".format(label))
 
     # Setup seeds
-    torch.manual_seed(cfg.get("seed", 1337))
-    torch.cuda.manual_seed(cfg.get("seed", 1337))
-    np.random.seed(cfg.get("seed", 1337))
-    random.seed(cfg.get("seed", 1337))
+    torch.manual_seed(1337)
+    torch.cuda.manual_seed(1337)
+    np.random.seed(1337)
+    random.seed(1337)
 
     # Setup device
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -66,6 +66,12 @@ def train(cfg, writer, logger, logdir):
     mutual_info_meter = {m: {env: averageMeter() for env in loaders['val'].keys()} for m in cfg["models"].keys()}
     time_meter = averageMeter()
 
+    # set seeds for training
+    torch.manual_seed(cfg.get("seed"))
+    torch.cuda.manual_seed(cfg.get("seed"))
+    np.random.seed(cfg.get("seed"))
+    random.seed(cfg.get("seed"))
+
     start_iter = 0
     models = {}
     swag_models = {}
@@ -74,7 +80,7 @@ def train(cfg, writer, logger, logdir):
     best_iou = {}
     # Setup Model
     for model, attr in cfg['models'].items():
-    
+
         best_iou[model] = -100.0
 
         attr = defaultdict(lambda: None, attr)
@@ -140,7 +146,7 @@ def train(cfg, writer, logger, logdir):
 
                 pretrained_dict = checkpoint['model_state']
                 model_dict = models[model].state_dict()
-                
+
                 best_iou[model] = checkpoint['mean_iou']
 
                 # 1. filter out unnecessary keys
@@ -177,7 +183,6 @@ def train(cfg, writer, logger, logdir):
                 print("No checkpoint found at '{}'".format(model_pkl))
                 exit()
 
-
     i = start_iter
     print("Beginning Training at iteration: {}".format(i))
     while i < cfg["training"]["train_iters"]:
@@ -189,7 +194,7 @@ def train(cfg, writer, logger, logdir):
         for (input_list, labels_list) in loaders['train']:
 
             i += 1
-            
+
             inputs, labels = parseEightCameras(input_list['rgb'], labels_list, input_list['d'], device)
 
             # Read batch from only one camera
@@ -214,7 +219,7 @@ def train(cfg, writer, logger, logdir):
 
                 loss[m] = loss_fn(input=outputs[m], target=labels)
                 loss[m].backward()
-                
+
                 optimizers[m].step()
             time_meter.update(time.time() - start_ts)
             if (i + 1) % cfg['training']['print_interval'] == 0:
@@ -397,7 +402,7 @@ def train(cfg, writer, logger, logdir):
 
                 # save models
                 if i <= cfg["training"]["train_iters"]:
-                    
+
                     for m in optimizers.keys():
                         model = models[m]
                         optimizer = optimizers[m]
@@ -471,6 +476,7 @@ def train(cfg, writer, logger, logdir):
             if i >= cfg["training"]["train_iters"]:
                 break
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="config")
     parser.add_argument(
@@ -480,7 +486,7 @@ if __name__ == "__main__":
         default="configs/train/rgbd_BayesianSegnet_0.5_T000.yml",
         help="Configuration file to use",
     )
-    
+
     parser.add_argument(
         "--tag",
         nargs="?",
@@ -517,25 +523,25 @@ if __name__ == "__main__":
             for root, dirs, files in os.walk(args.run):
                 for f in files:
                     if m in f and '.pkl' in f:
-                        cfg['models'][m]['resume'] = root + f 
+                        cfg['models'][m]['resume'] = root + f
 
         logdir = args.run
-        
+
     else:
         with open(args.config) as fp:
             cfg = defaultdict(lambda: None, yaml.load(fp))
 
         logdir = "/".join(["runs"] + args.config.split("/")[1:])[:-4]
-        
+
         # append tag 
         if args.tag:
             logdir += "/" + args.tag
-        
+
     # baseline train (concatenation, warping baselines)
     writer = SummaryWriter(logdir)
     path = shutil.copy(args.config, logdir)
     logger = get_logger(logdir)
-    
+
     # generate seed if none present
     if cfg['seed'] is None:
         seed = int(time.time())
@@ -548,7 +554,7 @@ if __name__ == "__main__":
             modified.write("seed: {}\n".format(seed) + data)
 
     train(cfg, writer, logger, logdir)
-    
+
     print('done')
     time.sleep(10)
     writer.close()

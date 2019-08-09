@@ -114,6 +114,5 @@ class CAFnet(nn.Module):
             "1.3": UncertaintyGatedFusion,
             "ConditionalAttentionFusionv2": ConditionalAttentionFusionv2,
             "2.1": ConditionalAttentionFusionv2,
-            "ScaledMultiply": ScaledMultiply,
             "ScaledAverage": ScaledAverage,
         }[name]

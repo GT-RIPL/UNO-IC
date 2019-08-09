@@ -77,11 +77,9 @@ def train(cfg, writer, logger, logdir):
     swag_models = {}
     optimizers = {}
     schedulers = {}
-    best_iou = {}
+    best_iou = -100.0
     # Setup Model
     for model, attr in cfg['models'].items():
-
-        best_iou[model] = -100.0
 
         attr = defaultdict(lambda: None, attr)
 
@@ -147,7 +145,7 @@ def train(cfg, writer, logger, logdir):
                 pretrained_dict = checkpoint['model_state']
                 model_dict = models[model].state_dict()
 
-                best_iou[model] = checkpoint['mean_iou']
+                best_iou = checkpoint['mean_iou']
 
                 # 1. filter out unnecessary keys
                 pretrained_dict = {k: v.resize_(model_dict[k].shape) for k, v in pretrained_dict.items() if (
@@ -403,6 +401,8 @@ def train(cfg, writer, logger, logdir):
                 # save models
                 if i <= cfg["training"]["train_iters"]:
 
+                    print("best iou so far: {}, current iou: {}".format(best_iou, mean_iou))
+
                     for m in optimizers.keys():
                         model = models[m]
                         optimizer = optimizers[m]
@@ -412,8 +412,9 @@ def train(cfg, writer, logger, logdir):
                             os.makedirs(writer.file_writer.get_logdir() + "/best_model")
 
                         # save best model (averaging the best overall accuracies on the validation set)
-                        if mean_iou > best_iou[m]:
-                            best_iou[m] = mean_iou
+                        if mean_iou > best_iou:
+                            print('SAVING BEST MODEL')
+                            best_iou = mean_iou
                             state = {
                                 "epoch": i,
                                 "model_state": model.state_dict(),

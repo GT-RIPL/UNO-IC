@@ -1,7 +1,7 @@
 import torch.nn as nn
 from torch.autograd import Variable
 
-from .fusion import GatedFusion, PreweightedGatedFusion, ConditionalAttentionFusion, UncertaintyGatedFusion, ConditionalAttentionFusionv2
+from .fusion import *
 from ptsemseg.models.recalibrator import *
 from ptsemseg.models.segnet_mcdo import *
 
@@ -57,19 +57,7 @@ class CAFnet(nn.Module):
         for param in self.d_segnet.parameters():
             param.requires_grad = False
         
-        print(fusion_module)
-        if fusion_module == "GatedFusion" or str(fusion_module) == '1.0':
-            self.gatedFusion = GatedFusion(n_classes)
-        elif fusion_module == "ConditionalAttentionFusion" or str(fusion_module) == '1.1':
-            self.gatedFusion = ConditionalAttentionFusion(n_classes)
-        elif fusion_module == "PreweightGatedFusion" or str(fusion_module) == '1.2':
-            self.gatedFusion = PreweightedGatedFusion(n_classes)
-        elif fusion_module == "UncertaintyGatedFusion" or str(fusion_module) == '1.3':
-            self.gatedFusion = UncertaintyGatedFusion(n_classes)
-        elif fusion_module == "ConditionalAttentionFusionv2" or str(fusion_module) == '2.1':
-            self.gatedFusion = ConditionalAttentionFusionv2(n_classes)
-        else:
-            raise NotImplementedError
+        self.fusion = self._get_fusion_module[fusion_module]
 
     def forward(self, inputs):
 
@@ -91,7 +79,7 @@ class CAFnet(nn.Module):
         # mean_d = mean_d / self.d_scaling
         # mean_rgb = mean_rgb / self.rgb_scaling
 
-        x = self.gatedFusion(mean_rgb, mean_d, var_rgb, var_d)
+        x = self.fusion(mean_rgb, mean_d, var_rgb, var_d)
 
         return x
 
@@ -115,3 +103,21 @@ class CAFnet(nn.Module):
         else:
             print("model not found")
             exit()
+            
+    def _get_fusion_module(self, name):
+        
+        return {
+            "GatedFusion": GatedFusion,
+            "1.0": GatedFusion,
+            "ConditionalAttentionFusion": ConditionalAttentionFusion,
+            "1.1": ConditionalAttentionFusion,
+
+            "PreweightedGatedFusion": PreweightedGatedFusion,
+            "1.2": PreweightedGatedFusion,
+            "UncertaintyGatedFusion": UncertaintyGatedFusion,
+            "1.3": UncertaintyGatedFusion,
+            "ConditionalAttentionFusionv2": ConditionalAttentionFusionv2,
+            "2.1": ConditionalAttentionFusionv2,
+            "ScaledMultiply": ScaledMultiply,
+            "ScaledAverage": ScaledAverage,
+        }[name]

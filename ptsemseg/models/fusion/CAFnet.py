@@ -105,7 +105,9 @@ class CAFnet(nn.Module):
             exit()
             
     def _get_fusion_module(self, name):
-        
+
+        name = str(name)
+
         return {
             "GatedFusion": GatedFusion,
             "1.0": GatedFusion,

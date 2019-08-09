@@ -57,7 +57,7 @@ class CAFnet(nn.Module):
         for param in self.d_segnet.parameters():
             param.requires_grad = False
         
-        self.fusion = self._get_fusion_module[fusion_module]
+        self.fusion = self._get_fusion_module(fusion_module)
 
     def forward(self, inputs):
 

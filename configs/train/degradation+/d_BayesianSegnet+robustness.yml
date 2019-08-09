@@ -47,11 +47,11 @@ data:
     val_split: val
     val_subsplit: [
                    'async_fog_000_clear',
-                   'async_fog_050_clear',
-                   'async_fog_100_clear',
+                   #'async_fog_050_clear',
+                   #'async_fog_100_clear',
                    "async_fog_000_clear__{'channel':'rgbd','type':'gaussianNoise','value':'3'}",
-                   "async_fog_000_clear__{'channel':'rgbd','type':'shotNoise','value':'3'}",
-                   "async_fog_000_clear__{'channel':'rgbd','type':'impulseNoise','value':'3'}",
+                   #"async_fog_000_clear__{'channel':'rgbd','type':'shotNoise','value':'3'}",
+                   #"async_fog_000_clear__{'channel':'rgbd','type':'impulseNoise','value':'3'}",
                   ]    
     val_reduction: 0.5
     img_rows: 512

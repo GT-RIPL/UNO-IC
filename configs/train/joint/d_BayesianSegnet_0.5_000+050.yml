@@ -28,10 +28,6 @@ data:
     val_subsplit: [
                    'async_fog_000_clear',
                    'async_fog_050_clear',
-                   'async_fog_100_clear',
-                   "async_fog_100_clear__{'channel':'rgb','type':'blackoutNoise','value':'20'}",
-                   "async_fog_100_clear__{'channel':'d','type':'blackoutNoise','value':'20'}",
-
                   ]    
     val_reduction: 0.5
     img_rows: 512

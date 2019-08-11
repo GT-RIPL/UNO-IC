@@ -164,8 +164,9 @@ def train(cfg, writer, logger, logdir):
                 if attr['resume'] == 'same_yaml':
                     optimizers[model].load_state_dict(checkpoint["optimizer_state"])
                     schedulers[model].load_state_dict(checkpoint["scheduler_state"])
-                    start_iter = checkpoint["epoch"]
-                else:
+                
+                # resume iterations only if specified
+                if cfg['training']['resume']:
                     start_iter = checkpoint["epoch"]
 
                 # start_iter = 0

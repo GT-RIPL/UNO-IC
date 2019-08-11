@@ -7,9 +7,11 @@ models:
         in_channels: 3
         start_layer: down1
         end_layer: up1
+        freeze_seg: True
         reduction: 1.0
         mcdo_passes: 6 # Number of Passes
         dropoutP: 0.5 # Dropout Probability
+        resume: models/Segnet/rgb_Segnet/rgb_segnet_mcdo_airsim_T000+T050.pkl
 fusion: None #{None,SoftmaxMultiply}
 recal: None #{None,afterMCDO,beforeMCDO}
 recalibrator: None #{Histogram,Polynomial_X}
@@ -36,9 +38,9 @@ data:
     path: datasets/airsim_data_async #../../ros/data/airsim_03-30-2019/airsim_data_async
     noisy_type: None 
 training:
-    train_iters: 500000
+    train_iters: 300000
     batch_size: 2
-    val_interval: 100000
+    val_interval: 50000
     n_workers: 8
     print_interval: 50
     png_frames: 50

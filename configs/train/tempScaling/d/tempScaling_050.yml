@@ -3,28 +3,18 @@ id: BayesianSegnet_tempScaling_T050
 model:
     arch: segnet_mcdo
 models:
-    #rgb:
-    #    in_channels: 3
-    #    start_layer: down1
-    #    end_layer: up1
-    #    reduction: 1.0
-    #    mcdo_passes: 6 # Number of Passes
-    #    mask_dir: models/DropoutMasks/Random # Directory of Indexed Masks
-    #   masks: [0,1,2,3,4,5] # Number Mask Indices Should Equal Number of MCDO Passes
-    #    fixed_mcdo: No # Yes: Fixed Masks per Pass; No: Randomized Masks per Pass
-    #    dropoutP: 0.5 # Dropout Probability
-    #    resume: None
     d:
         in_channels: 3
         start_layer: down1
         end_layer: up1
+        freeze_seg: True
         reduction: 1.0
         mcdo_passes: 6
         mask_dir: models/DropoutMasks/Random 
         masks: [0,1,2,3,4,5] 
         fixed_mcdo: No
         dropoutP: 0.5
-        resume: None
+        resume: models/Segnet/d_Segnet/d_segnet_mcdo_airsim_T050.pkl
 fusion: None #{None,SoftmaxMultiply}
 recal: None #{None,afterMCDO,beforeMCDO}
 recalibrator: None #{Histogram,Polynomial_X}
@@ -49,12 +39,12 @@ data:
     path: datasets/airsim_data_async #../../ros/data/airsim_03-30-2019/airsim_data_async
     noisy_type: None 
 training:
-    train_iters: 100000
+    train_iters: 300000
     batch_size: 2
-    val_interval: 5000
+    val_interval: 50000
     n_workers: 8
     print_interval: 50
-    png_frames: 5000
+    png_frames: 50
     optimizer:
         name: 'adam'
         lr: 1.0e-5

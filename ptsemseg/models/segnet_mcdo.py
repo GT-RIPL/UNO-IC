@@ -21,8 +21,9 @@ class segnet_mcdo(nn.Module):
                  reduction=1.0,
                  device="cpu",
                  recalibrator="None",
-                 temperatureScaling=False,
-                 freeze=False,
+                 temperatureScaling=False,                  
+                 freeze_seg=False,
+                 freeze_temp=False,
                  bins=0
                  ):
         super(segnet_mcdo, self).__init__()
@@ -35,6 +36,8 @@ class segnet_mcdo(nn.Module):
         self.dropoutP = dropoutP
         self.full_mcdo = full_mcdo
         self.device = device
+        self.freeze_seg = freeze_seg
+        self.freeze_temp = freeze_temp
 
         # Select Recalibrator
         self.temperatureScaling = temperatureScaling
@@ -94,12 +97,13 @@ class segnet_mcdo(nn.Module):
         if self.temperatureScaling:
             self.temperature = torch.nn.Parameter(torch.ones(1))
 
-        if freeze:
+
+        self.softmaxMCDO = torch.nn.Softmax(dim=1)
+
+        if freeze_seg:
             for layer in self.layers.values():
                 for param in layer.parameters():
                     param.requires_grad = False
-
-        self.softmaxMCDO = torch.nn.Softmax(dim=1)
 
         for k, v in self.layers.items():
             setattr(self, k, v)
@@ -151,6 +155,9 @@ class segnet_mcdo(nn.Module):
 
     def forward(self, inputs, mcdo=True):
 
+        if self.freeze_seg:
+            self.eval()
+            
         if self.full_mcdo:
             down1, indices_1, unpool_shape1 = self.layers["down1"](inputs, MCDO=mcdo)
             down2, indices_2, unpool_shape2 = self.layers["down2"](down1, MCDO=mcdo)
@@ -174,7 +181,7 @@ class segnet_mcdo(nn.Module):
             up1 = self.layers["up1"](up2, indices_1, unpool_shape1)
 
         if self.temperatureScaling:
-            up1 = up1 / (self.temperature + 1e-5)
+            up1 = up1 / self.temperature
 
         return up1
 

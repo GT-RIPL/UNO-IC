@@ -461,6 +461,15 @@ def plotMutualInfo(logdir, i, i_val, k, pred, variance):
         os.makedirs(path)
     plt.savefig("{}/{}_{}_mutual_info.png".format(path, i_val, i))
     plt.close(fig)
+def plotSpatial(logdir, i, i_val, k, pred, variance):
+    path = "{}/{}".format(logdir, k)
+    fig, axes = plt.subplots(1, 2)
+    axes[0].imshow(variance[0, :, :].cpu().numpy())
+    axes[1].imshow(pred[0])
+    if not os.path.exists(path):
+        os.makedirs(path)
+    plt.savefig("{}/{}_{}_spatial.png".format(path, i_val, i))
+    plt.close(fig)
 
 
 def save_pred(logdir, loc, k, i_val, i, pred, mutual_info, entropy):
@@ -535,3 +544,69 @@ def mem_report():
     _mem_report(cuda_tensors, 'GPU')
     _mem_report(host_tensors, 'CPU')
     print('=' * LEN)
+
+
+
+def predictive_entropy(pred):
+    # pred [batch,11,512,512,num_passes]
+    # return [batch,512,512]
+    PEtropy = []
+    for b in range(pred.shape[0]):
+        avg = pred[b, :, :, :, :].mean(-1)  # [11,512,512]
+        entropy = avg * torch.log(avg)  # [11,512,512]
+        entropy = -entropy.sum(0)  # [512,512]
+        PEtropy.append(entropy.unsqueeze(0))
+    PEtropy = torch.cat(PEtropy)
+    return PEtropy
+
+
+def mutul_information(pred):
+    # pred [batch,11,512,512,num_passes]
+    # return [batch,512,512]
+    MI = []
+    for b in range(pred.shape[0]):
+        avg = pred[b, :, :, :, :].mean(-1)  # [11,512,512]
+        entropy = avg * torch.log(avg)  # [11,512,512]
+        entropy = -entropy.sum(0)  # [512,512]
+        expect = pred[b, :, :, :, :] * torch.log(pred[b, :, :, :, :])  # [11,512,512,10]
+        expect = expect.sum(0).mean(-1)  # (512,512)
+        MI.append((entropy + expect).unsqueeze(0))
+    MI = torch.cat(MI)
+    return MI
+
+
+def mutualinfo_entropy(pred):
+    # pred [batch,11,512,512,num_passes]
+    # return [batch,512,512]
+    MI = []
+    PEtropy = []
+    for b in range(pred.shape[0]):
+        avg = pred[b, :, :, :, :].mean(-1)  # [11,512,512]
+        entropy = avg * torch.log(avg)  # [11,512,512]
+        entropy = -entropy.sum(0)  # [512,512]
+        PEtropy.append(entropy.unsqueeze(0))
+        expect = pred[b, :, :, :, :] * torch.log(pred[b, :, :, :, :])  # [11,512,512,10]
+        expect = expect.sum(0).mean(-1)  # (512,512)
+        MI.append((entropy + expect).unsqueeze(0))
+    PEtropy = torch.cat(PEtropy)
+    MI = torch.cat(MI)
+    # import ipdb;ipdb.set_trace()
+    return PEtropy, MI
+
+def save_pred(logdir,loc,k,i_val,i,pred,mutual_info,entropy):
+    #pred [batch,11,512,512,num_passes]
+    #loc [row,col]
+    pred = pred.cpu().numpy()
+    path = "{}/{}/{}".format(logdir,k,'dist')
+    if not os.path.exists(path):
+        os.makedirs(path)
+    prediction = {}
+    for ps in range(pred.shape[-1]):
+        prediction['pass'+str(ps)] = pred[0,:,loc[0],loc[1],ps]
+    prediction['Entropy'] = [entropy] + [0]*(pred.shape[1]-1)
+    prediction['mutual_info'] = [mutual_info] + [0]*(pred.shape[1]-1)
+
+    classes = ['class'+str(cl) for cl in range(pred.shape[1])]  
+    df = DataFrame(prediction,index=classes)  
+    #print(df)
+    df.to_excel ('{}/{}_{}_{}_{}.xlsx'.format(path, i_val, i,loc[0],loc[1]), index = True, header=True)

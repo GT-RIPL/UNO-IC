@@ -28,7 +28,13 @@ class GatedFusion(nn.Module):
         )
         self.sigmoid = nn.Sigmoid()
 
-    def forward(self, rgb, d, rgb_var, d_var):
+    def forward(self, mean, variance):
+        
+        rgb = mean['rgb']
+        d = mean['d']
+        rgb_var = variance['rgb']
+        d_var = variance['d']
+        
         fusion = torch.cat([rgb, d], dim=1)
 
         G = self.conv(fusion)
@@ -58,7 +64,13 @@ class ConditionalAttentionFusion(nn.Module):
                                             dilation=1),
                                   nn.Sigmoid())
 
-    def forward(self, rgb, d, rgb_var, d_var):
+    def forward(self, mean, variance):
+    
+        rgb = mean['rgb']
+        d = mean['d']
+        rgb_var = variance['rgb']
+        d_var = variance['d']
+        
         AB = torch.cat([rgb, d], dim=1)
         ABCD = torch.cat([rgb, d, rgb_var, d_var], dim=1)
 
@@ -90,7 +102,13 @@ class PreweightedGatedFusion(nn.Module):
                                             dilation=1),
                                   nn.Sigmoid())
 
-    def forward(self, rgb, d, rgb_var, d_var):
+    def forward(self, mean, variance):
+    
+        rgb = mean['rgb']
+        d = mean['d']
+        rgb_var = variance['rgb']
+        d_var = variance['d']
+        
         rgb_var = 1 / (rgb_var + 1e-5)
         d_var = 1 / (d_var + 1e-5)
 
@@ -126,7 +144,13 @@ class UncertaintyGatedFusion(nn.Module):
                                             dilation=1),
                                   nn.Sigmoid())
 
-    def forward(self, rgb, d, rgb_var, d_var):
+    def forward(self, mean, variance):
+    
+        rgb = mean['rgb']
+        d = mean['d']
+        rgb_var = variance['rgb']
+        d_var = variance['d']
+        
         CD = torch.cat([rgb_var, d_var], dim=1)
 
         G = self.gate(CD)
@@ -184,7 +208,13 @@ class ConditionalAttentionFusionv2(nn.Module):
 
         self.n_channels = n_channels
 
-    def forward(self, rgb, d, rgb_var, d_var):
+    def forward(self, mean, variance):
+    
+    
+        rgb = mean['rgb']
+        d = mean['d']
+        rgb_var = variance['rgb']
+        d_var = variance['d']
 
         AB = torch.cat([rgb, d], dim=1)
         CD = torch.cat([rgb_var, d_var], dim=1)

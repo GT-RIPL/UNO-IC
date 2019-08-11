@@ -34,6 +34,15 @@ import time
 from ptsemseg.posteriors import SWAG
 from ptsemseg.utils import bn_update, mem_report
 
+def random_seed(seed_value, use_cuda):
+    np.random.seed(seed_value) # cpu vars
+    torch.manual_seed(seed_value) # cpu  vars
+    random.seed(seed_value) # Python
+    if use_cuda: 
+        torch.cuda.manual_seed(seed_value)
+        torch.cuda.manual_seed_all(seed_value) # gpu vars
+        torch.backends.cudnn.deterministic = True  #needed
+        torch.backends.cudnn.benchmark = False
 
 def train(cfg, writer, logger, logdir):
 
@@ -43,10 +52,7 @@ def train(cfg, writer, logger, logdir):
     logger.info("Using commit {}".format(label))
 
     # Setup seeds
-    torch.manual_seed(1337)
-    torch.cuda.manual_seed(1337)
-    np.random.seed(1337)
-    random.seed(1337)
+    random_seed(1337, True)
 
     # Setup device
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -67,11 +73,8 @@ def train(cfg, writer, logger, logdir):
     time_meter = averageMeter()
 
     # set seeds for training
-    torch.manual_seed(cfg.get("seed"))
-    torch.cuda.manual_seed(cfg.get("seed"))
-    np.random.seed(cfg.get("seed"))
-    random.seed(cfg.get("seed"))
-
+    random_seed(cfg['seed'], True)
+    
     start_iter = 0
     models = {}
     swag_models = {}
@@ -98,10 +101,11 @@ def train(cfg, writer, logger, logdir):
                                   recalibrator=cfg['recalibrator'],
                                   temperatureScaling=cfg['temperatureScaling'],
                                   varianceScaling=cfg['varianceScaling'],
-                                  freeze=attr['freeze'],
                                   fusion_module=attr['fusion_module'],
                                   resume_rgb=attr['resume_rgb'],
-                                  resume_d=attr['resume_d'],
+                                  resume_d=attr['resume_d'],                                  
+                                  freeze_seg=attr['freeze_seg'],
+                                  freeze_temp=attr['freeze_temp'],
                                   bins=cfg['bins']).to(device)
 
         models[model] = torch.nn.DataParallel(models[model], device_ids=range(torch.cuda.device_count()))
@@ -347,6 +351,8 @@ def train(cfg, writer, logger, logdir):
                                     rgb[:, n, :, :] = rgb[:, n, :, :] * rgb_var
                                     d[:, n, :, :] = d[:, n, :, :] * d_var
                                 outputs = rgb + d
+                            elif cfg["fusion"] == "Noisy-Or":
+                                outputs = 1-(1-torch.nn.Softmax(dim=1)(mean["rgb"])) * (1-torch.nn.Softmax(dim=1)(mean["d"]))
                             else:
                                 print("Fusion Type Not Supported")
 

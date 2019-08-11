@@ -237,12 +237,8 @@ def validate(cfg, writer, logger, logdir):
                         rgb[:, n, :, :] = rgb[:, n, :, :] * rgb_var
                         d[:, n, :, :] = d[:, n, :, :] * d_var
                     outputs = rgb + d
-
-                elif cfg["fusion"] == "FuzzyLogic":
-                    outputs = torch.max(torch.nn.Softmax(dim=1)(mean["rgb"]),
-                                        torch.nn.Softmax(dim=1)(mean["d"]))
-                elif cfg["fusion"] == "FuzzyLogicVariance":
-                    outputs = torch.max(variance["rgb"], variance["d"])
+                elif cfg["fusion"] == "Noisy-Or":
+                    outputs = 1-(1-torch.nn.Softmax(dim=1)(mean["rgb"])) * (1-torch.nn.Softmax(dim=1)(mean["d"]))
                 else:
                     print("Fusion Type Not Supported")
 

@@ -64,16 +64,19 @@ class CAFnet(nn.Module):
 
         inputs_rgb = inputs[:, :3, :, :]
         inputs_d = inputs[:, 3:, :, :]
-
-        mean_rgb, var_rgb, entropy_rgb, MI_rgb = self.rgb_segnet.module.forwardMCDO(inputs_rgb)
-        mean_d, var_d, entropy_rgb, MI_rgb = self.d_segnet.module.forwardMCDO(inputs_d)
+        
+        mean = {}
+        variance = {}
+        entropy = {}
+        MI = {}
+        mean['rgb'], variance['rgb'], entropy['rgb'], MI['rgb'] = self.rgb_segnet.module.forwardMCDO(inputs_rgb)
+        mean['d'], variance['d'], entropy['d'], MI['d'] = self.d_segnet.module.forwardMCDO(inputs_d)
         
         s = var_rgb.shape
+        variance['rgb'] = torch.mean(var_rgb, 1).view(-1, 1, s[2], s[3])
+        variance['d'] = torch.mean(var_d, 1).view(-1, 1, s[2], s[3])
         
-        var_rgb = torch.mean(var_rgb, 1).view(-1, 1, s[2], s[3])
-        var_d = torch.mean(var_d, 1).view(-1, 1, s[2], s[3])
-
-        x = self.fusion(mean_rgb, mean_d, var_rgb, var_d)
+        x = self.fusion(mean, variance)
 
         return x
 

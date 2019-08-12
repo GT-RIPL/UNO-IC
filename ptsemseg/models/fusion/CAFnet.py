@@ -27,8 +27,8 @@ class CAFnet(nn.Module):
                  temperatureScaling=False,
                  bins=0,
                  fusion_module="1.1",
-                 resume_rgb="./models/Segnet/rgb_Segnet/rgb_segnet_mcdo_airsim_T000+T050.pkl",
-                 resume_d="./models/Segnet/d_Segnet/d_segnet_mcdo_airsim_T000+T050.pkl"
+                 pretrained_rgb="./models/Segnet/rgb_Segnet/rgb_segnet_mcdo_airsim_T000+T050.pkl",
+                 pretrained_d="./models/Segnet/d_Segnet/d_segnet_mcdo_airsim_T000+T050.pkl"
                  ):
         super(CAFnet, self).__init__()
 

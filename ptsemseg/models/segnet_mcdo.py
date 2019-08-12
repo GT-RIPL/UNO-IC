@@ -105,7 +105,7 @@ class segnet_mcdo(nn.Module):
                 for param in layer.parameters():
                     param.requires_grad = False
 
-        if freeze_temp:
+        if temperatureScaling and freeze_temp:
             self.temperature.requires_grad = False
 
         for k, v in self.layers.items():

@@ -17,7 +17,7 @@ models:
 recalibration: None #{None, afterMCDO, beforeMCDO}
 recalibrator: None #{HistogramLinear, HistogramFlat, Polynomial_X, Isotonic, Platt}
 bins: 20
-temperatureScaling: True
+temperatureScaling: False
 
 # training
 freeze_seg: True

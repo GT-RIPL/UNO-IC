@@ -223,6 +223,7 @@ def train(cfg, writer, logger, logdir):
                 outputs[m] = models[m](images[m])
 
                 loss[m] = loss_fn(input=outputs[m], target=labels)
+
                 loss[m].backward()
 
                 optimizers[m].step()

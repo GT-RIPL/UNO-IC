@@ -24,21 +24,53 @@ class CAFnet(nn.Module):
                  device="cpu",
                  recalibration="None",
                  recalibrator="None",
-                 temperatureScaling=False,
                  bins=0,
-                 fusion_module="1.1",
+                 temperatureScaling=False,
+                 freeze_seg=True,
+                 freeze_temp=True,
+                 fusion_module="1.3",
                  pretrained_rgb="./models/Segnet/rgb_Segnet/rgb_segnet_mcdo_airsim_T000+T050.pkl",
                  pretrained_d="./models/Segnet/d_Segnet/d_segnet_mcdo_airsim_T000+T050.pkl"
                  ):
         super(CAFnet, self).__init__()
 
-        self.rgb_segnet = segnet_mcdo(n_classes, in_channels, is_unpooling, input_size, batch_size, version,
-                                      mcdo_passes, dropoutP, full_mcdo, start_layer,
-                                      end_layer, reduction, device, recalibrator, recalibration, temperatureScaling, bins)
+        self.rgb_segnet = segnet_mcdo(n_classes=n_classes,
+                                      input_size=input_size,
+                                      batch_size=batch_size,
+                                      version=version,
+                                      reduction=reduction,
+                                      mcdo_passes=mcdo_passes,
+                                      dropoutP=dropoutP,
+                                      full_mcdo=full_mcdo,
+                                      in_channels=in_channels,
+                                      start_layer=start_layer,
+                                      end_layer=end_layer,
+                                      device=device,
+                                      recalibration=recalibration,
+                                      recalibrator=recalibrator,
+                                      temperatureScaling=temperatureScaling,
+                                      freeze_seg=freeze_seg,
+                                      freeze_temp=freeze_temp,
+                                      bins=bins)
 
-        self.d_segnet = segnet_mcdo(n_classes, in_channels, is_unpooling, input_size, batch_size, version,
-                                    mcdo_passes, dropoutP, full_mcdo, start_layer,
-                                    end_layer, reduction, device, recalibrator, recalibration, temperatureScaling, bins)
+        self.d_segnet = segnet_mcdo(n_classes=n_classes,
+                                    input_size=input_size,
+                                    batch_size=batch_size,
+                                    version=version,
+                                    reduction=reduction,
+                                    mcdo_passes=mcdo_passes,
+                                    dropoutP=dropoutP,
+                                    full_mcdo=full_mcdo,
+                                    in_channels=in_channels,
+                                    start_layer=start_layer,
+                                    end_layer=end_layer,
+                                    device=device,
+                                    recalibration=recalibration,
+                                    recalibrator=recalibrator,
+                                    temperatureScaling=temperatureScaling,
+                                    freeze_seg=freeze_seg,
+                                    freeze_temp=freeze_temp,
+                                    bins=bins)
 
         self.rgb_segnet = torch.nn.DataParallel(self.rgb_segnet, device_ids=range(torch.cuda.device_count()))
         self.d_segnet = torch.nn.DataParallel(self.d_segnet, device_ids=range(torch.cuda.device_count()))

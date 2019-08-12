@@ -258,7 +258,7 @@ def train(cfg, writer, logger, logdir):
                 #################################################################################
                 # Recalibration
                 #################################################################################
-                if cfg["recal"] != "None":
+                if str(cfg["recalibrator"]) != "None":
                     print("=" * 10, "RECALIBRATING", "=" * 10)
 
                     for m in cfg["models"].keys():

@@ -183,8 +183,8 @@ class segnet_mcdo(nn.Module):
         if self.temperatureScaling:
             up1 = up1 / self.temperature
 
-        for param in self.parameters():
-            print(param.data)
+        # for param in self.parameters():
+        #     print(param.data)
 
         return up1
 

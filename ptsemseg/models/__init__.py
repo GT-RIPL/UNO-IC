@@ -15,7 +15,7 @@ from ptsemseg.models.fusion.CAFnet import CAFnet
 from ptsemseg.models.tempnet import tempnet
 
 
-def get_model(model_dict,
+def get_model(name,
               n_classes,
               input_size=(512, 512),
               batch_size=2,
@@ -29,31 +29,28 @@ def get_model(model_dict,
               learned_uncertainty="none",
               version=None,
               reduction=1.0,
+              recalibration=None,
               recalibrator=None,
               temperatureScaling=False,
-              varianceScaling=False,                  
               freeze_seg=False,
               freeze_temp=False,
               fusion_module="1.1",
               bins=0,
-              resume_rgb=None,
-              resume_d=None,
+              pretrained_rgb=None,
+              pretrained_d=None,
               device="cpu"):
-    name = model_dict['arch']
     model = _get_model_instance(name)
-    param_dict = copy.deepcopy(model_dict)
-    param_dict.pop('arch')
 
     if name in ["frrnA", "frrnB"]:
-        model = model(n_classes, **param_dict)
+        model = model(n_classes)
 
     elif name in ["fcn32s", "fcn16s", "fcn8s"]:
-        model = model(n_classes=n_classes, **param_dict)
+        model = model(n_classes=n_classes)
         vgg16 = models.vgg16(pretrained=True)
         model.init_vgg16_params(vgg16)
 
     elif name == "segnet":
-        model = model(n_classes=n_classes, **param_dict)
+        model = model(n_classes=n_classes)
         vgg16 = models.vgg16(pretrained=True)
         model.init_vgg16_params(vgg16)
 
@@ -70,8 +67,9 @@ def get_model(model_dict,
                       start_layer=start_layer,
                       end_layer=end_layer,
                       device=device,
+                      recalibration=recalibration,
                       recalibrator=recalibrator,
-                      temperatureScaling=temperatureScaling,                  
+                      temperatureScaling=temperatureScaling,
                       freeze_seg=freeze_seg,
                       freeze_temp=freeze_temp,
                       bins=bins)
@@ -91,7 +89,8 @@ def get_model(model_dict,
                       start_layer=start_layer,
                       end_layer=end_layer,
                       device=device,
-                      recalibrator=recalibrator,                              
+                      recalibration=recalibration,
+                      recalibrator=recalibrator,
                       freeze_seg=freeze_seg,
                       freeze_temp=freeze_temp,
                       bins=bins)
@@ -112,11 +111,12 @@ def get_model(model_dict,
                       start_layer=start_layer,
                       end_layer=end_layer,
                       device=device,
+                      recalibration=recalibration,
                       recalibrator=recalibrator,
                       temperatureScaling=temperatureScaling,
                       bins=bins,
-                      resume_rgb=resume_rgb,
-                      resume_d=resume_d,
+                      pretrained_rgb=pretrained_rgb,
+                      pretrained_d=pretrained_d,
                       fusion_module=fusion_module)
 
     elif name == "fused_segnet":
@@ -126,7 +126,7 @@ def get_model(model_dict,
         model.d_segnet.init_vgg16_params(vgg16)
 
     elif name == "unet":
-        model = model(n_classes=n_classes, **param_dict)
+        model = model(n_classes=n_classes)
 
     elif name == "pspnet":
         model = model(n_classes=n_classes,
@@ -138,15 +138,14 @@ def get_model(model_dict,
                       learned_uncertainty=learned_uncertainty,
                       in_channels=in_channels,
                       start_layer=start_layer,
-                      end_layer=end_layer,
-                      **param_dict)
+                      end_layer=end_layer)
 
     elif name == "SSMA":
         model = model(backbone='resnet', output_stride=16, num_classes=n_classes, sync_bn=True, freeze_bn=False)
     elif name == "DeepLab":
         model = model(backbone='resnet', output_stride=16, num_classes=n_classes, sync_bn=True, freeze_bn=False)
     else:
-        model = model(n_classes=n_classes, **param_dict)
+        model = model(n_classes=n_classes)
 
     return model
 

@@ -5,6 +5,7 @@ from .fusion import *
 from ptsemseg.models.recalibrator import *
 from ptsemseg.models.segnet_mcdo import *
 
+
 class CAFnet(nn.Module):
     def __init__(self,
                  backbone="segnet",
@@ -21,6 +22,7 @@ class CAFnet(nn.Module):
                  end_layer="up1",
                  reduction=1.0,
                  device="cpu",
+                 recalibration="None",
                  recalibrator="None",
                  temperatureScaling=False,
                  bins=0,
@@ -32,15 +34,14 @@ class CAFnet(nn.Module):
 
         self.rgb_segnet = segnet_mcdo(n_classes, in_channels, is_unpooling, input_size, batch_size, version,
                                       mcdo_passes, dropoutP, full_mcdo, start_layer,
-                                      end_layer, reduction, device, recalibrator, temperatureScaling, bins)
+                                      end_layer, reduction, device, recalibrator, recalibration, temperatureScaling, bins)
 
         self.d_segnet = segnet_mcdo(n_classes, in_channels, is_unpooling, input_size, batch_size, version,
                                     mcdo_passes, dropoutP, full_mcdo, start_layer,
-                                    end_layer, reduction, device, recalibrator, temperatureScaling, bins)
+                                    end_layer, reduction, device, recalibrator, recalibration, temperatureScaling, bins)
 
         self.rgb_segnet = torch.nn.DataParallel(self.rgb_segnet, device_ids=range(torch.cuda.device_count()))
         self.d_segnet = torch.nn.DataParallel(self.d_segnet, device_ids=range(torch.cuda.device_count()))
-
 
         # initialize segnet weights
         if resume_rgb:
@@ -53,7 +54,7 @@ class CAFnet(nn.Module):
             param.requires_grad = False
         for param in self.d_segnet.parameters():
             param.requires_grad = False
-        
+
         self.fusion = self._get_fusion_module(fusion_module)(n_classes)
 
     def forward(self, inputs):
@@ -64,18 +65,19 @@ class CAFnet(nn.Module):
 
         inputs_rgb = inputs[:, :3, :, :]
         inputs_d = inputs[:, 3:, :, :]
-        
+
         mean = {}
         variance = {}
         entropy = {}
         MI = {}
+
         mean['rgb'], variance['rgb'], entropy['rgb'], MI['rgb'] = self.rgb_segnet.module.forwardMCDO(inputs_rgb)
         mean['d'], variance['d'], entropy['d'], MI['d'] = self.d_segnet.module.forwardMCDO(inputs_d)
-        
-        s = var_rgb.shape
-        variance['rgb'] = torch.mean(var_rgb, 1).view(-1, 1, s[2], s[3])
-        variance['d'] = torch.mean(var_d, 1).view(-1, 1, s[2], s[3])
-        
+
+        s = variance['rgb'].shape
+        variance['rgb'] = torch.mean(variance['rgb'], 1).view(-1, 1, s[2], s[3])
+        variance['d'] = torch.mean(variance['d'], 1).view(-1, 1, s[2], s[3])
+
         x = self.fusion(mean, variance)
 
         return x
@@ -100,7 +102,7 @@ class CAFnet(nn.Module):
         else:
             print("model not found")
             exit()
-            
+
     def _get_fusion_module(self, name):
 
         name = str(name)

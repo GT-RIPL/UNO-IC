@@ -1,5 +1,5 @@
 seed: 1337
-id: rgbd_BayesianSegnet_SoftmaxMult
+id: softmaxMultiply_segnet_tempScaling_T000+T050
 models:
     rgb:
         # model settings
@@ -11,9 +11,7 @@ models:
         dropoutP: 0.5
         full_mcdo: False
         reduction: 1.0
-
-        # model file to load
-        resume: models/Segnet/rgb_Segnet/rgb_segnet_mcdo_airsim_T000.pkl
+        resume: models/Segnet/rgb_Segnet/temperatureScaling/rgb_segnet_mcdo_airsim_T000+T050.pkl
     d:
         # model settings
         arch: segnet_mcdo
@@ -24,15 +22,13 @@ models:
         dropoutP: 0.5
         full_mcdo: False
         reduction: 1.0
-
-        # model file to load
-        resume: models/Segnet/d_Segnet/d_segnet_mcdo_airsim_T000.pkl
+        resume: models/Segnet/d_Segnet/temperatureScaling/d_segnet_mcdo_airsim_T000+T050.pkl
 
 # recalibration
 recalibration: None #{None, afterMCDO, beforeMCDO}
 recalibrator: None #{HistogramLinear, HistogramFlat, Polynomial_X, Isotonic, Platt}
 bins: 20
-temperatureScaling: False
+temperatureScaling: True
 
 # training
 freeze_seg: False
@@ -49,30 +45,26 @@ fusion: SoftmaxMultiply #{None, SoftmaxMultiply, SoftmaxAverage, WeightedVarianc
 data:
     dataset: airsim
     train_split: train
-    train_subsplit: ['async_fog_000_clear']
-    train_reduction: 1.0    
+    train_subsplit: ['async_fog_000_clear',
+                     'async_fog_050_clear']
+    train_reduction: 1.0
     recal_split: recal
-    recal_subsplit: ['async_fog_000_clear']
+    recal_subsplit: ['async_fog_000_clear',
+                     'async_fog_050_clear',]
     recal_reduction: 0.5
     val_split: val
-    val_subsplit: [
-                   'async_fog_000_clear',
-                   'async_fog_050_clear',
-                   'async_fog_100_clear',
-                   "async_fog_100_clear__{'channel':'rgb','type':'blackoutNoise','value':'20'}",
-                   "async_fog_100_clear__{'channel':'d','type':'blackoutNoise','value':'20'}",
-
-                  ]    
-    val_reduction: 0.5
+    val_subsplit: ['async_fog_000_clear',
+                   'async_fog_050_clear',]
+    val_reduction: 1.0
     img_rows: 512
     img_cols: 512
     path: datasets/airsim_data_async
     noisy_type: None
 
 training:
-    train_iters: 0
+    train_iters: 500000
     batch_size: 2
-    val_interval: 0 #5000
+    val_interval: 50000 #5000
     n_workers: 8
     print_interval: 50
     png_frames: 50 #5000

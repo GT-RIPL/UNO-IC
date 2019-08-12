@@ -1,7 +1,7 @@
 seed: 1337
-id: d_segnet_T000+T050
+id: rgb_segnet_tempScaling_T000+T050
 models:
-    d:
+    rgb:
         # model settings
         arch: segnet_mcdo
         in_channels: 3
@@ -11,13 +11,13 @@ models:
         dropoutP: 0.5
         full_mcdo: False
         reduction: 1.0
-        resume: models/Segnet/d_Segnet/d_segnet_mcdo_airsim_T000+T050.pkl
+        resume: models/Segnet/rgb_Segnet/temperatureScaling/rgb_segnet_mcdo_airsim_T000+T050.pkl
 
 # recalibration
 recalibration: None #{None, afterMCDO, beforeMCDO}
 recalibrator: None #{HistogramLinear, HistogramFlat, Polynomial_X, Isotonic, Platt}
 bins: 20
-temperatureScaling: False
+temperatureScaling: True
 
 # training
 freeze_seg: False

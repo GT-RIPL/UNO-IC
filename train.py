@@ -34,18 +34,19 @@ import time
 from ptsemseg.posteriors import SWAG
 from ptsemseg.utils import bn_update, mem_report
 
+
 def random_seed(seed_value, use_cuda):
-    np.random.seed(seed_value) # cpu vars
-    torch.manual_seed(seed_value) # cpu  vars
-    random.seed(seed_value) # Python
-    if use_cuda: 
+    np.random.seed(seed_value)  # cpu vars
+    torch.manual_seed(seed_value)  # cpu  vars
+    random.seed(seed_value)  # Python
+    if use_cuda:
         torch.cuda.manual_seed(seed_value)
-        torch.cuda.manual_seed_all(seed_value) # gpu vars
-        torch.backends.cudnn.deterministic = True  #needed
+        torch.cuda.manual_seed_all(seed_value)  # gpu vars
+        torch.backends.cudnn.deterministic = True  # needed
         torch.backends.cudnn.benchmark = False
 
-def train(cfg, writer, logger, logdir):
 
+def train(cfg, writer, logger, logdir):
     # log git commit
     import subprocess
     label = subprocess.check_output(["git", "describe", "--always"]).strip()
@@ -74,20 +75,21 @@ def train(cfg, writer, logger, logdir):
 
     # set seeds for training
     random_seed(cfg['seed'], True)
-    
+
     start_iter = 0
     models = {}
     swag_models = {}
     optimizers = {}
     schedulers = {}
     best_iou = -100.0
+
     # Setup Model
     for model, attr in cfg['models'].items():
 
         attr = defaultdict(lambda: None, attr)
 
-        models[model] = get_model(cfg['model'],
-                                  n_classes,
+        models[model] = get_model(name=attr['arch'],
+                                  n_classes=n_classes,
                                   input_size=(cfg['data']['img_rows'], cfg['data']['img_cols']),
                                   batch_size=cfg['training']['batch_size'],
                                   in_channels=attr['in_channels'],
@@ -95,18 +97,18 @@ def train(cfg, writer, logger, logdir):
                                   end_layer=attr['end_layer'],
                                   mcdo_passes=attr['mcdo_passes'],
                                   dropoutP=attr['dropoutP'],
-                                  full_mcdo=cfg['full_mcdo'],
+                                  full_mcdo=attr['full_mcdo'],
                                   reduction=attr['reduction'],
                                   device=device,
+                                  recalibration=cfg['recalibration'],
                                   recalibrator=cfg['recalibrator'],
+                                  bins=cfg['bins'],
                                   temperatureScaling=cfg['temperatureScaling'],
-                                  varianceScaling=cfg['varianceScaling'],
-                                  fusion_module=attr['fusion_module'],
-                                  resume_rgb=attr['resume_rgb'],
-                                  resume_d=attr['resume_d'],                                  
-                                  freeze_seg=attr['freeze_seg'],
-                                  freeze_temp=attr['freeze_temp'],
-                                  bins=cfg['bins']).to(device)
+                                  freeze_seg=cfg['freeze_seg'],
+                                  freeze_temp=cfg['freeze_temp'],
+                                  pretrained_rgb=cfg['pretrained_rgb'],
+                                  pretrained_d=cfg['pretrained_d'],
+                                  fusion_module=cfg['fusion_module']).to(device)
 
         models[model] = torch.nn.DataParallel(models[model], device_ids=range(torch.cuda.device_count()))
 
@@ -164,9 +166,9 @@ def train(cfg, writer, logger, logdir):
                 if attr['resume'] == 'same_yaml':
                     optimizers[model].load_state_dict(checkpoint["optimizer_state"])
                     schedulers[model].load_state_dict(checkpoint["scheduler_state"])
-                
+
                 # resume iterations only if specified
-                if cfg['training']['resume']:
+                if cfg['training']['resume_iteration']:
                     start_iter = checkpoint["epoch"]
 
                 # start_iter = 0
@@ -353,7 +355,7 @@ def train(cfg, writer, logger, logdir):
                                     d[:, n, :, :] = d[:, n, :, :] * d_var
                                 outputs = rgb + d
                             elif cfg["fusion"] == "Noisy-Or":
-                                outputs = 1-(1-torch.nn.Softmax(dim=1)(mean["rgb"])) * (1-torch.nn.Softmax(dim=1)(mean["d"]))
+                                outputs = 1 - (1 - torch.nn.Softmax(dim=1)(mean["rgb"])) * (1 - torch.nn.Softmax(dim=1)(mean["d"]))
                             else:
                                 print("Fusion Type Not Supported")
 

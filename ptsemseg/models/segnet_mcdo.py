@@ -20,12 +20,12 @@ class segnet_mcdo(nn.Module):
                  end_layer="up1",
                  reduction=1.0,
                  device="cpu",
+                 recalibration="None",
                  recalibrator="None",
-                 temperatureScaling=False,                  
+                 bins=0,
+                 temperatureScaling=False,
                  freeze_seg=False,
-                 freeze_temp=False,
-                 bins=0
-                 ):
+                 freeze_temp=False):
         super(segnet_mcdo, self).__init__()
 
         self.in_channels = in_channels
@@ -42,6 +42,7 @@ class segnet_mcdo(nn.Module):
         # Select Recalibrator
         self.temperatureScaling = temperatureScaling
         self.recalibrator = recalibrator
+        self.recalibration = recalibration
 
         if recalibrator != "None" and bins > 0:
             self.ranges = list(zip([1. * a / bins for a in range(bins + 2)][:-2],
@@ -96,7 +97,6 @@ class segnet_mcdo(nn.Module):
 
         if self.temperatureScaling:
             self.temperature = torch.nn.Parameter(torch.ones(1))
-
 
         self.softmaxMCDO = torch.nn.Softmax(dim=1)
 
@@ -157,7 +157,7 @@ class segnet_mcdo(nn.Module):
 
         if self.freeze_seg:
             self.eval()
-            
+
         if self.full_mcdo:
             down1, indices_1, unpool_shape1 = self.layers["down1"](inputs, MCDO=mcdo)
             down2, indices_2, unpool_shape2 = self.layers["down2"](down1, MCDO=mcdo)
@@ -183,6 +183,9 @@ class segnet_mcdo(nn.Module):
         if self.temperatureScaling:
             up1 = up1 / self.temperature
 
+        for param in self.parameters():
+            print(param.data)
+
         return up1
 
     def forwardAvg(self, inputs):
@@ -196,7 +199,7 @@ class segnet_mcdo(nn.Module):
         x = x / self.mcdo_passes
         return x
 
-    def forwardMCDO(self, inputs, recalType="None", softmax=False):
+    def forwardMCDO(self, inputs, softmax=False):
         with torch.no_grad():
             for i in range(self.mcdo_passes):
                 if i == 0:
@@ -209,28 +212,25 @@ class segnet_mcdo(nn.Module):
         variance = x.var(-1)
 
         # Uncalibrated Softmax Mean and Variance
-        if recalType != "None":
+        if str(self.recalibration) != "None":
 
             mean = self.softmaxMCDO(x).mean(-1)
             variance = self.softmaxMCDO(x).var(-1)
 
-            if recalType == "beforeMCDO":
+            if str(self.recalibration) == "beforeMCDO":
                 for c in range(self.n_classes):
                     x[:, c, :, :, :] = self.calibrationPerClass[c].predict(x[:, c, :, :, :].reshape(-1)).reshape(
                         x[:, c, :, :, :].shape)
                 mean = self.softmaxMCDO(x).mean(-1)
                 variance = self.softmaxMCDO(x).var(-1)
-            elif recalType == "afterMCDO":
+            elif str(self.recalibration) == "afterMCDO":
                 for c in range(self.n_classes):
                     mean[:, c, :, :] = self.calibrationPerClass[c].predict(mean[:, c, :, :].reshape(-1)).reshape(
                         mean[:, c, :, :].shape)
 
         prob = self.softmaxMCDO(x)
-        # entropy = predictive_entropy(prob)
-        # mutual_info = mutul_information(prob)
         entropy, mutual_info = mutualinfo_entropy(prob)  # (2,512,512)
-        
-        
+
         return mean, variance, entropy, mutual_info
 
     def applyCalibration(self, output):

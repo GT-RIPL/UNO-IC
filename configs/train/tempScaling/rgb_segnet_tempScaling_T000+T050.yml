@@ -1,7 +1,7 @@
 seed: 1337
-id: d_segnet_T000+T050
+id: rgb_segnet_tempScaling_T000+T050
 models:
-    d:
+    rgb:
         # model settings
         arch: segnet_mcdo
         in_channels: 3
@@ -11,16 +11,16 @@ models:
         dropoutP: 0.5
         full_mcdo: False
         reduction: 1.0
-        resume: models/Segnet/d_Segnet/d_segnet_mcdo_airsim_T000+T050.pkl
+        resume: models/Segnet/rgb_Segnet/rgb_segnet_mcdo_airsim_T000+T050.pkl
 
 # recalibration
 recalibration: None #{None, afterMCDO, beforeMCDO}
 recalibrator: None #{HistogramLinear, HistogramFlat, Polynomial_X, Isotonic, Platt}
 bins: 20
-temperatureScaling: False
+temperatureScaling: True
 
 # training
-freeze_seg: False
+freeze_seg: True
 freeze_temp: False
 
 # learned fusion specific settings
@@ -44,14 +44,14 @@ data:
     val_split: val
     val_subsplit: ['async_fog_000_clear',
                    'async_fog_050_clear',]
-    val_reduction: 1.0
+    val_reduction: 0.5
     img_rows: 512
     img_cols: 512
     path: datasets/airsim_data_async #../../ros/data/airsim_03-30-2019/airsim_data_async
     noisy_type: None
 
 training:
-    train_iters: 500000
+    train_iters: 300000
     batch_size: 2
     val_interval: 50000 #5000
     n_workers: 8

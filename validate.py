@@ -26,12 +26,25 @@ from functools import partial
 from collections import defaultdict
 
 
+def random_seed(seed_value, use_cuda):
+    np.random.seed(seed_value)  # cpu vars
+    torch.manual_seed(seed_value)  # cpu  vars
+    random.seed(seed_value)  # Python
+    if use_cuda:
+        torch.cuda.manual_seed(seed_value)
+        torch.cuda.manual_seed_all(seed_value)  # gpu vars
+        torch.backends.cudnn.deterministic = True  # needed
+        torch.backends.cudnn.benchmark = False
+
+
 def validate(cfg, writer, logger, logdir):
+    # log git commit
+    import subprocess
+    label = subprocess.check_output(["git", "describe", "--always"]).strip()
+    logger.info("Using commit {}".format(label))
+
     # Setup seeds
-    torch.manual_seed(cfg.get("seed", 1337))
-    torch.cuda.manual_seed(cfg.get("seed", 1337))
-    np.random.seed(cfg.get("seed", 1337))
-    random.seed(cfg.get("seed", 1337))
+    random_seed(1337, True)
 
     # Setup device
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -51,6 +64,9 @@ def validate(cfg, writer, logger, logdir):
     mutual_info_meter = {m: {env: averageMeter() for env in loaders['val'].keys()} for m in cfg["models"].keys()}
     time_meter = averageMeter()
 
+    # set seeds for training
+    random_seed(cfg['seed'], True)
+
     start_iter = 0
     models = {}
     swag_models = {}
@@ -62,23 +78,27 @@ def validate(cfg, writer, logger, logdir):
 
         attr = defaultdict(lambda: None, attr)
 
-        models[model] = get_model(cfg["model"],
-                                  n_classes,
+        models[model] = get_model(name=attr['arch'],
+                                  n_classes=n_classes,
                                   input_size=(cfg['data']['img_rows'], cfg['data']['img_cols']),
-                                  batch_size=cfg["training"]["batch_size"],
+                                  batch_size=cfg['training']['batch_size'],
                                   in_channels=attr['in_channels'],
                                   start_layer=attr['start_layer'],
                                   end_layer=attr['end_layer'],
                                   mcdo_passes=attr['mcdo_passes'],
                                   dropoutP=attr['dropoutP'],
-                                  full_mcdo=cfg['full_mcdo'],
+                                  full_mcdo=attr['full_mcdo'],
                                   reduction=attr['reduction'],
                                   device=device,
+                                  recalibration=cfg['recalibration'],
                                   recalibrator=cfg['recalibrator'],
+                                  bins=cfg['bins'],
                                   temperatureScaling=cfg['temperatureScaling'],
-                                  varianceScaling=cfg['varianceScaling'],
-                                  freeze=attr['freeze'],
-                                  bins=cfg["bins"]).to(device)
+                                  freeze_seg=cfg['freeze_seg'],
+                                  freeze_temp=cfg['freeze_temp'],
+                                  pretrained_rgb=cfg['pretrained_rgb'],
+                                  pretrained_d=cfg['pretrained_d'],
+                                  fusion_module=cfg['fusion_module']).to(device)
 
         models[model] = torch.nn.DataParallel(models[model], device_ids=range(torch.cuda.device_count()))
 
@@ -203,7 +223,6 @@ def validate(cfg, writer, logger, logdir):
 
                 for m in cfg["models"].keys():
 
-
                     if cfg['swa']:
                         mean[m] = swag_models[m](images_val[m])
                         variance[m] = torch.zeros(mean[m].shape)
@@ -238,7 +257,7 @@ def validate(cfg, writer, logger, logdir):
                         d[:, n, :, :] = d[:, n, :, :] * d_var
                     outputs = rgb + d
                 elif cfg["fusion"] == "Noisy-Or":
-                    outputs = 1-(1-torch.nn.Softmax(dim=1)(mean["rgb"])) * (1-torch.nn.Softmax(dim=1)(mean["d"]))
+                    outputs = 1 - (1 - torch.nn.Softmax(dim=1)(mean["rgb"])) * (1 - torch.nn.Softmax(dim=1)(mean["d"]))
                 else:
                     print("Fusion Type Not Supported")
 
@@ -274,7 +293,6 @@ def validate(cfg, writer, logger, logdir):
         for m in cfg["models"].keys():
             val_loss_meter[m][env].reset()
         running_metrics_val[env].reset()
-    
 
 
 if __name__ == "__main__":
@@ -286,7 +304,7 @@ if __name__ == "__main__":
         default="configs/train/rgbd_BayesianSegnet_0.5_T000.yml",
         help="Configuration file to use",
     )
-    
+
     parser.add_argument(
         "--tag",
         nargs="?",
@@ -355,7 +373,7 @@ if __name__ == "__main__":
 
     # validate base model
     validate(cfg, writer, logger, logdir)
-    
+
     print('done')
     time.sleep(10)
     writer.close()

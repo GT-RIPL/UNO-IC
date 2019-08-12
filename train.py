@@ -19,8 +19,7 @@ import cv2
 from ptsemseg.models import get_model
 from ptsemseg.loss import get_loss_function
 from ptsemseg.loader import get_loaders
-from ptsemseg.utils import get_logger, parseEightCameras, plotPrediction, plotMeansVariances, plotEntropy, \
-    plotMutualInfo
+from ptsemseg.utils import get_logger, parseEightCameras, plotPrediction, plotMeansVariances, plotEntropy, plotMutualInfo
 from ptsemseg.metrics import runningScore, averageMeter
 from ptsemseg.schedulers import get_scheduler
 from ptsemseg.optimizers import get_optimizer
@@ -150,8 +149,6 @@ def train(cfg, writer, logger, logdir):
 
                 pretrained_dict = checkpoint['model_state']
                 model_dict = models[model].state_dict()
-
-                best_iou = checkpoint['mean_iou']
 
                 # 1. filter out unnecessary keys
                 pretrained_dict = {k: v.resize_(model_dict[k].shape) for k, v in pretrained_dict.items() if (

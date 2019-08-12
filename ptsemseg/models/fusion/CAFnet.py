@@ -44,10 +44,10 @@ class CAFnet(nn.Module):
         self.d_segnet = torch.nn.DataParallel(self.d_segnet, device_ids=range(torch.cuda.device_count()))
 
         # initialize segnet weights
-        if resume_rgb:
-            self.loadModel(self.rgb_segnet, resume_rgb)
-        if resume_d:
-            self.loadModel(self.d_segnet, resume_d)
+        if pretrained_rgb:
+            self.loadModel(self.rgb_segnet, pretrained_rgb)
+        if pretrained_d:
+            self.loadModel(self.d_segnet, pretrained_d)
 
         # freeze segnet networks
         for param in self.rgb_segnet.parameters():

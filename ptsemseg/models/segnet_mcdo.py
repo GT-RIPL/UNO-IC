@@ -2,7 +2,7 @@ import torch.nn as nn
 from torch.autograd import Variable
 
 from ptsemseg.models.recalibrator import *
-from ptsemseg.utils import save_pred
+from ptsemseg.utils import save_pred, mutualinfo_entropy
 
 
 class segnet_mcdo(nn.Module):

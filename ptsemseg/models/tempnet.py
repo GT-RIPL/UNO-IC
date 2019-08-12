@@ -2,15 +2,14 @@ import torch.nn as nn
 from torch.autograd import Variable
 
 from ptsemseg.models.recalibrator import *
-from ptsemseg.utils import save_pred
+from ptsemseg.utils import save_pred, mutualinfo_entropy
 
-
-
-
-RGB_MEAN =0.32459927664415256# 0.010529351229716495 (MI) #0.32459927664415256 (ENTROPY) #1.062915936313771 (TEMP)
-D_MEAN = 0.31072759806505734# 0.015111614662738568 (MI) #0.31072759806505734 (ENTROPY) #1.0135884158917376 (TEMP)
+RGB_MEAN = 0.32459927664415256  # 0.010529351229716495 (MI) #0.32459927664415256 (ENTROPY) #1.062915936313771 (TEMP)
+D_MEAN = 0.31072759806505734  # 0.015111614662738568 (MI) #0.31072759806505734 (ENTROPY) #1.0135884158917376 (TEMP)
 RGB_TEMP_MEAN = 1.062915936313771
 D_TEMP_MEAN = 1.0135884158917376
+
+
 class tempnet(nn.Module):
     def __init__(self,
                  n_classes=21,
@@ -44,7 +43,6 @@ class tempnet(nn.Module):
         self.png_frames = 50
 
         # Select Recalibrator
-        self.temperatureScaling = temperatureScaling
         self.recalibrator = recalibrator
 
         if recalibrator != "None" and bins > 0:
@@ -82,9 +80,9 @@ class tempnet(nn.Module):
                 "up2": segnetUp2(128, 64),
                 "up1": segnetUp2(64, n_classes, relu=True),
                 "temp_down1": segnetDown2(self.in_channels, 64),
-                "temp_down2": segnetDown2(64, 128),#.to(device) ,
-                "temp_up2": segnetUp2(128, 64),#.to(device) ,
-                "temp_up1": segnetUp2(64, 1),#.to(device) ,
+                "temp_down2": segnetDown2(64, 128),  # .to(device) ,
+                "temp_up2": segnetUp2(128, 64),  # .to(device) ,
+                "temp_up1": segnetUp2(64, 1),  # .to(device) ,
             }
 
         else:
@@ -101,15 +99,15 @@ class tempnet(nn.Module):
                 "up2": segnetUp2MCDO(128, 64, pMCDO=dropoutP),
                 "up1": segnetUp2MCDO(64, n_classes, pMCDO=dropoutP, relu=True),
                 "temp_down1": segnetDown2(self.in_channels, 64),
-                "temp_down2": segnetDown2(64, 128),#.to(device) ,
-                "temp_up2": segnetUp2(128, 64),#.to(device) ,
-                "temp_up1": segnetUp2(64, 1),#.to(device) ,
+                "temp_down2": segnetDown2(64, 128),  # .to(device) ,
+                "temp_up2": segnetUp2(128, 64),  # .to(device) ,
+                "temp_up1": segnetUp2(64, 1),  # .to(device) ,
             }
 
         self.temperature_paras = []
         self.img_net_paras = []
 
-        for key,layer in self.layers.items():
+        for key, layer in self.layers.items():
             if 'temp' in key:
                 self.temperature_paras.append(list(layer.parameters()))
                 for param in layer.parameters():
@@ -200,11 +198,11 @@ class tempnet(nn.Module):
         if spatial:
             tdown1, tindices_1, tunpool_shape1 = self.layers["temp_down1"](inputs)
             tdown2, tindices_2, tunpool_shape2 = self.layers["temp_down2"](tdown1)
-            
-            tup2 = self.layers["temp_up2"](tdown2, tindices_2, tunpool_shape2)
-            tup1 = self.layers["temp_up1"](tup2, tindices_1, tunpool_shape1) #[batch,1,512,512]
 
-            avg_temp = tup1.mean((2,3)).unsqueeze(-1).unsqueeze(-1) #(batch,1,1,1)
+            tup2 = self.layers["temp_up2"](tdown2, tindices_2, tunpool_shape2)
+            tup1 = self.layers["temp_up1"](tup2, tindices_1, tunpool_shape1)  # [batch,1,512,512]
+
+            avg_temp = tup1.mean((2, 3)).unsqueeze(-1).unsqueeze(-1)  # (batch,1,1,1)
 
             return up1 * tup1, avg_temp, tup1
         return up1
@@ -220,74 +218,51 @@ class tempnet(nn.Module):
         x = x / self.mcdo_passes
         return x
 
-    def forwardMCDO(self, inputs, recalType="None", softmax=False):
+    def forwardMCDO(self, inputs, softmax=False):
 
         for i in range(self.mcdo_passes):
             if i == 0:
-                x_bp, avg_temp, tup1 = self.forward(inputs,spatial=True)
+                x_bp, avg_temp, tup1 = self.forward(inputs, spatial=True)
                 x = x_bp.unsqueeze(-1)
             else:
                 x = torch.cat((x, self.forward(inputs, spatial=True)[0].unsqueeze(-1)), -1)
+
         mean = x.mean(-1)
         variance = x.std(-1)
 
-        if recalType != "None":
+        if self.recalibrator != "None":
             mean = self.softmaxMCDO(x).mean(-1)
             variance = self.softmaxMCDO(x).std(-1)
-            if recalType == "beforeMCDO":
+            if self.recalibrator == "beforeMCDO":
                 for c in range(self.n_classes):
                     x[:, c, :, :, :] = self.calibrationPerClass[c].predict(x[:, c, :, :, :].reshape(-1)).reshape(
                         x[:, c, :, :, :].shape)
                 mean = self.softmaxMCDO(x).mean(-1)
                 variance = self.softmaxMCDO(x).std(-1)
-            elif recalType == "afterMCDO":
+            elif self.recalibrator == "afterMCDO":
                 for c in range(self.n_classes):
                     mean[:, c, :, :] = self.calibrationPerClass[c].predict(mean[:, c, :, :].reshape(-1)).reshape(
                         mean[:, c, :, :].shape)
             return mean, variance
         else:
-            mean = x.mean(-1) #[batch,classes,512,512,passes]
+            mean = x.mean(-1)  # [batch,classes,512,512,passes]
             variance = x.std(-1)
             prob = self.softmaxMCDO(x)
-            #entropy = predictive_entropy(prob)
-            #mutual_info = mutul_information(prob)
-            entropy,mutual_info = mutualinfo_entropy(prob)#(2,512,512)
+            # entropy = predictive_entropy(prob)
+            # mutual_info = mutul_information(prob)
+            entropy, mutual_info = mutualinfo_entropy(prob)  # (2,512,512)
             if self.model == 'rgb':
-                mean = mean*torch.min((RGB_MEAN/entropy.mean((1,2)).unsqueeze(-1).unsqueeze(-1).unsqueeze(-1))**4,(avg_temp/RGB_TEMP_MEAN)**4)
+                mean = mean * torch.min((RGB_MEAN / entropy.mean((1, 2)).unsqueeze(-1).unsqueeze(-1).unsqueeze(-1)) ** 4, (avg_temp / RGB_TEMP_MEAN) ** 4)
             else:
-                mean = mean*torch.min((D_MEAN/entropy.mean((1,2)).unsqueeze(-1).unsqueeze(-1).unsqueeze(-1))**4,(avg_temp/D_TEMP_MEAN)**4)
+                mean = mean * torch.min((D_MEAN / entropy.mean((1, 2)).unsqueeze(-1).unsqueeze(-1).unsqueeze(-1)) ** 4, (avg_temp / D_TEMP_MEAN) ** 4)
 
-            mutual_info_argmin = mutual_info[0,:,:].argmin()
-            mutual_info_argmax = mutual_info[0,:,:].argmax()
-            entropy_argmin = entropy[0,:,:].argmin()
-            entropy_argmax = entropy[0,:,:].argmax()
-
-            if i_val % self.png_frames == 0:
-                save_pred(logdir,[mutual_info_argmin//512,mutual_info_argmin%512],
-                          k,i_val,itr,prob,mutual_info[0,mutual_info_argmin//512,mutual_info_argmin%512],
-                        entropy[0,mutual_info_argmin//512,mutual_info_argmin%512])
-                save_pred(logdir,[mutual_info_argmax//512,mutual_info_argmax%512],
-                          k,i_val,itr,prob,mutual_info[0,mutual_info_argmax//512,mutual_info_argmax%512],
-                        entropy[0,mutual_info_argmax//512,mutual_info_argmax%512])
-                save_pred(logdir,[entropy_argmin//512,entropy_argmin%512],
-                          k,i_val,itr,prob,mutual_info[0,entropy_argmin//512,entropy_argmin%512],
-                        entropy[0,entropy_argmin//512,entropy_argmin%512])
-                save_pred(logdir,[entropy_argmax//512,entropy_argmax%512],
-                          k,i_val,itr,prob,mutual_info[0,entropy_argmax//512,entropy_argmax%512],
-                        entropy[0,170,256])
-                        
-                save_pred(logdir,[170,256],k,i_val,itr,prob,mutual_info[0,170,256],entropy[0,170,256])
-                
-                plotSpatial(logdir, i, i_val, k + "/" + m, pred, tup1)
-                
-                        
             return mean, variance, entropy, mutual_info
 
-        for c in range(self.n_classes):
-            output[:, c, :, :] = self.calibrationPerClass[c].predict(output[:, c, :, :].reshape(-1)).reshape(
-                output[:, c, :, :].shape)
+        # for c in range(self.n_classes):
+        #     output[:, c, :, :] = self.calibrationPerClass[c].predict(output[:, c, :, :].reshape(-1)).reshape(
+        #         output[:, c, :, :].shape)
 
-        return output
+        # return output
 
     def showCalibration(self, output, label, logdir, model, iteration):
 
@@ -373,4 +348,3 @@ class tempnet(nn.Module):
         plt.close(fig)
 
         torch.cuda.empty_cache()
-        

@@ -264,11 +264,8 @@ def train(cfg, writer, logger, logdir):
                     for m in cfg["models"].keys():
 
                         bs = cfg['training']['batch_size']
-                        output_all = torch.zeros(
-                            (len(loaders['recal']) * bs, n_classes, cfg['data']['img_rows'], cfg['data']['img_cols']))
-                        labels_all = torch.zeros(
-                            (len(loaders['recal']) * bs, cfg['data']['img_rows'], cfg['data']['img_cols']),
-                            dtype=torch.long)
+                        output_all = torch.zeros((len(loaders['recal']) * bs, n_classes, cfg['data']['img_rows'], cfg['data']['img_cols']))
+                        labels_all = torch.zeros((len(loaders['recal']) * bs, cfg['data']['img_rows'], cfg['data']['img_cols']), dtype=torch.long)
 
                         with torch.no_grad():
                             for i_recal, (input_list, labels_list) in tqdm(enumerate(loaders['recal'])):
@@ -280,9 +277,7 @@ def train(cfg, writer, logger, logdir):
                                 labels_recal = labels[:bs, :, :]
 
                                 # Run Models
-                                mean, variance, entropy, mutual_info = models[m].module.forwardMCDO(images_val[m],
-                                                                                                    logdir, k, i_val, i,
-                                                                                                    cfg["recal"])
+                                mean, variance, entropy, mutual_info = models[m].module.forwardMCDO(images_val[m], logdir, k, i_val, i)
                                 # concat results
                                 output_all[bs * i_recal:bs * (i_recal + 1), :, :, :] = torch.nn.Softmax(dim=1)(mean)
                                 labels_all[bs * i_recal:bs * (i_recal + 1), :, :] = labels_recal
@@ -330,8 +325,7 @@ def train(cfg, writer, logger, logdir):
                                     mean[m] = swag_models[m](images_val[m])
                                     variance[m] = torch.zeros(mean[m].shape)
                                 elif hasattr(models[m].module, 'forwardMCDO'):
-                                    mean[m], variance[m], entropy[m], mutual_info[m] = models[m].module.forwardMCDO(
-                                        images_val[m], recalType=cfg["recal"])
+                                    mean[m], variance[m], entropy[m], mutual_info[m] = models[m].module.forwardMCDO(images_val[m])
                                 else:
                                     mean[m] = models[m](images_val[m])
                                     variance[m] = torch.zeros(mean[m].shape)

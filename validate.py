@@ -15,7 +15,7 @@ import cv2
 from ptsemseg.models import get_model
 from ptsemseg.loss import get_loss_function
 from ptsemseg.loader import get_loaders
-from ptsemseg.utils import get_logger, parseEightCameras, plotPrediction, plotMeansVariances, plotEntropy, plotMutualInfo
+from ptsemseg.utils import get_logger, parseEightCameras, plotPrediction, plotMeansVariances, plotEntropy, plotMutualInfo, plotSpatial, save_pred
 from ptsemseg.metrics import runningScore, averageMeter
 from ptsemseg.schedulers import get_scheduler
 from ptsemseg.optimizers import get_optimizer
@@ -229,8 +229,7 @@ def validate(cfg, writer, logger, logdir):
                         entropy[m] = torch.zeros(labels_val.shape)
                         mutual_info[m] = torch.zeros(labels_val.shape)
                     elif hasattr(models[m].module, 'forwardMCDO'):
-                        mean[m], variance[m], entropy[m], mutual_info[m] = models[m].module.forwardMCDO(
-                            images_val[m], recalType=cfg["recal"])
+                        mean[m], variance[m], entropy[m], mutual_info[m] = models[m].module.forwardMCDO(images_val[m])
                     else:
                         mean[m] = models[m](images_val[m])
                         variance[m] = torch.zeros(mean[m].shape)
@@ -272,6 +271,27 @@ def validate(cfg, writer, logger, logdir):
                                            pred, gt, mean[m], variance[m])
                         plotEntropy(logdir, i + 1, i_val, k + "/" + m, pred, entropy[m])
                         plotMutualInfo(logdir, i + 1, i_val, k + "/" + m, pred, mutual_info[m])
+
+                    mutual_info_argmin = mutual_info[0, :, :].argmin()
+                    mutual_info_argmax = mutual_info[0, :, :].argmax()
+                    entropy_argmin = entropy[0, :, :].argmin()
+                    entropy_argmax = entropy[0, :, :].argmax()
+                    save_pred(logdir, [mutual_info_argmin // 512, mutual_info_argmin % 512],
+                              k, i_val, i, outputs, mutual_info[0, mutual_info_argmin // 512, mutual_info_argmin % 512],
+                              entropy[0, mutual_info_argmin // 512, mutual_info_argmin % 512])
+                    save_pred(logdir, [mutual_info_argmax // 512, mutual_info_argmax % 512],
+                              k, i_val, i, outputs, mutual_info[0, mutual_info_argmax // 512, mutual_info_argmax % 512],
+                              entropy[0, mutual_info_argmax // 512, mutual_info_argmax % 512])
+                    save_pred(logdir, [entropy_argmin // 512, entropy_argmin % 512],
+                              k, i_val, i, outputs, mutual_info[0, entropy_argmin // 512, entropy_argmin % 512],
+                              entropy[0, entropy_argmin // 512, entropy_argmin % 512])
+                    save_pred(logdir, [entropy_argmax // 512, entropy_argmax % 512],
+                              k, i_val, i, outputs, mutual_info[0, entropy_argmax // 512, entropy_argmax % 512],
+                              entropy[0, 170, 256])
+
+                    save_pred(logdir, [170, 256], k, i_val, itr, prob, mutual_info[0, 170, 256], entropy[0, 170, 256])
+
+                    plotSpatial(logdir, i, i_val, k + "/" + m, pred, tup1)
 
                 running_metrics_val[k].update(gt, pred)
 

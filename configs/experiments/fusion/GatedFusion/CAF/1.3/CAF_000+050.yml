@@ -1,9 +1,9 @@
 seed: 1337
 id: CAF_segnet_1.3_T000+T050
 models:
-    d:
+    rgbd:
         # model settings
-        arch: segnet_mcdo
+        arch: CAFnet
         in_channels: 3
         start_layer: down1
         end_layer: up1

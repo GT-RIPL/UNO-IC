@@ -20,7 +20,7 @@ bins: 20
 temperatureScaling: True
 
 # training
-freeze_seg: True
+freeze_seg: False
 freeze_temp: False
 
 # learned fusion specific settings

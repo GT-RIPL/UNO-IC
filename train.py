@@ -244,12 +244,12 @@ def train(cfg, writer, logger, logdir):
 
                 loss[m].backward()
 
-                if (i + 1) % cfg['training']['print_interval'] == 0:
-                    #plot_grad_flow(models[m].module.fusion, i)
-                    for n, p in models[m].module.fusion.named_parameters():
-                        if (p.requires_grad) and ("bias" not in n):
-                            logger.info(str(n))
-                            logger.info(str(p.grad))
+               # if (i + 1) % cfg['training']['print_interval'] == 0:
+               #     #plot_grad_flow(models[m].module.fusion, i)
+               #     for n, p in models[m].module.fusion.named_parameters():
+               #         if (p.requires_grad) and ("bias" not in n):
+               #             logger.info(str(n))
+               #             logger.info(str(p.grad))
                 
                 optimizers[m].step()
             time_meter.update(time.time() - start_ts)

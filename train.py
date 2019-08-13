@@ -248,7 +248,6 @@ def train(cfg, writer, logger, logdir):
                     #plot_grad_flow(models[m].module.fusion, i)
                     for n, p in models[m].module.fusion.named_parameters():
                         if (p.requires_grad) and ("bias" not in n):
-                            print(n, p.grad)
                             logger.info(str(n))
                             logger.info(str(p.grad))
                 

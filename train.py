@@ -427,7 +427,7 @@ def train(cfg, writer, logger, logdir):
                                                      "best_model",
                                                      "{}_{}_{}_best_model.pkl".format(
                                                          m,
-                                                         cfg['model']['arch'],
+                                                         cfg['models'][m]['arch'],
                                                          cfg['data']['dataset']))
                             torch.save(state, save_path)
 
@@ -441,7 +441,7 @@ def train(cfg, writer, logger, logdir):
                                                          "best_model",
                                                          "{}_{}_{}_swag.pkl".format(
                                                              m,
-                                                             cfg['model']['arch'],
+                                                             cfg['models'][m]['arch'],
                                                              cfg['data']['dataset']))
 
                                 torch.save(state, save_path)
@@ -457,7 +457,7 @@ def train(cfg, writer, logger, logdir):
                         save_path = os.path.join(writer.file_writer.get_logdir(),
                                                  "{}_{}_{}_best_model.pkl".format(
                                                      m,
-                                                     cfg['model']['arch'],
+                                                     cfg['models'][m]['arch'],
                                                      cfg['data']['dataset']))
                         torch.save(state, save_path)
 
@@ -470,7 +470,7 @@ def train(cfg, writer, logger, logdir):
                             save_path = os.path.join(writer.file_writer.get_logdir(),
                                                      "{}_{}_{}_swag.pkl".format(
                                                          m,
-                                                         cfg['model']['arch'],
+                                                         cfg['models'][m]['arch'],
                                                          cfg['data']['dataset']))
 
                             torch.save(state, save_path)

@@ -272,27 +272,6 @@ def validate(cfg, writer, logger, logdir):
                         plotEntropy(logdir, i + 1, i_val, k + "/" + m, pred, entropy[m])
                         plotMutualInfo(logdir, i + 1, i_val, k + "/" + m, pred, mutual_info[m])
 
-                    mutual_info_argmin = mutual_info[0, :, :].argmin()
-                    mutual_info_argmax = mutual_info[0, :, :].argmax()
-                    entropy_argmin = entropy[0, :, :].argmin()
-                    entropy_argmax = entropy[0, :, :].argmax()
-                    save_pred(logdir, [mutual_info_argmin // 512, mutual_info_argmin % 512],
-                              k, i_val, i, outputs, mutual_info[0, mutual_info_argmin // 512, mutual_info_argmin % 512],
-                              entropy[0, mutual_info_argmin // 512, mutual_info_argmin % 512])
-                    save_pred(logdir, [mutual_info_argmax // 512, mutual_info_argmax % 512],
-                              k, i_val, i, outputs, mutual_info[0, mutual_info_argmax // 512, mutual_info_argmax % 512],
-                              entropy[0, mutual_info_argmax // 512, mutual_info_argmax % 512])
-                    save_pred(logdir, [entropy_argmin // 512, entropy_argmin % 512],
-                              k, i_val, i, outputs, mutual_info[0, entropy_argmin // 512, entropy_argmin % 512],
-                              entropy[0, entropy_argmin // 512, entropy_argmin % 512])
-                    save_pred(logdir, [entropy_argmax // 512, entropy_argmax % 512],
-                              k, i_val, i, outputs, mutual_info[0, entropy_argmax // 512, entropy_argmax % 512],
-                              entropy[0, 170, 256])
-
-                    save_pred(logdir, [170, 256], k, i_val, itr, prob, mutual_info[0, 170, 256], entropy[0, 170, 256])
-
-                    plotSpatial(logdir, i, i_val, k + "/" + m, pred, tup1)
-
                 running_metrics_val[k].update(gt, pred)
 
         for m in cfg["models"].keys():

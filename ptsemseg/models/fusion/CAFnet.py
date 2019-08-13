@@ -89,6 +89,8 @@ class CAFnet(nn.Module):
 
         self.fusion = self._get_fusion_module(fusion_module)(n_classes)
 
+
+
     def forward(self, inputs):
 
         # Freeze batchnorm
@@ -111,6 +113,11 @@ class CAFnet(nn.Module):
         variance['d'] = torch.mean(variance['d'], 1).view(-1, 1, s[2], s[3])
 
         x = self.fusion(mean, variance)
+        #for param in self.fusion.parameters():
+        #    print(param.data)
+
+        #import ipdb; ipdb.set_trace()
+        #print(x)
 
         return x
 

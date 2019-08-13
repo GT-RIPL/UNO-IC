@@ -14,12 +14,14 @@ from validate import validate
 from torch.utils import data
 from tqdm import tqdm
 import cv2
+import matplotlib.pyplot as plt
 
 # from ptsemseg.process_img import generate_noise
 from ptsemseg.models import get_model
 from ptsemseg.loss import get_loss_function
 from ptsemseg.loader import get_loaders
-from ptsemseg.utils import get_logger, parseEightCameras, plotPrediction, plotMeansVariances, plotEntropy, plotMutualInfo
+from ptsemseg.utils import get_logger, parseEightCameras, plotPrediction, plotMeansVariances, plotEntropy, \
+    plotMutualInfo
 from ptsemseg.metrics import runningScore, averageMeter
 from ptsemseg.schedulers import get_scheduler
 from ptsemseg.optimizers import get_optimizer
@@ -32,6 +34,25 @@ import time
 # SWAG lib imports
 from ptsemseg.posteriors import SWAG
 from ptsemseg.utils import bn_update, mem_report
+
+
+def plot_grad_flow(module, i=0):
+    ave_grads = []
+    layers = []
+    for n, p in module.named_parameters():
+        if (p.requires_grad) and ("bias" not in n):
+            layers.append(n)
+            ave_grads.append(p.grad.abs().mean())
+    plt.plot(ave_grads, alpha=0.3, color="b")
+    plt.hlines(0, 0, len(ave_grads) + 1, linewidth=1, color="k")
+    plt.xticks(range(0, len(ave_grads), 1), layers, rotation="vertical")
+    plt.xlim(xmin=0, xmax=len(ave_grads))
+    plt.xlabel("Layers")
+    plt.ylabel("average gradient")
+    plt.title("Gradient flow")
+    plt.grid(True)
+    plt.savefig("gradient_flow_{}".format(i))
+    plt.close()
 
 
 def random_seed(seed_value, use_cuda):
@@ -223,6 +244,14 @@ def train(cfg, writer, logger, logdir):
 
                 loss[m].backward()
 
+                if (i + 1) % cfg['training']['print_interval'] == 0:
+                    #plot_grad_flow(models[m].module.fusion, i)
+                    for n, p in models[m].module.fusion.named_parameters():
+                        if (p.requires_grad) and ("bias" not in n):
+                            print(n, p.grad)
+                            logger.info(str(n))
+                            logger.info(str(p.grad))
+                
                 optimizers[m].step()
             time_meter.update(time.time() - start_ts)
             if (i + 1) % cfg['training']['print_interval'] == 0:
@@ -262,8 +291,11 @@ def train(cfg, writer, logger, logdir):
                     for m in cfg["models"].keys():
 
                         bs = cfg['training']['batch_size']
-                        output_all = torch.zeros((len(loaders['recal']) * bs, n_classes, cfg['data']['img_rows'], cfg['data']['img_cols']))
-                        labels_all = torch.zeros((len(loaders['recal']) * bs, cfg['data']['img_rows'], cfg['data']['img_cols']), dtype=torch.long)
+                        output_all = torch.zeros(
+                            (len(loaders['recal']) * bs, n_classes, cfg['data']['img_rows'], cfg['data']['img_cols']))
+                        labels_all = torch.zeros(
+                            (len(loaders['recal']) * bs, cfg['data']['img_rows'], cfg['data']['img_cols']),
+                            dtype=torch.long)
 
                         with torch.no_grad():
                             for i_recal, (input_list, labels_list) in tqdm(enumerate(loaders['recal'])):
@@ -275,7 +307,8 @@ def train(cfg, writer, logger, logdir):
                                 labels_recal = labels[:bs, :, :]
 
                                 # Run Models
-                                mean, variance, entropy, mutual_info = models[m].module.forwardMCDO(images_val[m], logdir, k, i_val, i)
+                                mean, variance, entropy, mutual_info = models[m].module.forwardMCDO(images_val[m],
+                                                                                                    logdir, k, i_val, i)
                                 # concat results
                                 output_all[bs * i_recal:bs * (i_recal + 1), :, :, :] = torch.nn.Softmax(dim=1)(mean)
                                 labels_all[bs * i_recal:bs * (i_recal + 1), :, :] = labels_recal
@@ -323,7 +356,8 @@ def train(cfg, writer, logger, logdir):
                                     mean[m] = swag_models[m](images_val[m])
                                     variance[m] = torch.zeros(mean[m].shape)
                                 elif hasattr(models[m].module, 'forwardMCDO'):
-                                    mean[m], variance[m], entropy[m], mutual_info[m] = models[m].module.forwardMCDO(images_val[m])
+                                    mean[m], variance[m], entropy[m], mutual_info[m] = models[m].module.forwardMCDO(
+                                        images_val[m])
                                 else:
                                     mean[m] = models[m](images_val[m])
                                     variance[m] = torch.zeros(mean[m].shape)
@@ -347,7 +381,8 @@ def train(cfg, writer, logger, logdir):
                                     d[:, n, :, :] = d[:, n, :, :] * d_var
                                 outputs = rgb + d
                             elif cfg["fusion"] == "Noisy-Or":
-                                outputs = 1 - (1 - torch.nn.Softmax(dim=1)(mean["rgb"])) * (1 - torch.nn.Softmax(dim=1)(mean["d"]))
+                                outputs = 1 - (1 - torch.nn.Softmax(dim=1)(mean["rgb"])) * (
+                                        1 - torch.nn.Softmax(dim=1)(mean["d"]))
                             else:
                                 print("Fusion Type Not Supported")
 

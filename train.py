@@ -10,7 +10,7 @@ import torch
 import random
 import argparse
 import numpy as np
-from validate import validate
+
 from torch.utils import data
 from tqdm import tqdm
 import cv2
@@ -35,24 +35,26 @@ import time
 from ptsemseg.posteriors import SWAG
 from ptsemseg.utils import bn_update, mem_report
 
+global logdir, cfg, n_classes, i, i_val, k
 
 def plot_grad_flow(module, i=0):
     ave_grads = []
     layers = []
     for n, p in module.named_parameters():
         if (p.requires_grad) and ("bias" not in n):
-            layers.append(n)
-            ave_grads.append(p.grad.abs().mean())
+            
+            for _ in range(len(p)):
+                layers.append(_)
+                ave_grads.append(p.grad[_].abs().mean().item())
+    print(layers, ave_grads)
     plt.plot(ave_grads, alpha=0.3, color="b")
-    plt.hlines(0, 0, len(ave_grads) + 1, linewidth=1, color="k")
-    plt.xticks(range(0, len(ave_grads), 1), layers, rotation="vertical")
-    plt.xlim(xmin=0, xmax=len(ave_grads))
     plt.xlabel("Layers")
     plt.ylabel("average gradient")
     plt.title("Gradient flow")
     plt.grid(True)
-    plt.savefig("gradient_flow_{}".format(i))
-    plt.close()
+    
+    if (i + 1) % 50 == 0:
+        plt.savefig("gradient_flow_{}".format(i))
 
 
 def random_seed(seed_value, use_cuda):
@@ -206,6 +208,7 @@ def train(cfg, writer, logger, logdir):
                 print("No checkpoint found at '{}'".format(model_pkl))
                 exit()
 
+    plt.clf()           
     i = start_iter
     print("Beginning Training at iteration: {}".format(i))
     while i < cfg["training"]["train_iters"]:
@@ -244,12 +247,7 @@ def train(cfg, writer, logger, logdir):
 
                 loss[m].backward()
 
-                if (i + 1) % cfg['training']['print_interval'] == 0:
-                    #plot_grad_flow(models[m].module.fusion, i)
-                    for n, p in models[m].module.fusion.named_parameters():
-                        if (p.requires_grad) and ("bias" not in n):
-                            logger.info(str(n))
-                            logger.info(str(p.grad))
+                # plot_grad_flow(models[m].module.fusion, i)
                 
                 optimizers[m].step()
             time_meter.update(time.time() - start_ts)

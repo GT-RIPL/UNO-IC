@@ -4,6 +4,9 @@ from torch.autograd import Variable
 from .fusion import *
 from ptsemseg.models.recalibrator import *
 from ptsemseg.models.segnet_mcdo import *
+from ptsemseg.utils import mutualinfo_entropy, plotEverything, plotPrediction
+
+import torch.nn as nn
 
 
 class CAFnet(nn.Module):
@@ -29,6 +32,7 @@ class CAFnet(nn.Module):
                  freeze_seg=True,
                  freeze_temp=True,
                  fusion_module="1.3",
+                 scale_module="None",
                  pretrained_rgb="./models/Segnet/rgb_Segnet/rgb_segnet_mcdo_airsim_T000+T050.pkl",
                  pretrained_d="./models/Segnet/d_Segnet/d_segnet_mcdo_airsim_T000+T050.pkl"
                  ):
@@ -87,12 +91,13 @@ class CAFnet(nn.Module):
         for param in self.d_segnet.parameters():
             param.requires_grad = False
 
-        self.fusion = self._get_fusion_module(fusion_module)(n_classes)
+        self.fusion = self._get_fusion_module(fusion_module, n_classes)
+        self.scale = self._get_scale_module(scale_module)
+        self.i = 0
 
-
+        self.fuseProbabilities = True
 
     def forward(self, inputs):
-
         # Freeze batchnorm
         self.rgb_segnet.eval()
         self.d_segnet.eval()
@@ -103,21 +108,53 @@ class CAFnet(nn.Module):
         mean = {}
         variance = {}
         entropy = {}
-        MI = {}
+        mutual_info = {}
 
-        mean['rgb'], variance['rgb'], entropy['rgb'], MI['rgb'] = self.rgb_segnet.module.forwardMCDO(inputs_rgb)
-        mean['d'], variance['d'], entropy['d'], MI['d'] = self.d_segnet.module.forwardMCDO(inputs_d)
+        # computer logits and uncertainty measures
+        mean['rgb'], variance['rgb'], entropy['rgb'], mutual_info['rgb'] = self.rgb_segnet.module.forwardMCDO(
+            inputs_rgb)
+        mean['d'], variance['d'], entropy['d'], mutual_info['d'] = self.d_segnet.module.forwardMCDO(inputs_d)
+        variance['rgb'] = torch.mean(variance['rgb'], 1).unsqueeze(1)
+        variance['d'] = torch.mean(variance['d'], 1).unsqueeze(1)
 
-        s = variance['rgb'].shape
-        variance['rgb'] = torch.mean(variance['rgb'], 1).view(-1, 1, s[2], s[3])
-        variance['d'] = torch.mean(variance['d'], 1).view(-1, 1, s[2], s[3])
+        # scale logits by uncertainty
+        if self.scale is not None:
+            mean['rgb'], mean['d'] = self.scale(mean, variance, entropy, mutual_info)  # [bs, n, 512, 512]
 
-        x = self.fusion(mean, variance)
-        #for param in self.fusion.parameters():
-        #    print(param.data)
+        # take probabilities
+        if self.fuseProbabilities or self.scale is not None:
+            mean['rgb'] = nn.Softmax(dim=1)(mean['rgb'])
+            mean['d'] = nn.Softmax(dim=1)(mean['d'])
 
-        #import ipdb; ipdb.set_trace()
-        #print(x)
+        # fuse outputs
+        x = self.fusion(mean, variance, entropy, mutual_info)  # [bs, n, 512, 512]
+
+        # plot uncertainty
+        self.i += 1
+        if (self.i) % 5 == 0:
+            p = nn.Softmax(dim=1)(x)
+
+            entropy['rgbd'], mutual_info['rgbd'] = mutualinfo_entropy(p.unsqueeze(-1))
+
+            pred = {}
+            pred['rgb'] = mean['rgb'].max(1)[0]
+            pred['d'] = mean['d'].max(1)[0]
+            pred['rgbd'] = p.max(1)[0]
+
+            labels = ['mutual info', 'entropy', 'probability', 'variance']
+
+            values = [mutual_info['rgb'], entropy['rgb'], pred['rgb'], variance['rgb'].squeeze(1)]
+            plotEverything('./plots/', self.i, self.i, "/rgb", values, labels)
+
+            values = [mutual_info['d'], entropy['d'], pred['d'], variance['d'].squeeze(1)]
+            plotEverything('./plots/', self.i, self.i, "/d", values, labels)
+
+            values = [mutual_info['rgbd'], entropy['rgbd'], pred['rgbd'], torch.zeros((1, 512, 512))]
+            plotEverything('./plots/', self.i, self.i, "/rgbd", values, labels)
+
+            inputs = {'rgb': inputs_rgb, 'd': inputs_d}
+            plotPrediction('./plots/', None, 11, self.i, self.i, "/inputs", inputs, np.zeros((1, 512, 512)),
+                           np.zeros((1, 512, 512)))
 
         return x
 
@@ -142,21 +179,23 @@ class CAFnet(nn.Module):
             print("model not found")
             exit()
 
-    def _get_fusion_module(self, name):
+    def _get_fusion_module(self, name, n_classes=11):
 
         name = str(name)
 
         return {
-            "GatedFusion": GatedFusion,
-            "1.0": GatedFusion,
-            "ConditionalAttentionFusion": ConditionalAttentionFusion,
-            "1.1": ConditionalAttentionFusion,
+            "1.0": GatedFusion(n_classes),
+            "1.1": ConditionalAttentionFusion(n_classes),
+            "1.3": UncertaintyGatedFusion(n_classes),
+            "ScaledAverage": ScaledAverage(n_classes),
+        }[name]
 
-            "PreweightedGatedFusion": PreweightedGatedFusion,
-            "1.2": PreweightedGatedFusion,
-            "UncertaintyGatedFusion": UncertaintyGatedFusion,
-            "1.3": UncertaintyGatedFusion,
-            "ConditionalAttentionFusionv2": ConditionalAttentionFusionv2,
-            "2.1": ConditionalAttentionFusionv2,
-            "ScaledAverage": ScaledAverage,
+    def _get_scale_module(self, name):
+
+        name = str(name)
+
+        return {
+            "0.0": TemperatureScaling(),
+            "1.0": UncertaintyScaling(),
+            "None": None
         }[name]

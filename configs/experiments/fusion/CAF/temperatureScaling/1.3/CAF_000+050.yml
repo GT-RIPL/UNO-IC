@@ -56,15 +56,15 @@ data:
     noisy_type: None
 
 training:
-    train_iters: 300000
+    train_iters: 50000
     batch_size: 2
-    val_interval: 50000 #5000
+    val_interval: 100    #5000
     n_workers: 8
     print_interval: 50
     png_frames: 50 #5000
     optimizer:
         name: 'adam'
-        lr: 1.0e-4
+        lr: 1.0e-5
     loss:
         name: 'cross_entropy'
         size_average: True

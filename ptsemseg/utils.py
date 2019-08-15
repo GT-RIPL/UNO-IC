@@ -5,7 +5,7 @@ import matplotlib
 
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 import itertools
 import torch
 import torch.nn.functional as F
@@ -20,7 +20,6 @@ import gc
 
 from pandas import DataFrame
 from collections import OrderedDict
-
 
 def recursive_glob(rootdir=".", suffix=""):
     """Performs recursive glob with given suffix and rootdir 
@@ -461,6 +460,7 @@ def plotMutualInfo(logdir, i, i_val, k, pred, variance):
         os.makedirs(path)
     plt.savefig("{}/{}_{}_mutual_info.png".format(path, i_val, i))
     plt.close(fig)
+    
 def plotSpatial(logdir, i, i_val, k, pred, variance):
     path = "{}/{}".format(logdir, k)
     fig, axes = plt.subplots(1, 2)
@@ -468,9 +468,38 @@ def plotSpatial(logdir, i, i_val, k, pred, variance):
     axes[1].imshow(pred[0])
     if not os.path.exists(path):
         os.makedirs(path)
+    plt.colorbar()
     plt.savefig("{}/{}_{}_spatial.png".format(path, i_val, i))
     plt.close(fig)
 
+def plotMutualInfoEntropy(logdir, i, i_val, k, pred, variance):
+    path = "{}/{}".format(logdir, k)
+    fig, axes = plt.subplots(1, 2)
+    axes[0].imshow(pred[0].detach().cpu().numpy())
+    axes[1].imshow(variance[0, :, :].detach().cpu().numpy())
+    if not os.path.exists(path):
+        os.makedirs(path)
+    plt.colorbar()
+    plt.savefig("{}/{}_{}_mutual_info_entropy.png".format(path, i_val, i))
+    plt.close(fig)
+
+def plotEverything(logdir, i, i_val, k, values, labels):
+    path = "{}/{}".format(logdir, k)
+    fig, axes = plt.subplots(2, len(values)//2)
+    #import ipdb; ipdb.set_trace()
+        
+    for i in range(len(values)):
+        axes[i % 2, i // 2].set_title(labels[i])
+        im = axes[i % 2, i // 2].imshow(values[i][0, :, :].detach().cpu().numpy())
+        divider = make_axes_locatable(axes[i % 2, i // 2])
+        cax = divider.append_axes("right", size="5%", pad=0.05)
+        fig.colorbar(im, cax=cax)
+        
+    if not os.path.exists(path):
+        os.makedirs(path)
+    fig.tight_layout()
+    plt.savefig("{}/{}_{}_everything.png".format(path, i_val, i))
+    plt.close(fig)
 
 def save_pred(logdir, loc, k, i_val, i, pred, mutual_info, entropy):
     # pred [batch,11,512,512,num_passes]
@@ -560,7 +589,7 @@ def predictive_entropy(pred):
     return PEtropy
 
 
-def mutul_information(pred):
+def mutual_information(pred):
     # pred [batch,11,512,512,num_passes]
     # return [batch,512,512]
     MI = []
@@ -576,7 +605,7 @@ def mutul_information(pred):
 
 
 def mutualinfo_entropy(pred):
-    # pred [batch,11,512,512,num_passes]
+    # pred [batch,11,512,512]
     # return [batch,512,512]
     MI = []
     PEtropy = []
@@ -587,6 +616,7 @@ def mutualinfo_entropy(pred):
         PEtropy.append(entropy.unsqueeze(0))
         expect = pred[b, :, :, :, :] * torch.log(pred[b, :, :, :, :])  # [11,512,512,10]
         expect = expect.sum(0).mean(-1)  # (512,512)
+        print(expect, entropy)
         MI.append((entropy + expect).unsqueeze(0))
     PEtropy = torch.cat(PEtropy)
     MI = torch.cat(MI)

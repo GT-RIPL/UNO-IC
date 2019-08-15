@@ -9,9 +9,9 @@ class ScaledAverage(nn.Module):
         self.rgb_scaling = torch.nn.Parameter(torch.ones(1))
         self.d_scaling = torch.nn.Parameter(torch.ones(1))
 
-    def forward(self, rgb, d, rgb_var, d_var):
+    def forward(self, mean, variance, mutual_info, entropy):
 
-        return rgb * self.rgb_scaling + d + self.d_scaling
+        return mean['rgb'] * self.rgb_scaling + mean['d'] * self.d_scaling
 
 class GatedFusion(nn.Module):
     def __init__(self, n_classes):
@@ -28,12 +28,10 @@ class GatedFusion(nn.Module):
         )
         self.sigmoid = nn.Sigmoid()
 
-    def forward(self, mean, variance):
-        
-        rgb = mean['rgb']
-        d = mean['d']
-        rgb_var = variance['rgb']
-        d_var = variance['d']
+    def forward(self, mean, variance, mutual_info, entropy):
+    
+        rgb, rgb_var, rgb_mi, rgb_entropy = mean['rgb'], variance['rgb'], mutual_info['rgb'], entropy['rgb']
+        d, d_var, d_mi, d_entropy = mean['d'], variance['d'], mutual_info['d'], entropy['d']
         
         fusion = torch.cat([rgb, d], dim=1)
 
@@ -64,20 +62,16 @@ class ConditionalAttentionFusion(nn.Module):
                                             dilation=1),
                                   nn.Sigmoid())
 
-    def forward(self, mean, variance):
+    def forward(self, mean, variance, mutual_info, entropy):
     
-        rgb = mean['rgb']
-        d = mean['d']
-        rgb_var = variance['rgb']
-        d_var = variance['d']
+        rgb, rgb_var, rgb_mi, rgb_entropy = mean['rgb'], variance['rgb'], mutual_info['rgb'], entropy['rgb']
+        d, d_var, d_mi, d_entropy = mean['d'], variance['d'], mutual_info['d'], entropy['d']
         
         AB = torch.cat([rgb, d], dim=1)
         ABCD = torch.cat([rgb, d, rgb_var, d_var], dim=1)
 
         G = self.gate(ABCD)
-        # fused = self.fuser(G)
-
-        # return fused
+        
         G_rgb = G
         G_d = torch.ones(G.shape, dtype=torch.float, device=G.device) - G
 
@@ -87,51 +81,8 @@ class ConditionalAttentionFusion(nn.Module):
         P_fusion = P_rgb + P_d
 
         return P_fusion
-
 
 # 1.2
-class PreweightedGatedFusion(nn.Module):
-    def __init__(self, n_channels):
-        super(PreweightedGatedFusion, self).__init__()
-        self.gate = nn.Sequential(nn.Conv2d(2 * n_channels,
-                                            n_channels,
-                                            3,
-                                            stride=1,
-                                            padding=1,
-                                            bias=True,
-                                            dilation=1),
-                                  nn.Sigmoid())
-
-    def forward(self, mean, variance):
-    
-        rgb = mean['rgb']
-        d = mean['d']
-        rgb_var = variance['rgb']
-        d_var = variance['d']
-        
-        rgb_var = 1 / (rgb_var + 1e-5)
-        d_var = 1 / (d_var + 1e-5)
-
-        for n in range(rgb.shape[1]):
-            rgb[:, n, :, :] = rgb[:, n, :, :] * rgb_var
-            d[:, n, :, :] = d[:, n, :, :] * d_var
-
-        AB = torch.cat([rgb, d], dim=1)
-
-        G = self.gate(AB)
-
-        G_rgb = G
-        G_d = torch.ones(G.shape, dtype=torch.float, device=G.device) - G
-
-        P_rgb = rgb * G_rgb
-        P_d = d * G_d
-
-        P_fusion = P_rgb + P_d
-
-        return P_fusion
-
-
-# 1.3
 class UncertaintyGatedFusion(nn.Module):
     def __init__(self, n_channels):
         super(UncertaintyGatedFusion, self).__init__()
@@ -144,12 +95,10 @@ class UncertaintyGatedFusion(nn.Module):
                                             dilation=1),
                                   nn.Sigmoid())
 
-    def forward(self, mean, variance):
+    def forward(self, mean, variance, mutual_info, entropy):
     
-        rgb = mean['rgb']
-        d = mean['d']
-        rgb_var = variance['rgb']
-        d_var = variance['d']
+        rgb, rgb_var, rgb_mi, rgb_entropy = mean['rgb'], variance['rgb'], mutual_info['rgb'], entropy['rgb']
+        d, d_var, d_mi, d_entropy = mean['d'], variance['d'], mutual_info['d'], entropy['d']
         
         CD = torch.cat([rgb_var, d_var], dim=1)
 
@@ -165,79 +114,43 @@ class UncertaintyGatedFusion(nn.Module):
         return P_fusion
 
 
-# 2.1
-class ConditionalAttentionFusionv2(nn.Module):
-    def __init__(self, n_channels):
-        super(ConditionalAttentionFusionv2, self).__init__()
-        self.probability_fusion = []
-        self.uncertainty_fusion = []
-        self.total_fusion = []
-        for n in range(n_channels):
-            self.uncertainty_fusion.append(nn.Conv2d(2,
-                                                     1,
-                                                     3,
-                                                     stride=1,
-                                                     padding=1,
-                                                     bias=False,
-                                                     dilation=1).cuda())
+# 0.0
+class TemperatureScaling(nn.Module):
+    def __init__(self):
+        super(TemperatureScaling, self).__init__()
+        self.rgb_temperature = nn.Parameter(torch.ones(1))
+        self.d_temperature = nn.Parameter(torch.ones(1))
 
-            self.probability_fusion.append(nn.Conv2d(2,
-                                                     1,
-                                                     1,
-                                                     stride=1,
-                                                     padding=0,
-                                                     bias=False,
-                                                     dilation=1).cuda())
-
-            self.total_fusion.append(nn.Conv2d(2,
-                                               1,
-                                               1,
-                                               stride=1,
-                                               padding=0,
-                                               bias=False,
-                                               dilation=1).cuda())
-
-        self.fuser = nn.Sequential(nn.Conv2d(n_channels,
-                                             n_channels,
-                                             1,
-                                             stride=1,
-                                             padding=0,
-                                             bias=False,
-                                             dilation=1),
-                                   nn.BatchNorm2d(int(n_channels)))
-
-        self.n_channels = n_channels
-
-    def forward(self, mean, variance):
+    def forward(self, mean, variance, mutual_info, entropy):
     
+        return mean['rgb'] / self.rgb_temperature, mean['d'] / self.d_temperature 
+
+# 1.0
+class UncertaintyScaling(nn.Module):
+    def __init__(self):
+        super(UncertaintyScaling, self).__init__()
+        self.rgb_scale = nn.Conv2d(2,
+                                   1,
+                                   3,
+                                   stride=1,
+                                   padding=1,
+                                   bias=True,
+                                   dilation=1)
+        self.d_scale = nn.Conv2d(2,
+                                 1,
+                                 3,
+                                 stride=1,
+                                 padding=1,
+                                 bias=True,
+                                 dilation=1)
+
+    def forward(self, mean, variance, mutual_info, entropy):
     
-        rgb = mean['rgb']
-        d = mean['d']
-        rgb_var = variance['rgb']
-        d_var = variance['d']
-
-        AB = torch.cat([rgb, d], dim=1)
-        CD = torch.cat([rgb_var, d_var], dim=1)
-        G = torch.zeros(rgb.shape, device=AB.device)
-
-        for n in range(self.n_channels):
-            A = rgb[:, n, :, :].view(-1, 1, rgb.shape[2], rgb.shape[3])
-            B = d[:, n, :, :].view(-1, 1, d.shape[2], d.shape[3])
-
-            _AB = self.probability_fusion[n](torch.cat([A, B], dim=1))
-            _CD = self.uncertainty_fusion[n](CD)
-
-            G[:, n, :, :] = torch.squeeze(self.total_fusion[n](torch.cat([_AB, _CD], dim=1)))
-
-        # fused = self.fuser(G)
-
-        # return fused
-        G_rgb = G
-        G_d = torch.ones(G.shape, dtype=torch.float, device=G.device) - G
-
-        P_rgb = rgb * G_rgb
-        P_d = d * G_d
-
-        P_fusion = P_rgb + P_d
-
-        return P_fusion
+        rgb, rgb_var, rgb_mi, rgb_entropy = mean['rgb'], variance['rgb'], mutual_info['rgb'], entropy['rgb']
+        d, d_var, d_mi, d_entropy = mean['d'], variance['d'], mutual_info['d'], entropy['d']
+        
+        rgb = rgb / self.rgb_scale(torch.cat([rgb_var, rgb_entropy], dim=1))
+        d = d / self.d_scale(torch.cat([d_var, d_entropy], dim=1))
+        
+        return rgb, d
+        

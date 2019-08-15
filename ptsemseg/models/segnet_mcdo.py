@@ -206,8 +206,7 @@ class segnet_mcdo(nn.Module):
         with torch.no_grad():
             for i in range(self.mcdo_passes):
                 if i == 0:
-                    x_bp = self.forward(inputs)
-                    x = x_bp.unsqueeze(-1)
+                    x = self.forward(inputs).unsqueeze(-1)
                 else:
                     x = torch.cat((x, self.forward(inputs).unsqueeze(-1)), -1)
 
@@ -232,7 +231,7 @@ class segnet_mcdo(nn.Module):
                         mean[:, c, :, :].shape)
 
         prob = self.softmaxMCDO(x)
-        entropy, mutual_info = mutualinfo_entropy(prob)  # (2,512,512)
+        entropy, mutual_info = mutualinfo_entropy(prob)  # (batch,512,512)
 
         return mean, variance, entropy, mutual_info
 

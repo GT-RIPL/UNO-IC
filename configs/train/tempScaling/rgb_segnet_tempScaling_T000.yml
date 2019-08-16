@@ -61,5 +61,5 @@ training:
         name: 'cross_entropy'
         size_average: True
     lr_schedule:
-    resume_iteration: None
+    resume_iteration: False
 

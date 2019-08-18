@@ -32,7 +32,7 @@ class CAFnet(nn.Module):
                  freeze_seg=True,
                  freeze_temp=True,
                  fusion_module="1.3",
-                 scale_module="None",
+                 scaling_module="None",
                  pretrained_rgb="./models/Segnet/rgb_Segnet/rgb_segnet_mcdo_airsim_T000+T050.pkl",
                  pretrained_d="./models/Segnet/d_Segnet/d_segnet_mcdo_airsim_T000+T050.pkl"
                  ):
@@ -92,10 +92,11 @@ class CAFnet(nn.Module):
             param.requires_grad = False
 
         self.fusion = self._get_fusion_module(fusion_module, n_classes)
-        self.scale = self._get_scale_module(scale_module)
+        self.scale = self._get_scale_module(scaling_module, rgb_init=self.rgb_segnet.module.temperature, d_init=self.d_segnet.module.temperature)
         self.i = 0
 
         self.fuseProbabilities = True
+        self.fusion = NoisyOr(n_classes)
 
     def forward(self, inputs):
         # Freeze batchnorm
@@ -111,8 +112,7 @@ class CAFnet(nn.Module):
         mutual_info = {}
 
         # computer logits and uncertainty measures
-        mean['rgb'], variance['rgb'], entropy['rgb'], mutual_info['rgb'] = self.rgb_segnet.module.forwardMCDO(
-            inputs_rgb)
+        mean['rgb'], variance['rgb'], entropy['rgb'], mutual_info['rgb'] = self.rgb_segnet.module.forwardMCDO(inputs_rgb)
         mean['d'], variance['d'], entropy['d'], mutual_info['d'] = self.d_segnet.module.forwardMCDO(inputs_d)
         variance['rgb'] = torch.mean(variance['rgb'], 1).unsqueeze(1)
         variance['d'] = torch.mean(variance['d'], 1).unsqueeze(1)
@@ -121,8 +121,7 @@ class CAFnet(nn.Module):
         if self.scale is not None:
             mean['rgb'], mean['d'] = self.scale(mean, variance, entropy, mutual_info)  # [bs, n, 512, 512]
 
-        # take probabilities
-        if self.fuseProbabilities or self.scale is not None:
+        if self.scale is not None or self.fuseProbabilities:
             mean['rgb'] = nn.Softmax(dim=1)(mean['rgb'])
             mean['d'] = nn.Softmax(dim=1)(mean['d'])
 
@@ -133,7 +132,6 @@ class CAFnet(nn.Module):
         self.i += 1
         if (self.i) % 5 == 0:
             p = nn.Softmax(dim=1)(x)
-
             entropy['rgbd'], mutual_info['rgbd'] = mutualinfo_entropy(p.unsqueeze(-1))
 
             pred = {}
@@ -142,7 +140,7 @@ class CAFnet(nn.Module):
             pred['rgbd'] = p.max(1)[0]
 
             labels = ['mutual info', 'entropy', 'probability', 'variance']
-
+            
             values = [mutual_info['rgb'], entropy['rgb'], pred['rgb'], variance['rgb'].squeeze(1)]
             plotEverything('./plots/', self.i, self.i, "/rgb", values, labels)
 
@@ -187,15 +185,22 @@ class CAFnet(nn.Module):
             "1.0": GatedFusion(n_classes),
             "1.1": ConditionalAttentionFusion(n_classes),
             "1.3": UncertaintyGatedFusion(n_classes),
-            "ScaledAverage": ScaledAverage(n_classes),
+            
+            "GatedFusion": GatedFusion(n_classes),
+            "CAF": ConditionalAttentionFusion(n_classes),
+            "UncertaintyGatedFusion": UncertaintyGatedFusion(n_classes),
+            
+            "Average": Average(n_classes),
+            "Multiply": Multiply(n_classes),
+            "NoisyOr": NoisyOr(n_classes),
         }[name]
 
-    def _get_scale_module(self, name):
+    def _get_scale_module(self, name, rgb_init=None, d_init=None):
 
         name = str(name)
 
         return {
-            "0.0": TemperatureScaling(),
-            "1.0": UncertaintyScaling(),
+            "temperature": TemperatureScaling(rgb_init=rgb_init, d_init=d_init),
+            "uncertainty": UncertaintyScaling(rgb_init=rgb_init, d_init=d_init),
             "None": None
         }[name]

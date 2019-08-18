@@ -130,7 +130,8 @@ def train(cfg, writer, logger, logdir):
                                   freeze_temp=cfg['freeze_temp'],
                                   pretrained_rgb=cfg['pretrained_rgb'],
                                   pretrained_d=cfg['pretrained_d'],
-                                  fusion_module=cfg['fusion_module']).to(device)
+                                  fusion_module=cfg['fusion_module'],
+                                  scaling_module=cfg['scaling_module']).to(device)
 
         models[model] = torch.nn.DataParallel(models[model], device_ids=range(torch.cuda.device_count()))
 
@@ -245,7 +246,14 @@ def train(cfg, writer, logger, logdir):
 
                 loss[m] = loss_fn(input=outputs[m], target=labels)
 
+
+                # import ipdb; ipdb.set_trace()
                 loss[m].backward()
+
+
+                # for n, p in models[m].module.named_parameters():
+                    # if (p.requires_grad) and ("bias" not in n):
+                        # print(n, p, p.grad)
 
                 # plot_grad_flow(models[m].module.fusion, i)
                 
@@ -390,10 +398,9 @@ def train(cfg, writer, logger, logdir):
                             if i_val % cfg["training"]["png_frames"] == 0:
                                 plotPrediction(logdir, cfg, n_classes, i, i_val, k, inputs_display, pred, gt)
                                 for m in cfg["models"].keys():
-                                    plotMeansVariances(logdir, cfg, n_classes, i, i_val, m, k + "/" + m, inputs,
-                                                       pred, gt, mean[m], variance[m])
-                                    plotEntropy(logdir, i, i_val, k + "/" + m, pred, entropy[m])
-                                    plotMutualInfo(logdir, i, i_val, k + "/" + m, pred, mutual_info[m])
+                                    labels = ['mutual info', 'entropy', 'probability', 'variance']                                    
+                                    values = [mutual_info[m], entropy[m], pred[m], variance[m]]
+                                    plotEverything(logdir, i, i_val, "/rgb", values, labels)
 
                             running_metrics_val[k].update(gt, pred)
 
@@ -411,6 +418,7 @@ def train(cfg, writer, logger, logdir):
                 mean_iou = 0
 
                 for env, valloader in loaders['val'].items():
+                    logger.info(env)
                     score, class_iou = running_metrics_val[env].get_scores()
                     for k, v in score.items():
                         logger.info('{}: {}'.format(k, v))

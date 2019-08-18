@@ -1,4 +1,4 @@
-id: CAFSegnet_T000_v1.3
+id: CAFSegnet_T000_v1.1_blackout_training
 model:
     arch: CAF_segnet
 models:
@@ -11,7 +11,7 @@ models:
         dropoutP: 0.5
         resume_rgb: ./models/Segnet/rgb_Segnet/rgb_segnet_mcdo_airsim_T000.pkl
         resume_d: ./models/Segnet/d_Segnet/d_segnet_mcdo_airsim_T000.pkl
-        fusion_module: 1.3
+        fusion_module: 1.1
 fusion: None #{None,SoftmaxMultiply}
 recal: None #{None,afterMCDO,beforeMCDO}
 recalibrator: None #{Histogram,Polynomial_X}
@@ -19,7 +19,9 @@ bins: 20
 data:
     dataset: airsim
     train_split: train
-    train_subsplit: ['async_fog_000_clear']
+    train_subsplit: ['async_fog_000_clear',
+                     "async_fog_000_clear__{'channel':'rgb','type':'blackoutNoise','value':'20'}",
+                     "async_fog_000_clear__{'channel':'d','type':'blackoutNoise','value':'20'}",]
     train_reduction: 1.0    
     recal_split: recal
     recal_subsplit: ['async_fog_000_clear']
@@ -33,7 +35,7 @@ data:
                    "async_fog_100_clear__{'channel':'d','type':'blackoutNoise','value':'20'}",
 
                   ]    
-    val_reduction: 0.5
+    val_reduction: 0.01
     img_rows: 512
     img_cols: 512
     path: datasets/airsim_data_async #../../ros/data/airsim_03-30-2019/airsim_data_async
@@ -53,3 +55,4 @@ training:
         size_average: True
     lr_schedule:
     resume: None
+

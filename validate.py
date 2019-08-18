@@ -256,23 +256,10 @@ def validate(cfg, writer, logger, logdir):
                         d[:, n, :, :] = d[:, n, :, :] * d_var
                     outputs = rgb + d
                 elif cfg["fusion"] == "Noisy-Or":
-                    outputs = 1 - (1 - torch.nn.Softmax(dim=1)(mean["rgb"])) * (1 - torch.nn.Softmax(dim=1)(mean["d"]))
+                    outputs = 1 - (1 - torch.nn.Softmax(dim=1)(mean["rgb"])) * (
+                            1 - torch.nn.Softmax(dim=1)(mean["d"]))
                 else:
                     print("Fusion Type Not Supported")
-
-                # plot ground truth vs mean/variance of outputs
-                pred = outputs.argmax(1).cpu().numpy()
-                gt = labels_val.data.cpu().numpy()
-                # import ipdb;ipdb.set_trace()
-                if i_val % cfg["training"]["png_frames"] == 0:
-                    plotPrediction(logdir, cfg, n_classes, i + 1, i_val, k, inputs_display, pred, gt)
-                    for m in cfg["models"].keys():
-                        plotMeansVariances(logdir, cfg, n_classes, i + 1, i_val, m, k + "/" + m, inputs_display,
-                                           pred, gt, mean[m], variance[m])
-                        plotEntropy(logdir, i + 1, i_val, k + "/" + m, pred, entropy[m])
-                        plotMutualInfo(logdir, i + 1, i_val, k + "/" + m, pred, mutual_info[m])
-
-                running_metrics_val[k].update(gt, pred)
 
         for m in cfg["models"].keys():
             for k in loaders['val'].keys():

@@ -1,4 +1,4 @@
-id: CAFSegnet_T000_v1.3_blackout_training
+id: CAFSegnet_T000_v1.0_blackout_training
 model:
     arch: CAF_segnet
 models:
@@ -11,7 +11,7 @@ models:
         dropoutP: 0.5
         resume_rgb: ./models/Segnet/rgb_Segnet/rgb_segnet_mcdo_airsim_T000.pkl
         resume_d: ./models/Segnet/d_Segnet/d_segnet_mcdo_airsim_T000.pkl
-        fusion_module: 1.3
+        fusion_module: 1.0
 fusion: None #{None,SoftmaxMultiply}
 recal: None #{None,afterMCDO,beforeMCDO}
 recalibrator: None #{Histogram,Polynomial_X}
@@ -35,7 +35,7 @@ data:
                    "async_fog_100_clear__{'channel':'d','type':'blackoutNoise','value':'20'}",
 
                   ]    
-    val_reduction: 0.01
+    val_reduction: 0.5
     img_rows: 512
     img_cols: 512
     path: datasets/airsim_data_async #../../ros/data/airsim_03-30-2019/airsim_data_async
@@ -55,4 +55,3 @@ training:
         size_average: True
     lr_schedule:
     resume: None
-

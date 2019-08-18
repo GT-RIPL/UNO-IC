@@ -95,8 +95,7 @@ class segnet_mcdo(nn.Module):
                 "up1": segnetUp2MCDO(64, n_classes, pMCDO=dropoutP, relu=True),
             }
 
-        if self.temperatureScaling:
-            self.temperature = torch.nn.Parameter(torch.ones(1))
+        self.temperature = torch.nn.Parameter(torch.ones(1))
 
         self.softmaxMCDO = torch.nn.Softmax(dim=1)
 
@@ -211,24 +210,19 @@ class segnet_mcdo(nn.Module):
                     x = torch.cat((x, self.forward(inputs).unsqueeze(-1)), -1)
 
         mean = x.mean(-1)
-        variance = x.var(-1)
+        variance = self.softmaxMCDO(x).var(-1)
 
         # Uncalibrated Softmax Mean and Variance
         if str(self.recalibration) != "None":
 
-            mean = self.softmaxMCDO(x).mean(-1)
-            variance = self.softmaxMCDO(x).var(-1)
-
             if str(self.recalibration) == "beforeMCDO":
                 for c in range(self.n_classes):
-                    x[:, c, :, :, :] = self.calibrationPerClass[c].predict(x[:, c, :, :, :].reshape(-1)).reshape(
-                        x[:, c, :, :, :].shape)
+                    x[:, c, :, :, :] = self.calibrationPerClass[c].predict(x[:, c, :, :, :].reshape(-1)).reshape(x[:, c, :, :, :].shape)
                 mean = self.softmaxMCDO(x).mean(-1)
                 variance = self.softmaxMCDO(x).var(-1)
             elif str(self.recalibration) == "afterMCDO":
                 for c in range(self.n_classes):
-                    mean[:, c, :, :] = self.calibrationPerClass[c].predict(mean[:, c, :, :].reshape(-1)).reshape(
-                        mean[:, c, :, :].shape)
+                    mean[:, c, :, :] = self.calibrationPerClass[c].predict(mean[:, c, :, :].reshape(-1)).reshape(mean[:, c, :, :].shape)
 
         prob = self.softmaxMCDO(x)
         entropy, mutual_info = mutualinfo_entropy(prob)  # (batch,512,512)

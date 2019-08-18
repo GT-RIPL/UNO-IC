@@ -1,24 +1,18 @@
-id: rgbd_BayesianSegnet_SoftmaxMult(train000,recal100)
+id: CAFSegnet_T000_v1.0
 model:
-    arch: segnet_mcdo
+    arch: CAF_segnet
 models:
-    rgb:
-        in_channels: 3
-        start_layer: down1
-        end_layer: up1
-        reduction: 1.0
-        mcdo_passes: 6 # Number of Passes
-        dropoutP: 0.5 # Dropout Probability
-        resume: models/Segnet/rgb_Segnet/rgb_segnet_mcdo_airsim_T000.pkl
-    d:
+    rgbd:
         in_channels: 3
         start_layer: down1
         end_layer: up1
         reduction: 1.0
         mcdo_passes: 6
         dropoutP: 0.5
-        resume: models/Segnet/d_Segnet/d_segnet_mcdo_airsim_T000.pkl
-fusion: SoftmaxMultiply #{None,SoftmaxMultiply}
+        resume_rgb: ./models/Segnet/rgb_Segnet/rgb_segnet_mcdo_airsim_T000.pkl
+        resume_d: ./models/Segnet/d_Segnet/d_segnet_mcdo_airsim_T000.pkl
+        fusion_module: 1.0
+fusion: None #{None,SoftmaxMultiply}
 recal: None #{None,afterMCDO,beforeMCDO}
 recalibrator: None #{Histogram,Polynomial_X}
 bins: 20
@@ -28,7 +22,7 @@ data:
     train_subsplit: ['async_fog_000_clear']
     train_reduction: 1.0    
     recal_split: recal
-    recal_subsplit: ['async_fog_100_clear']
+    recal_subsplit: ['async_fog_000_clear']
     recal_reduction: 0.5
     val_split: val
     val_subsplit: [
@@ -37,22 +31,23 @@ data:
                    'async_fog_100_clear',
                    "async_fog_100_clear__{'channel':'rgb','type':'blackoutNoise','value':'20'}",
                    "async_fog_100_clear__{'channel':'d','type':'blackoutNoise','value':'20'}",
-                  ]
+
+                  ]    
     val_reduction: 0.5
     img_rows: 512
     img_cols: 512
     path: datasets/airsim_data_async #../../ros/data/airsim_03-30-2019/airsim_data_async
     noisy_type: None 
 training:
-    train_iters: 100000
+    train_iters: 10000
     batch_size: 2
-    val_interval: 50 #5000
+    val_interval: 1000
     n_workers: 8
-    print_interval: 50
-    png_frames: 50 #5000
+    print_interval: 10
+    png_frames: 50
     optimizer:
         name: 'adam'
-        lr: 1.0e-5
+        lr: 1.0e-7
     loss:
         name: 'cross_entropy'
         size_average: True

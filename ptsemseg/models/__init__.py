@@ -35,6 +35,7 @@ def get_model(name,
               freeze_seg=False,
               freeze_temp=False,
               fusion_module="1.1",
+              scaling_module=None,
               bins=0,
               pretrained_rgb=None,
               pretrained_d=None,
@@ -117,7 +118,8 @@ def get_model(name,
                       bins=bins,
                       pretrained_rgb=pretrained_rgb,
                       pretrained_d=pretrained_d,
-                      fusion_module=fusion_module)
+                      fusion_module=fusion_module,
+                      scaling_module=scaling_module)
 
     elif name == "fused_segnet":
         model = model(n_classes=n_classes)

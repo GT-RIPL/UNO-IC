@@ -616,7 +616,6 @@ def mutualinfo_entropy(pred):
         PEtropy.append(entropy.unsqueeze(0))
         expect = pred[b, :, :, :, :] * torch.log(pred[b, :, :, :, :])  # [11,512,512,10]
         expect = expect.sum(0).mean(-1)  # (512,512)
-        print(expect, entropy)
         MI.append((entropy + expect).unsqueeze(0))
     PEtropy = torch.cat(PEtropy)
     MI = torch.cat(MI)

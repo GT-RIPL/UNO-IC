@@ -11,7 +11,7 @@ models:
         dropoutP: 0.5
         full_mcdo: False
         reduction: 1.0
-        resume: models/Segnet/d_Segnet/rgb_segnet_mcdo_airsim_T000.pkl
+        resume: models/Segnet/rgb_Segnet/rgb_segnet_mcdo_airsim_T000.pkl
 
 # recalibration
 recalibration: None #{None, afterMCDO, beforeMCDO}
@@ -40,7 +40,13 @@ data:
     recal_subsplit: ['async_fog_000_clear',]
     recal_reduction: 0.5
     val_split: val
-    val_subsplit: ['async_fog_000_clear',]
+    val_subsplit: [
+                   'async_fog_000_clear',
+                   'async_fog_050_clear',
+                   'async_fog_100_clear',
+                   "async_fog_100_clear__{'channel':'rgb','type':'blackoutNoise','value':'20'}",
+                   "async_fog_100_clear__{'channel':'d','type':'blackoutNoise','value':'20'}",
+                  ]
     val_reduction: 1.0
     img_rows: 512
     img_cols: 512

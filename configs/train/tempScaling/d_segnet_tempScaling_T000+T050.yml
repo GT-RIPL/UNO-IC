@@ -33,7 +33,7 @@ fusion: None #{None, SoftmaxMultiply, SoftmaxAverage, WeightedVariance, Noisy-Or
 
 data:
     dataset: airsim
-    train_split: train
+    train_split: recal
     train_subsplit: ['async_fog_000_clear',
                      'async_fog_050_clear']
     train_reduction: 1.0
@@ -51,9 +51,9 @@ data:
     noisy_type: None
 
 training:
-    train_iters: 300000
+    train_iters: 100000
     batch_size: 2
-    val_interval: 50000 #5000
+    val_interval: 20000 #5000
     n_workers: 8
     print_interval: 50
     png_frames: 50 #5000

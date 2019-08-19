@@ -95,7 +95,8 @@ class segnet_mcdo(nn.Module):
                 "up1": segnetUp2MCDO(64, n_classes, pMCDO=dropoutP, relu=True),
             }
 
-        self.temperature = torch.nn.Parameter(torch.ones(1))
+        if temperatureScaling:
+            self.temperature = torch.nn.Parameter(torch.ones(1))
 
         self.softmaxMCDO = torch.nn.Softmax(dim=1)
 

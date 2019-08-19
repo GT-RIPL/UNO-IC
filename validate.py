@@ -15,7 +15,7 @@ import cv2
 from ptsemseg.models import get_model
 from ptsemseg.loss import get_loss_function
 from ptsemseg.loader import get_loaders
-from ptsemseg.utils import get_logger, parseEightCameras, plotPrediction, plotMeansVariances, plotEntropy, plotMutualInfo, plotSpatial, save_pred
+from ptsemseg.utils import get_logger, parseEightCameras, plotPrediction, plotMeansVariances, plotEntropy, plotMutualInfo, plotSpatial, save_pred, plotEverything
 from ptsemseg.metrics import runningScore, averageMeter
 from ptsemseg.schedulers import get_scheduler
 from ptsemseg.optimizers import get_optimizer
@@ -235,7 +235,6 @@ def validate(cfg, writer, logger, logdir):
                         variance[m] = torch.zeros(mean[m].shape)
                         entropy[m] = torch.zeros(labels_val.shape)
                         mutual_info[m] = torch.zeros(labels_val.shape)
-                    val_loss[m] = loss_fn(input=mean[m], target=labels_val)
 
                 # import ipdb;ipdb.set_trace()
                 # Fusion Type
@@ -260,6 +259,20 @@ def validate(cfg, writer, logger, logdir):
                             1 - torch.nn.Softmax(dim=1)(mean["d"]))
                 else:
                     print("Fusion Type Not Supported")
+
+                # plot ground truth vs mean/variance of outputs
+                pred = outputs.argmax(1)
+                gt = labels_val
+                # import ipdb;ipdb.set_trace()
+                if i_val % cfg["training"]["png_frames"] == 0:
+                    plotPrediction(logdir, cfg, n_classes, i + 1, i_val, k, inputs_display, pred, gt)
+                    for m in cfg["models"].keys():
+                        prob = mean[m].max(1)[0]
+                        labels = ['mutual info', 'entropy', 'probability', 'variance']                                    
+                        values = [mutual_info[m], entropy[m], prob, torch.mean(variance[m], 1)]
+                        plotEverything(logdir, i, i_val, k + "/" + m, values, labels)
+
+                running_metrics_val[k].update(gt.data.cpu().numpy(), pred.cpu().numpy())
 
         for m in cfg["models"].keys():
             for k in loaders['val'].keys():

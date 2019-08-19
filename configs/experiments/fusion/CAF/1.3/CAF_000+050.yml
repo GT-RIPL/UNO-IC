@@ -43,27 +43,28 @@ data:
     recal_reduction: 0.5
     val_split: val
     val_subsplit: [
-        'async_fog_000_clear',
-        'async_fog_050_clear',
-        'async_fog_100_clear',
-        "async_fog_100_clear__{'channel':'rgb','type':'blackoutNoise','value':'20'}",
-        "async_fog_100_clear__{'channel':'d','type':'blackoutNoise','value':'20'}",]
-    val_reduction: 0.01
+                   'async_fog_000_clear',
+                   'async_fog_050_clear',
+                   'async_fog_100_clear',
+                   "async_fog_100_clear__{'channel':'rgb','type':'blackoutNoise','value':'20'}",
+                   "async_fog_100_clear__{'channel':'d','type':'blackoutNoise','value':'20'}",
+                  ]    
+    val_reduction: 0.5
     img_rows: 512
     img_cols: 512
     path: datasets/airsim_data_async #../../ros/data/airsim_03-30-2019/airsim_data_async
     noisy_type: None
 
 training:
-    train_iters: 10000
+    train_iters: 100000
     batch_size: 2
-    val_interval: 100 #5000
+    val_interval: 10000 #5000
     n_workers: 8
     print_interval: 50
     png_frames: 50 #5000
     optimizer:
         name: 'adam'
-        lr: 5.0e-4
+        lr: 1.0e-4
     loss:
         name: 'cross_entropy'
         size_average: True

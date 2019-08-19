@@ -92,13 +92,15 @@ class CAFnet(nn.Module):
             param.requires_grad = False
 
         self.fusion = self._get_fusion_module(fusion_module, n_classes)
-        self.scale = self._get_scale_module(scaling_module, rgb_init=self.rgb_segnet.module.temperature, d_init=self.d_segnet.module.temperature)
+        # self.scale = self._get_scale_module(scaling_module, rgb_init=self.rgb_segnet.module.temperature, d_init=self.d_segnet.module.temperature)
+        self.scale = self._get_scale_module(scaling_module)
         self.i = 0
 
         self.fuseProbabilities = True
         self.fusion = NoisyOr(n_classes)
 
     def forward(self, inputs):
+    
         # Freeze batchnorm
         self.rgb_segnet.eval()
         self.d_segnet.eval()
@@ -130,29 +132,29 @@ class CAFnet(nn.Module):
 
         # plot uncertainty
         self.i += 1
-        if (self.i) % 5 == 0:
-            p = nn.Softmax(dim=1)(x)
-            entropy['rgbd'], mutual_info['rgbd'] = mutualinfo_entropy(p.unsqueeze(-1))
+        # if (self.i) % 5 == 0:
+            # p = nn.Softmax(dim=1)(x)
+            # entropy['rgbd'], mutual_info['rgbd'] = mutualinfo_entropy(p.unsqueeze(-1))
 
-            pred = {}
-            pred['rgb'] = mean['rgb'].max(1)[0]
-            pred['d'] = mean['d'].max(1)[0]
-            pred['rgbd'] = p.max(1)[0]
+            # pred = {}
+            # pred['rgb'] = mean['rgb'].max(1)[0]
+            # pred['d'] = mean['d'].max(1)[0]
+            # pred['rgbd'] = p.max(1)[0]
 
-            labels = ['mutual info', 'entropy', 'probability', 'variance']
+            # labels = ['mutual info', 'entropy', 'probability', 'variance']
             
-            values = [mutual_info['rgb'], entropy['rgb'], pred['rgb'], variance['rgb'].squeeze(1)]
-            plotEverything('./plots/', self.i, self.i, "/rgb", values, labels)
+            # values = [mutual_info['rgb'], entropy['rgb'], pred['rgb'], variance['rgb'].squeeze(1)]
+            # plotEverything('./plots/', self.i, self.i, "/rgb", values, labels)
 
-            values = [mutual_info['d'], entropy['d'], pred['d'], variance['d'].squeeze(1)]
-            plotEverything('./plots/', self.i, self.i, "/d", values, labels)
+            # values = [mutual_info['d'], entropy['d'], pred['d'], variance['d'].squeeze(1)]
+            # plotEverything('./plots/', self.i, self.i, "/d", values, labels)
 
-            values = [mutual_info['rgbd'], entropy['rgbd'], pred['rgbd'], torch.zeros((1, 512, 512))]
-            plotEverything('./plots/', self.i, self.i, "/rgbd", values, labels)
+            # values = [mutual_info['rgbd'], entropy['rgbd'], pred['rgbd'], torch.zeros((1, 512, 512))]
+            # plotEverything('./plots/', self.i, self.i, "/rgbd", values, labels)
 
-            inputs = {'rgb': inputs_rgb, 'd': inputs_d}
-            plotPrediction('./plots/', None, 11, self.i, self.i, "/inputs", inputs, np.zeros((1, 512, 512)),
-                           np.zeros((1, 512, 512)))
+            # inputs = {'rgb': inputs_rgb, 'd': inputs_d}
+            # plotPrediction('./plots/', None, 11, self.i, self.i, "/inputs", inputs, torch.zeros((1, 512, 512)),
+                           # torch.zeros((1, 512, 512)))
 
         return x
 

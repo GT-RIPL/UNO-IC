@@ -20,8 +20,7 @@ import matplotlib.pyplot as plt
 from ptsemseg.models import get_model
 from ptsemseg.loss import get_loss_function
 from ptsemseg.loader import get_loaders
-from ptsemseg.utils import get_logger, parseEightCameras, plotPrediction, plotMeansVariances, plotEntropy, \
-    plotMutualInfo
+from ptsemseg.utils import get_logger, parseEightCameras, plotPrediction, plotMeansVariances, plotEntropy, plotMutualInfo, mutualinfo_entropy, plotEverything
 from ptsemseg.metrics import runningScore, averageMeter
 from ptsemseg.schedulers import get_scheduler
 from ptsemseg.optimizers import get_optimizer
@@ -189,7 +188,7 @@ def train(cfg, writer, logger, logdir):
                     schedulers[model].load_state_dict(checkpoint["scheduler_state"])
 
                 # resume iterations only if specified
-                if cfg['training']['resume_iteration']:
+                if cfg['training']['resume_iteration'] or str(cfg['training']['resume_iteration'])  == "None":
                     start_iter = checkpoint["epoch"]
 
                 # start_iter = 0
@@ -390,19 +389,27 @@ def train(cfg, writer, logger, logdir):
                                         1 - torch.nn.Softmax(dim=1)(mean["d"]))
                             else:
                                 print("Fusion Type Not Supported")
+                            
 
                             # plot ground truth vs mean/variance of outputs
-                            pred = outputs.argmax(1).cpu().numpy()
-                            gt = labels_val.data.cpu().numpy()
+                            prob, pred = outputs.max(1)
+                            gt = labels_val
+                            e, mi = mutualinfo_entropy(outputs.unsqueeze(-1))
 
                             if i_val % cfg["training"]["png_frames"] == 0:
                                 plotPrediction(logdir, cfg, n_classes, i, i_val, k, inputs_display, pred, gt)
+                                labels = ['mutual info', 'entropy', 'probability', 'variance']                                    
+                                values = [mi, e, prob, torch.zeros(mi.shape)]
+                                plotEverything(logdir, i, i_val, k + "/stats", values, labels)
+                                
                                 for m in cfg["models"].keys():
+                                
+                                    prob = mean[m].max(1)[0]
                                     labels = ['mutual info', 'entropy', 'probability', 'variance']                                    
-                                    values = [mutual_info[m], entropy[m], pred[m], variance[m]]
-                                    plotEverything(logdir, i, i_val, "/rgb", values, labels)
+                                    values = [mutual_info[m], entropy[m], prob, torch.mean(variance[m], 1)]
+                                    plotEverything(logdir, i, i_val, k + "/" + m, values, labels)
 
-                            running_metrics_val[k].update(gt, pred)
+                            running_metrics_val[k].update(gt.cpu().numpy(), pred.cpu().numpy())
 
                             for m in cfg["models"].keys():
                                 val_loss_meter[m][k].update(val_loss[m].item())

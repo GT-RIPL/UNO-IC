@@ -211,7 +211,7 @@ class segnet_mcdo(nn.Module):
                     x = torch.cat((x, self.forward(inputs).unsqueeze(-1)), -1)
 
         mean = x.mean(-1)
-        variance = self.softmaxMCDO(x).var(-1)
+        variance = x.var(-1)
 
         # Uncalibrated Softmax Mean and Variance
         if str(self.recalibration) != "None":

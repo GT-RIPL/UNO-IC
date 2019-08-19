@@ -97,7 +97,7 @@ class CAFnet(nn.Module):
         self.i = 0
 
         self.fuseProbabilities = True
-        self.fusion = NoisyOr(n_classes)
+        # self.fusion = NoisyOr(n_classes)
 
     def forward(self, inputs):
     

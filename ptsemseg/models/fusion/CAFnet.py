@@ -92,8 +92,8 @@ class CAFnet(nn.Module):
             param.requires_grad = False
 
         self.fusion = self._get_fusion_module(fusion_module, n_classes)
-        # self.scale = self._get_scale_module(scaling_module, rgb_init=self.rgb_segnet.module.temperature, d_init=self.d_segnet.module.temperature)
-        self.scale = self._get_scale_module(scaling_module)
+        # self.scale = self._get_scale_module(scaling_module, 2, rgb_init=self.rgb_segnet.module.temperature, d_init=self.d_segnet.module.temperature)
+        self.scale = self._get_scale_module(scaling_module, 2)
         self.i = 0
 
         self.fuseProbabilities = True
@@ -197,12 +197,12 @@ class CAFnet(nn.Module):
             "NoisyOr": NoisyOr(n_classes),
         }[name]
 
-    def _get_scale_module(self, name, rgb_init=None, d_init=None):
+    def _get_scale_module(self, name,n_filters=2, rgb_init=None, d_init=None):
 
         name = str(name)
 
         return {
             "temperature": TemperatureScaling(rgb_init=rgb_init, d_init=d_init),
-            "uncertainty": UncertaintyScaling(rgb_init=rgb_init, d_init=d_init),
+            "uncertainty": UncertaintyScaling(n_filters, rgb_init=rgb_init, d_init=d_init),
             "None": None
         }[name]

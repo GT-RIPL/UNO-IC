@@ -89,7 +89,6 @@ class CAFnet(nn.Module):
             param.requires_grad = False
 
         self.fusion = self._get_fusion_module(fusion_module, n_classes)
-<<<<<<< HEAD
         # self.scale = self._get_scale_module(scaling_module, rgb_init=self.rgb_segnet.module.temperature, d_init=self.d_segnet.module.temperature)
         
         self.bn_rgb = nn.Sequential(nn.BatchNorm2d(1),
@@ -99,10 +98,6 @@ class CAFnet(nn.Module):
         
         self.scale_d = self._get_scale_module(scaling_module, bias_init=None)
         self.scale_rgb = self._get_scale_module(scaling_module, bias_init=None)
-=======
-        # self.scale = self._get_scale_module(scaling_module, 2, rgb_init=self.rgb_segnet.module.temperature, d_init=self.d_segnet.module.temperature)
-        self.scale = self._get_scale_module(scaling_module, 2)
->>>>>>> 19d6536b8b74b0bd7e69a95dc1cf3e31efe3712a
         self.i = 0
         
         self.normalize = True
@@ -207,21 +202,12 @@ class CAFnet(nn.Module):
             "NoisyOr": NoisyOr(n_classes),
         }[name]
 
-<<<<<<< HEAD
     def _get_scale_module(self,name, n_classes=11, bias_init=None):
-=======
-    def _get_scale_module(self, name,n_filters=2, rgb_init=None, d_init=None):
->>>>>>> 19d6536b8b74b0bd7e69a95dc1cf3e31efe3712a
 
         name = str(name)
 
         return {
-<<<<<<< HEAD
             "temperature": TemperatureScaling(n_classes, bias_init),
             "uncertainty": UncertaintyScaling(n_classes, bias_init),
-=======
-            "temperature": TemperatureScaling(rgb_init=rgb_init, d_init=d_init),
-            "uncertainty": UncertaintyScaling(n_filters, rgb_init=rgb_init, d_init=d_init),
->>>>>>> 19d6536b8b74b0bd7e69a95dc1cf3e31efe3712a
             "None": None
         }[name]

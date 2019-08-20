@@ -140,7 +140,6 @@ class TemperatureScaling(nn.Module):
 
 # 1.0
 class UncertaintyScaling(nn.Module):
-<<<<<<< HEAD
     def __init__(self, n_classes=11, bias_init=None):
         super(UncertaintyScaling, self).__init__()
         self.scale = nn.Conv2d(1,
@@ -157,36 +156,6 @@ class UncertaintyScaling(nn.Module):
         self.scale.weight = torch.nn.Parameter(torch.zeros((1,1,3,3)))
         if bias_init is not None:
             self.scale.bias = torch.nn.Parameter(bias_init)
-=======
-    def __init__(self, n_filters, rgb_init=None, d_init=None):
-        super(UncertaintyScaling, self).__init__()
-        self.rgb_scale = nn.Conv2d(n_filters,
-                                   1,
-                                   3,
-                                   stride=1,
-                                   padding=1,
-                                   bias=True,
-                                   dilation=1)
-        self.d_scale = nn.Conv2d(n_filters,
-                                 1,
-                                 3,
-                                 stride=1,
-                                 padding=1,
-                                 bias=True,
-                                 dilation=1)
-        
-        
-        self.rgb_scale.weight = torch.nn.Parameter(torch.zeros((1,n_filters,3,3)))
-        
-        self.d_scale.weight = torch.nn.Parameter(torch.zeros((1,n_filters,3,3)))
-          
-        if rgb_init is not None:
-            self.rgb_scale.bias = torch.nn.Parameter(rgb_init)
-        else:                       
-            self.rgb_scale.bias = torch.nn.Parameter(torch.ones(1))
-        if d_init is not None:
-            self.d_scale.bias = torch.nn.Parameter(d_init)
->>>>>>> 19d6536b8b74b0bd7e69a95dc1cf3e31efe3712a
         else:
             self.scale.bias = torch.nn.Parameter(torch.ones(1))
         
@@ -195,32 +164,8 @@ class UncertaintyScaling(nn.Module):
 
     def forward(self, mean, variance, mutual_info, entropy):
     
-<<<<<<< HEAD
         s = self.scale(variance)
         out = mean / s
         out = self.norm(out)
         
         return out
-        
-=======
-        rgb, rgb_var, rgb_mi, rgb_entropy = mean['rgb'], variance['rgb'], mutual_info['rgb'], entropy['rgb']
-        d, d_var, d_mi, d_entropy = mean['d'], variance['d'], mutual_info['d'], entropy['d']
-        
-        if self.n_filters == 2:
-            rgb_s = self.rgb_scale(torch.cat([rgb_var, rgb_entropy.unsqueeze(1)], dim=1))
-            d_s = self.d_scale(torch.cat([d_var, d_entropy.unsqueeze(1)], dim=1))
-        else:
-            rgb_s = self.rgb_scale(rgb_var)
-            d_s = self.d_scale(d_var)
-
-        print("rgb weight: {}".format(self.rgb_scale.weight.mean()))
-        print("d weight: {}".format(self.d_scale.weight.mean()))
-        print("rgb bias: {}".format(self.rgb_scale.bias))
-        print("d bias: {}".format(self.d_scale.bias))
-        print("---------------------")
-        rgb = rgb / rgb_s
-        d = d / d_s
-        
-        return rgb, d
-        
->>>>>>> 19d6536b8b74b0bd7e69a95dc1cf3e31efe3712a

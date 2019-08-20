@@ -236,7 +236,6 @@ def validate(cfg, writer, logger, logdir):
                         entropy[m] = torch.zeros(labels_val.shape)
                         mutual_info[m] = torch.zeros(labels_val.shape)
 
-                # import ipdb;ipdb.set_trace()
                 # Fusion Type
                 if cfg["fusion"] == "None":
                     outputs = torch.nn.Softmax(dim=1)(mean[list(cfg["models"].keys())[0]])
@@ -254,9 +253,8 @@ def validate(cfg, writer, logger, logdir):
                         rgb[:, n, :, :] = rgb[:, n, :, :] * rgb_var
                         d[:, n, :, :] = d[:, n, :, :] * d_var
                     outputs = rgb + d
-                elif cfg["fusion"] == "Noisy-Or":
-                    outputs = 1 - (1 - torch.nn.Softmax(dim=1)(mean["rgb"])) * (
-                            1 - torch.nn.Softmax(dim=1)(mean["d"]))
+                elif cfg["fusion"] == "NoisyOr":
+                    outputs = 1 - (1 - torch.nn.Softmax(dim=1)(mean["rgb"])) * (1 - torch.nn.Softmax(dim=1)(mean["d"]))
                 else:
                     print("Fusion Type Not Supported")
 

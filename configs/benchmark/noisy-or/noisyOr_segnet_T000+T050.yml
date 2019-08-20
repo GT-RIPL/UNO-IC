@@ -40,7 +40,7 @@ pretrained_d: None
 fusion_module: None
 
 # basic fusion method
-fusion: Noisy-Or #{None, SoftmaxMultiply, SoftmaxAverage, WeightedVariance, Noisy-Or}
+fusion: NoisyOr #{None, SoftmaxMultiply, SoftmaxAverage, WeightedVariance, Noisy-Or}
 
 data:
     dataset: airsim

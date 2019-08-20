@@ -130,66 +130,42 @@ class UncertaintyGatedFusion(nn.Module):
 
 # 0.0
 class TemperatureScaling(nn.Module):
-    def __init__(self, rgb_init=None, d_init=None):
-        super(TemperatureScaling, self).__init__()
-        self.rgb_temperature = nn.Parameter(torch.ones(1) * 1.5)
-        self.d_temperature = nn.Parameter(torch.ones(1) * 1.5)
+    def __init__(self, n_classes=11, bias_init=None):
+        super(TemperatureScaling,  self).__init__()
+        self.temperature = nn.Parameter(torch.ones(1))
 
     def forward(self, mean, variance, mutual_info, entropy):
     
-        return mean['rgb'] / self.rgb_temperature, mean['d'] / self.d_temperature 
+        return mean / self.temperature
 
 # 1.0
 class UncertaintyScaling(nn.Module):
-    def __init__(self, rgb_init=None, d_init=None):
+    def __init__(self, n_classes=11, bias_init=None):
         super(UncertaintyScaling, self).__init__()
-        self.rgb_scale = nn.Conv2d(1,
-                                   1,
-                                   3,
-                                   stride=1,
-                                   padding=1,
-                                   bias=True,
-                                   dilation=1)
-        self.d_scale = nn.Conv2d(1,
-                                 1,
-                                 3,
-                                 stride=1,
-                                 padding=1,
-                                 bias=True,
-                                 dilation=1)
-        
-        
-        self.rgb_scale.weight = torch.nn.Parameter(torch.zeros((1,1,3,3)))
-        
-        self.d_scale.weight = torch.nn.Parameter(torch.zeros((1,1,3,3)))
-          
-        if rgb_init is not None:
-            self.rgb_scale.bias = torch.nn.Parameter(rgb_init)
-        else:                       
-            self.rgb_scale.bias = torch.nn.Parameter(torch.ones(1))
-        if d_init is not None:
-            self.d_scale.bias = torch.nn.Parameter(d_init)
+        self.scale = nn.Conv2d(1,
+                               1,
+                               3,
+                               stride=1,
+                               padding=1,
+                               bias=True)
+                               
+        self.norm = nn.Sequential(nn.Softmax(dim=1),
+                                  nn.BatchNorm2d(int(n_classes)),
+                                  nn.ReLU())
+       
+        self.scale.weight = torch.nn.Parameter(torch.zeros((1,1,3,3)))
+        if bias_init is not None:
+            self.scale.bias = torch.nn.Parameter(bias_init)
         else:
-            self.d_scale.bias = torch.nn.Parameter(torch.ones(1))
+            self.scale.bias = torch.nn.Parameter(torch.ones(1))
         
         
 
     def forward(self, mean, variance, mutual_info, entropy):
     
-        rgb, rgb_var, rgb_mi, rgb_entropy = mean['rgb'], variance['rgb'], mutual_info['rgb'], entropy['rgb']
-        d, d_var, d_mi, d_entropy = mean['d'], variance['d'], mutual_info['d'], entropy['d']
+        s = self.scale(variance)
+        out = mean / s
+        out = self.norm(out)
         
-        # rgb_s = self.rgb_scale(torch.cat([rgb_var, rgb_entropy.unsqueeze(1)], dim=1))
-        # d_s = self.d_scale(torch.cat([d_var, d_entropy.unsqueeze(1)], dim=1))
-        rgb_s = self.rgb_scale(rgb_var)
-        d_s = self.d_scale(d_var)
-        print("rgb weight: {}".format(self.rgb_scale.weight.mean()))
-        print("d weight: {}".format(self.d_scale.weight.mean()))
-        print("rgb bias: {}".format(self.rgb_scale.bias))
-        print("d bias: {}".format(self.d_scale.bias))
-        print("---------------------")
-        rgb = rgb / rgb_s
-        d = d / d_s
-        
-        return rgb, d
+        return out
         

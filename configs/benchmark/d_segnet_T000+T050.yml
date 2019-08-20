@@ -7,8 +7,8 @@ models:
         in_channels: 3
         start_layer: down1
         end_layer: up1
-        mcdo_passes: 6
-        dropoutP: 0.5
+        mcdo_passes: 1
+        dropoutP: 0.0
         full_mcdo: False
         reduction: 1.0
         resume: models/Segnet/d_Segnet/d_segnet_mcdo_airsim_T000+T050.pkl

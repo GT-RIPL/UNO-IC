@@ -58,7 +58,7 @@ data:
 training:
     train_iters: 100000
     batch_size: 2
-    val_interval: 5 #5000
+    val_interval: 1000 #5000
     n_workers: 8
     print_interval: 50
     png_frames: 50 #5000

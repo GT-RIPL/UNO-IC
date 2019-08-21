@@ -403,7 +403,7 @@ def train(cfg, writer, logger, logdir):
                                 plotEverything(logdir, i, i_val, k + "/stats", values, labels)
                                 
                                 for m in cfg["models"].keys():
-                                    prob = torch.nn.Softmax(dim=1)(mean[m].max(1))[0]
+                                    prob = torch.nn.Softmax(dim=1)(mean[m].max(1)[0])
                                     labels = ['mutual info', 'entropy', 'probability', 'variance']                                    
                                     values = [mutual_info[m], entropy[m], prob, torch.mean(variance[m], 1)]
                                     plotEverything(logdir, i, i_val, k + "/" + m, values, labels)

@@ -54,9 +54,8 @@ data:
     img_cols: 512
     path: datasets/airsim_data_async #../../ros/data/airsim_03-30-2019/airsim_data_async
     noisy_type: None
-
 training:
-    train_iters: 100000
+    train_iters: 10000
     batch_size: 2
     val_interval: 1000 #5000
     n_workers: 8

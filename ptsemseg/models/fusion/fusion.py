@@ -159,8 +159,6 @@ class UncertaintyScaling(nn.Module):
         else:
             self.scale.bias = torch.nn.Parameter(torch.ones(1))
         
-        self.n_filters = n_filters
-        
 
     def forward(self, mean, variance, mutual_info, entropy):
     

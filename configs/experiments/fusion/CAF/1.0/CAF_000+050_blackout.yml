@@ -38,7 +38,7 @@ data:
                      'async_fog_000_clear',
                      'async_fog_050_clear',
                      "async_fog_000_clear__{'channel':'rgb','type':'blackoutNoise','value':'20'}",
-                     "async_fog_000_clear__{'channel':'d','type':'blackoutNoise','value':'20'}"
+                     "async_fog_000_clear__{'channel':'d','type':'blackoutNoise','value':'20'}",
                      "async_fog_050_clear__{'channel':'rgb','type':'blackoutNoise','value':'20'}",
                      "async_fog_050_clear__{'channel':'d','type':'blackoutNoise','value':'20'}"
                     ]

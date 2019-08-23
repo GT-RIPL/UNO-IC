@@ -39,17 +39,17 @@ data:
     path: datasets/airsim_data_async #../../ros/data/airsim_03-30-2019/airsim_data_async
     noisy_type: None 
 training:
-    train_iters: 100000
+    train_iters: 10000
     batch_size: 2
-    val_interval: 10000
+    val_interval: 1000 #5000
     n_workers: 8
-    print_interval: 10
-    png_frames: 50
+    print_interval: 50
+    png_frames: 50 #5000
     optimizer:
         name: 'adam'
-        lr: 1.0e-4
+        lr: 1.0e-3
     loss:
         name: 'cross_entropy'
         size_average: True
     lr_schedule:
-    resume: None
+    resume_iteration: None

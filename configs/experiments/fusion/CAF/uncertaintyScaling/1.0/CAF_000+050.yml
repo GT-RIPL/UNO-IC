@@ -1,5 +1,5 @@
 seed: 1337
-id: CAF_segnet_1.0_T000+T050
+id: CAF_segnet_1.0_uncertaintyScaling_T000+T050
 models:
     rgbd:
         # model settings
@@ -27,6 +27,7 @@ freeze_temp: True
 pretrained_rgb: models/Segnet/rgb_Segnet/rgb_segnet_mcdo_airsim_T000+T050.pkl
 pretrained_d: models/Segnet/d_Segnet/d_segnet_mcdo_airsim_T000+T050.pkl
 fusion_module: 1.0
+scaling_module: uncertainty
 
 # basic fusion method
 fusion: None #{None, SoftmaxMultiply, SoftmaxAverage, WeightedVariance, Noisy-Or}
@@ -34,26 +35,31 @@ fusion: None #{None, SoftmaxMultiply, SoftmaxAverage, WeightedVariance, Noisy-Or
 data:
     dataset: airsim
     train_split: train
-    train_subsplit: ['async_fog_000_clear',
-                     'async_fog_050_clear']
+    train_subsplit: [
+            'async_fog_000_clear',
+            'async_fog_050_clear',]
     train_reduction: 1.0
     recal_split: recal
     recal_subsplit: ['async_fog_000_clear',
                      'async_fog_050_clear',]
     recal_reduction: 0.5
     val_split: val
-    val_subsplit: ['async_fog_000_clear',
-                   'async_fog_050_clear',]
-    val_reduction: 0.1
+    val_subsplit: [
+            'async_fog_000_clear',
+            'async_fog_050_clear',
+            'async_fog_100_clear',
+            "async_fog_100_clear__{'channel':'rgb','type':'blackoutNoise','value':'20'}",
+            "async_fog_100_clear__{'channel':'d','type':'blackoutNoise','value':'20'}",]
+    val_reduction: 0.5
     img_rows: 512
     img_cols: 512
     path: datasets/airsim_data_async #../../ros/data/airsim_03-30-2019/airsim_data_async
     noisy_type: None
 
 training:
-    train_iters: 100000
+    train_iters: 10000
     batch_size: 2
-    val_interval: 5 #5000
+    val_interval: 1000 #5000
     n_workers: 8
     print_interval: 50
     png_frames: 50 #5000

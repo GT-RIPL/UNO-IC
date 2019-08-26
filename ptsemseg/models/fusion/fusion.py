@@ -150,19 +150,37 @@ class UncertaintyScaling(nn.Module):
                                bias=True)
                                
         self.norm = nn.Sequential(nn.Softmax(dim=1),
-                                  nn.BatchNorm2d(int(n_classes)),
-                                  nn.ReLU())
+                                  nn.BatchNorm2d(int(n_classes)))
+                                  
+                                  
        
         self.scale.weight = torch.nn.Parameter(torch.zeros((1,1,3,3)))
         if bias_init is not None:
             self.scale.bias = torch.nn.Parameter(bias_init)
         else:
-            self.scale.bias = torch.nn.Parameter(torch.ones(1))
+            self.scale.bias = torch.nn.Parameter(torch.tensor([1]))
         
 
     def forward(self, mean, variance, mutual_info, entropy):
     
+        print(self.scale.weight.mean(), self.scale.bias)
         s = self.scale(variance)
+        out = mean / s
+        out = self.norm(out)
+        
+        return out
+        
+
+class GlobalUncertaintyScaling(nn.Module):
+    def __init__(self, n_classes=11, bias_init=None):
+        super(GlobalUncertaintyScaling, self).__init__()
+        self.scale = nn.Linear(1, 1)
+        
+        self.norm = nn.Sequential(nn.Softmax(dim=1),
+                                  nn.BatchNorm2d(int(n_classes)))
+
+    def forward(self, mean, variance, mutual_info, entropy):
+        s = self.scale(variance.mean().unsqueeze(0))
         out = mean / s
         out = self.norm(out)
         

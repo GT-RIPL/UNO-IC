@@ -158,7 +158,7 @@ class UncertaintyScaling(nn.Module):
         if bias_init is not None:
             self.scale.bias = torch.nn.Parameter(bias_init)
         else:
-            self.scale.bias = torch.nn.Parameter(torch.tensor([1]))
+            self.scale.bias = torch.nn.Parameter(torch.tensor([1.0]))
         
 
     def forward(self, mean, variance, mutual_info, entropy):

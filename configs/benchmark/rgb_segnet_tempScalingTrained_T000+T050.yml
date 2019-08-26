@@ -49,6 +49,8 @@ data:
                    "async_fog_000_clear__{'channel':'d','type':'gaussianNoise','value':'3'}",
                    "async_fog_000_clear__{'channel':'d','type':'shotNoise','value':'3'}",
                    "async_fog_000_clear__{'channel':'d','type':'impulseNoise','value':'3'}",
+                   "async_fog_100_clear__{'channel':'rgb','type':'blackoutNoise','value':'20'}",
+                   "async_fog_100_clear__{'channel':'d','type':'blackoutNoise','value':'20'}",
                    "async_fog_000_clear__{'channel':'rgb','type':'gaussianNoise','value':'3'}",
                    "async_fog_000_clear__{'channel':'rgb','type':'shotNoise','value':'3'}",
                    "async_fog_000_clear__{'channel':'rgb','type':'impulseNoise','value':'3'}",

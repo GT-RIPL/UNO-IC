@@ -3,12 +3,12 @@ id: rgb_tempnet_T000
 models:
     rgb:
         # model settings
-        arch: tempnet
+        arch: segnet_mcdo
         in_channels: 3
         start_layer: down1
         end_layer: up1
-        mcdo_passes: 6
-        dropoutP: 0.5
+        mcdo_passes: 1
+        dropoutP: 0.0
         full_mcdo: False
         reduction: 1.0
 

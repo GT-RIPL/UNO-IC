@@ -7,8 +7,8 @@ models:
         in_channels: 3
         start_layer: down1
         end_layer: up1
-        mcdo_passes: 6
-        dropoutP: 0.5
+        mcdo_passes: 1
+        dropoutP: 0.0
         full_mcdo: False
         reduction: 1.0
         resume: models/Segnet/d_Segnet/temperatureScaling/noRecal/d_segnet_mcdo_airsim_T000+T050.pkl
@@ -46,8 +46,25 @@ data:
                    'async_fog_000_clear',
                    'async_fog_050_clear',
                    'async_fog_100_clear',
+                   "async_fog_000_clear__{'channel':'d','type':'gaussianNoise','value':'3'}",
+                   "async_fog_000_clear__{'channel':'d','type':'shotNoise','value':'3'}",
+                   "async_fog_000_clear__{'channel':'d','type':'impulseNoise','value':'3'}",
                    "async_fog_100_clear__{'channel':'rgb','type':'blackoutNoise','value':'20'}",
                    "async_fog_100_clear__{'channel':'d','type':'blackoutNoise','value':'20'}",
+                   "async_fog_000_clear__{'channel':'rgb','type':'gaussianNoise','value':'3'}",
+                   "async_fog_000_clear__{'channel':'rgb','type':'shotNoise','value':'3'}",
+                   "async_fog_000_clear__{'channel':'rgb','type':'impulseNoise','value':'3'}",
+                   "async_fog_000_clear__{'channel':'rgb','type':'defocusBlur','value':'3'}",
+                   "async_fog_000_clear__{'channel':'rgb','type':'motionBlur','value':'3'}",
+                   "async_fog_000_clear__{'channel':'rgb','type':'zoomBlur','value':'3'}",
+                   "async_fog_000_clear__{'channel':'rgb','type':'snow','value':'3'}",
+                   "async_fog_000_clear__{'channel':'rgb','type':'frost','value':'3'}",
+                   "async_fog_000_clear__{'channel':'rgb','type':'fog','value':'3'}",
+                   "async_fog_000_clear__{'channel':'rgb','type':'brightness','value':'3'}",
+                   "async_fog_000_clear__{'channel':'rgb','type':'contrast','value':'3'}",
+                   "async_fog_000_clear__{'channel':'rgb','type':'elastic','value':'3'}",
+                   "async_fog_000_clear__{'channel':'rgb','type':'pixelate','value':'3'}",
+                   "async_fog_000_clear__{'channel':'rgb','type':'jpeg','value':'3'}",
                   ]
     val_reduction: 0.5
     img_rows: 512

@@ -1,5 +1,5 @@
 seed: 1337
-id: CAF_segnet_1.0_T000+T050
+id: CAF_segnet_1.3_globalUncertaintyScaling_T000+T050
 models:
     rgbd:
         # model settings
@@ -17,38 +17,39 @@ models:
 recalibration: None #{None, afterMCDO, beforeMCDO}
 recalibrator: None #{HistogramLinear, HistogramFlat, Polynomial_X, Isotonic, Platt}
 bins: 20
-temperatureScaling: True
+temperatureScaling: False
 
 # training
 freeze_seg: True
 freeze_temp: True
 
 # learned fusion specific settings
-pretrained_rgb: models/Segnet/rgb_Segnet/temperatureScaling/rgb_segnet_mcdo_airsim_T000+T050.pkl
-pretrained_d: models/Segnet/d_Segnet/temperatureScaling/d_segnet_mcdo_airsim_T000+T050.pkl
-fusion_module: 1.0
+pretrained_rgb: models/Segnet/rgb_Segnet/rgb_segnet_mcdo_airsim_T000+T050.pkl
+pretrained_d: models/Segnet/d_Segnet/d_segnet_mcdo_airsim_T000+T050.pkl
+fusion_module: NoisyOr
+scaling_module: GlobalUncertainty
 
 # basic fusion method
 fusion: None #{None, SoftmaxMultiply, SoftmaxAverage, WeightedVariance, Noisy-Or}
 
 data:
     dataset: airsim
-    train_split: train
-    train_subsplit: ['async_fog_000_clear',
-                     'async_fog_050_clear']
+    train_split: recal
+    train_subsplit: [
+            "async_fog_000_clear__{'channel':'rgb','type':'blackoutNoise','value':'20'}",
+            "async_fog_000_clear__{'channel':'d','type':'blackoutNoise','value':'20'}"]
     train_reduction: 1.0
     recal_split: recal
     recal_subsplit: ['async_fog_000_clear',
                      'async_fog_050_clear',]
-    recal_reduction: 0.1
+    recal_reduction: 0.5
     val_split: val
     val_subsplit: [
-        'async_fog_000_clear',
-        'async_fog_050_clear',
-        'async_fog_100_clear',
-        "async_fog_100_clear__{'channel':'rgb','type':'blackoutNoise','value':'20'}",
-        "async_fog_100_clear__{'channel':'d','type':'blackoutNoise','value':'20'}",
-    ]
+            'async_fog_000_clear',
+            'async_fog_050_clear',
+            'async_fog_100_clear',
+            "async_fog_100_clear__{'channel':'rgb','type':'blackoutNoise','value':'20'}",
+            "async_fog_100_clear__{'channel':'d','type':'blackoutNoise','value':'20'}",]
     val_reduction: 0.5
     img_rows: 512
     img_cols: 512
@@ -56,15 +57,15 @@ data:
     noisy_type: None
 
 training:
-    train_iters: 300000
+    train_iters: 10000
     batch_size: 2
-    val_interval: 500 #5000
+    val_interval: 50 #5000
     n_workers: 8
     print_interval: 50
     png_frames: 50 #5000
     optimizer:
         name: 'adam'
-        lr: 1.0e-4
+        lr: 1.0e-3
     loss:
         name: 'cross_entropy'
         size_average: True

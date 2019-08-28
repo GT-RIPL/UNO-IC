@@ -6,9 +6,6 @@ from ptsemseg.models.recalibrator import *
 from ptsemseg.models.segnet_mcdo import *
 from ptsemseg.utils import mutualinfo_entropy, plotEverything, plotPrediction
 
-import torch.nn as nn
-
-
 class CAFnet(nn.Module):
     def __init__(self,
                  backbone="segnet",
@@ -92,12 +89,21 @@ class CAFnet(nn.Module):
             param.requires_grad = False
 
         self.fusion = self._get_fusion_module(fusion_module, n_classes)
-        # self.scale = self._get_scale_module(scaling_module, 2, rgb_init=self.rgb_segnet.module.temperature, d_init=self.d_segnet.module.temperature)
-        self.scale = self._get_scale_module(scaling_module, 2)
+        self.bn_rgb = nn.Sequential(nn.BatchNorm2d(1),
+                                    nn.ReLU())
+        self.bn_d = nn.Sequential(nn.BatchNorm2d(1),
+                                  nn.ReLU())
+        
+        if hasattr(self.d_segnet.module, 'temperature'):
+            self.scale_d = self._get_scale_module(scaling_module, bias_init=self.d_segnet.module.temperature)
+            self.scale_rgb = self._get_scale_module(scaling_module, bias_init=self.rgb_segnet.module.temperature)
+        else:
+            self.scale_d = self._get_scale_module(scaling_module)
+            self.scale_rgb = self._get_scale_module(scaling_module)
         self.i = 0
-
-        self.fuseProbabilities = True
-        # self.fusion = NoisyOr(n_classes)
+        
+        self.normalize = False
+        
 
     def forward(self, inputs):
     
@@ -116,16 +122,17 @@ class CAFnet(nn.Module):
         # computer logits and uncertainty measures
         mean['rgb'], variance['rgb'], entropy['rgb'], mutual_info['rgb'] = self.rgb_segnet.module.forwardMCDO(inputs_rgb)
         mean['d'], variance['d'], entropy['d'], mutual_info['d'] = self.d_segnet.module.forwardMCDO(inputs_d)
+        
         variance['rgb'] = torch.mean(variance['rgb'], 1).unsqueeze(1)
         variance['d'] = torch.mean(variance['d'], 1).unsqueeze(1)
-
-        # scale logits by uncertainty
-        if self.scale is not None:
-            mean['rgb'], mean['d'] = self.scale(mean, variance, entropy, mutual_info)  # [bs, n, 512, 512]
-
-        if self.scale is not None or self.fuseProbabilities:
-            mean['rgb'] = nn.Softmax(dim=1)(mean['rgb'])
-            mean['d'] = nn.Softmax(dim=1)(mean['d'])
+        
+        if self.normalize:
+            variance['rgb'] = self.bn_rgb(variance['rgb'])
+            variance['d'] = self.bn_d(variance['d'])
+        
+        if self.scale_d is not None:
+            mean['rgb'] = self.scale_rgb(mean['rgb'], variance['rgb'], entropy['rgb'], mutual_info['rgb'])
+            mean['d'] = self.scale_d(mean['d'], variance['d'], entropy['d'], mutual_info['d'])  # [bs, n, 512, 512]
 
         # fuse outputs
         x = self.fusion(mean, variance, entropy, mutual_info)  # [bs, n, 512, 512]
@@ -137,8 +144,8 @@ class CAFnet(nn.Module):
             # entropy['rgbd'], mutual_info['rgbd'] = mutualinfo_entropy(p.unsqueeze(-1))
 
             # pred = {}
-            # pred['rgb'] = mean['rgb'].max(1)[0]
-            # pred['d'] = mean['d'].max(1)[0]
+            # pred['rgb'] = nn.Softmax(dim=1)(mean['rgb']).max(1)[0]
+            # pred['d'] = nn.Softmax(dim=1)(mean['d']).max(1)[0]
             # pred['rgbd'] = p.max(1)[0]
 
             # labels = ['mutual info', 'entropy', 'probability', 'variance']
@@ -197,12 +204,15 @@ class CAFnet(nn.Module):
             "NoisyOr": NoisyOr(n_classes),
         }[name]
 
-    def _get_scale_module(self, name,n_filters=2, rgb_init=None, d_init=None):
+    def _get_scale_module(self,name, n_classes=11, bias_init=None):
 
         name = str(name)
 
         return {
-            "temperature": TemperatureScaling(rgb_init=rgb_init, d_init=d_init),
-            "uncertainty": UncertaintyScaling(n_filters, rgb_init=rgb_init, d_init=d_init),
+            "temperature": TemperatureScaling(n_classes, bias_init),
+            "uncertainty": UncertaintyScaling(n_classes, bias_init),
+            "LocalUncertaintyScaling": LocalUncertaintyScaling(n_classes, bias_init),
+            "GlobalUncertainty": GlobalUncertaintyScaling(n_classes, bias_init),
+            "GlobalLocalUncertainty": GlobalLocalUncertaintyScaling(n_classes, bias_init),
             "None": None
         }[name]

@@ -36,12 +36,13 @@ from ptsemseg.utils import bn_update, mem_report
 
 global logdir, cfg, n_classes, i, i_val, k
 
+
 def plot_grad_flow(module, i=0):
     ave_grads = []
     layers = []
     for n, p in module.named_parameters():
         if (p.requires_grad) and ("bias" not in n):
-            
+
             for _ in range(len(p)):
                 layers.append(_)
                 ave_grads.append(p.grad[_].abs().mean().item())
@@ -51,7 +52,7 @@ def plot_grad_flow(module, i=0):
     plt.ylabel("average gradient")
     plt.title("Gradient flow")
     plt.grid(True)
-    
+
     if (i + 1) % 50 == 0:
         plt.savefig("gradient_flow_{}".format(i))
 
@@ -112,18 +113,11 @@ def train(cfg, writer, logger, logdir):
         models[model] = get_model(name=attr['arch'],
                                   n_classes=n_classes,
                                   input_size=(cfg['data']['img_rows'], cfg['data']['img_cols']),
-                                  batch_size=cfg['training']['batch_size'],
                                   in_channels=attr['in_channels'],
-                                  start_layer=attr['start_layer'],
-                                  end_layer=attr['end_layer'],
                                   mcdo_passes=attr['mcdo_passes'],
                                   dropoutP=attr['dropoutP'],
                                   full_mcdo=attr['full_mcdo'],
-                                  reduction=attr['reduction'],
                                   device=device,
-                                  recalibration=cfg['recalibration'],
-                                  recalibrator=cfg['recalibrator'],
-                                  bins=cfg['bins'],
                                   temperatureScaling=cfg['temperatureScaling'],
                                   freeze_seg=cfg['freeze_seg'],
                                   freeze_temp=cfg['freeze_temp'],
@@ -188,7 +182,7 @@ def train(cfg, writer, logger, logdir):
                     schedulers[model].load_state_dict(checkpoint["scheduler_state"])
 
                 # resume iterations only if specified
-                if cfg['training']['resume_iteration'] or str(cfg['training']['resume_iteration'])  == "None":
+                if cfg['training']['resume_iteration'] or str(cfg['training']['resume_iteration']) == "None":
                     start_iter = checkpoint["epoch"]
 
                 # start_iter = 0
@@ -208,7 +202,7 @@ def train(cfg, writer, logger, logdir):
                 print("No checkpoint found at '{}'".format(model_pkl))
                 exit()
 
-    plt.clf()           
+    plt.clf()
     i = start_iter
     print("Beginning Training at iteration: {}".format(i))
     while i < cfg["training"]["train_iters"]:
@@ -248,17 +242,15 @@ def train(cfg, writer, logger, logdir):
 
                 loss[m] = loss_fn(input=outputs[m], target=labels)
 
-
                 # import ipdb; ipdb.set_trace()
                 loss[m].backward()
 
-
                 # for n, p in models[m].module.named_parameters():
-                    # if (p.requires_grad) and ("bias" not in n):
-                        # print(n, p, p.grad)
+                # if (p.requires_grad) and ("bias" not in n):
+                # print(n, p, p.grad)
 
                 # plot_grad_flow(models[m].module.fusion, i)
-                
+
                 optimizers[m].step()
             time_meter.update(time.time() - start_ts)
             if (i + 1) % cfg['training']['print_interval'] == 0:
@@ -364,13 +356,12 @@ def train(cfg, writer, logger, logdir):
                                     mean[m] = swag_models[m](images_val[m])
                                     variance[m] = torch.zeros(mean[m].shape)
                                 elif hasattr(models[m].module, 'forwardMCDO'):
-
                                     if cfg["model"]["arch"] == "tempnet":
                                         mean[m], variance[m], entropy[m], mutual_info[m],temp_map[m],_,_,_ = models[m].module.forwardMCDO(
-                                            images_val[m])
+                                           images_val[m])
                                     else:
                                         mean[m], variance[m], entropy[m], mutual_info[m] = models[m].module.forwardMCDO(
-                                        images_val[m])
+                                            images_val[m])
                                 else:
                                     mean[m] = models[m](images_val[m])
                                     variance[m] = torch.zeros(mean[m].shape)
@@ -398,7 +389,6 @@ def train(cfg, writer, logger, logdir):
                                         1 - torch.nn.Softmax(dim=1)(mean["d"]))
                             else:
                                 print("Fusion Type Not Supported")
-                            
 
                             # plot ground truth vs mean/variance of outputs
                             prob, pred = outputs.max(1)
@@ -407,10 +397,10 @@ def train(cfg, writer, logger, logdir):
 
                             if i_val % cfg["training"]["png_frames"] == 0:
                                 plotPrediction(logdir, cfg, n_classes, i, i_val, k, inputs_display, pred, gt)
-                                labels = ['mutual info', 'entropy', 'probability', 'variance','temperature']                                    
-                                values = [mi, e, prob, torch.zeros(mi.shape),torch.zeros(mi.shape)]
+                                labels = ['mutual info', 'entropy', 'probability', 'variance', 'temperature']
+                                values = [mi, e, prob, torch.zeros(mi.shape), torch.zeros(mi.shape)]
                                 plotEverything(logdir, i, i_val, k + "/stats", values, labels)
-                                
+
                                 for m in cfg["models"].keys():
                                     prob = torch.nn.Softmax(dim=1)(mean[m].max(1))[0]
                                     if cfg["model"]["arch"] == "tempnet":
@@ -490,10 +480,6 @@ def train(cfg, writer, logger, logdir):
                                                          cfg['data']['dataset']))
                             torch.save(state, save_path)
 
-                        
-
-
-
                             if cfg['swa'] and i > cfg['swa']['start']:
                                 state = {
                                     "epoch": i,
@@ -510,7 +496,7 @@ def train(cfg, writer, logger, logdir):
                                 torch.save(state, save_path)
 
                         # save models
-                        if i%cfg['training']['save_iters'] == 0:
+                        if i % cfg['training']['save_iters'] == 0:
                             state = {
                                 "epoch": i,
                                 "model_state": model.state_dict(),
@@ -522,7 +508,7 @@ def train(cfg, writer, logger, logdir):
                                                      "{}_{}_{}_{}_model.pkl".format(
                                                          m,
                                                          cfg['models'][m]['arch'],
-                                                         cfg['data']['dataset']),i)
+                                                         cfg['data']['dataset']), i)
                             torch.save(state, save_path)
 
                         if cfg['swa'] and i > cfg['swa']['start']:

@@ -36,8 +36,8 @@ data:
     dataset: airsim
     train_split: recal
     train_subsplit: [
-            'async_fog_000_clear',
-            'async_fog_050_clear',]
+            "async_fog_000_clear__{'channel':'rgb','type':'blackoutNoise','value':'20'}",
+            "async_fog_000_clear__{'channel':'d','type':'blackoutNoise','value':'20'}"]
     train_reduction: 1.0
     recal_split: recal
     recal_subsplit: ['async_fog_000_clear',
@@ -65,7 +65,7 @@ training:
     png_frames: 50 #5000
     optimizer:
         name: 'adam'
-        lr: 1.0e-4
+        lr: 1.0e-3
     loss:
         name: 'cross_entropy'
         size_average: True

@@ -20,6 +20,21 @@ def cross_entropy2d(input, target, weight=None, size_average=True):
     )
     return loss
 
+def negative_log_likelihood2d(input, target, weight=None, size_average=True):
+    n, c, h, w = input.size()
+    nt, ht, wt = target.size()
+
+    # Handle inconsistent size between input and target
+    if h != ht or w != wt:
+        # input = F.interpolate(input, size=(ht, wt), mode="bilinear", align_corners=True)
+        input = F.upsample(input, size=(ht, wt), mode="bilinear", align_corners=True)
+
+    input = input.transpose(1, 2).transpose(2, 3).contiguous().view(-1, c)
+    target = target.view(-1)
+    loss = F.nll_loss(
+        input, target, weight=weight, size_average=size_average, ignore_index=250
+    )
+    return loss
 
 def multi_scale_cross_entropy2d(
     input, target, weight=None, size_average=True, scale_weight=None

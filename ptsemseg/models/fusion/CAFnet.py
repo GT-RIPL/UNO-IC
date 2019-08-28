@@ -102,7 +102,7 @@ class CAFnet(nn.Module):
             self.scale_rgb = self._get_scale_module(scaling_module)
         self.i = 0
         
-        self.normalize = True
+        self.normalize = False
         
 
     def forward(self, inputs):
@@ -131,7 +131,7 @@ class CAFnet(nn.Module):
             variance['d'] = self.bn_d(variance['d'])
         
         if self.scale_d is not None:
-            mean['rgb'] = self.scale_rgb(mean['d'], variance['d'], entropy['d'], mutual_info['d'])
+            mean['rgb'] = self.scale_rgb(mean['rgb'], variance['rgb'], entropy['rgb'], mutual_info['rgb'])
             mean['d'] = self.scale_d(mean['d'], variance['d'], entropy['d'], mutual_info['d'])  # [bs, n, 512, 512]
 
         # fuse outputs
@@ -211,6 +211,8 @@ class CAFnet(nn.Module):
         return {
             "temperature": TemperatureScaling(n_classes, bias_init),
             "uncertainty": UncertaintyScaling(n_classes, bias_init),
-            "globalUncertainty": GlobalUncertaintyScaling(n_classes, bias_init),
+            "LocalUncertaintyScaling": LocalUncertaintyScaling(n_classes, bias_init),
+            "GlobalUncertainty": GlobalUncertaintyScaling(n_classes, bias_init),
+            "GlobalLocalUncertainty": GlobalLocalUncertaintyScaling(n_classes, bias_init),
             "None": None
         }[name]

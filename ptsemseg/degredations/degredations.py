@@ -237,8 +237,6 @@ def fog(x, severity=1):
 
     x = np.array(x) / 255.
     max_val = x.max()
-    print(plasma_fractal(wibbledecay=c[1])[:512, :512][..., np.newaxis])
-    print(plasma_fractal(wibbledecay=c[1])[:512, :512][..., np.newaxis].shape)
     x += c[0] * plasma_fractal(wibbledecay=c[1])[:512, :512][..., np.newaxis]
     return np.clip(x * max_val / (max_val + c[0]), 0, 1) * 255
 
@@ -388,11 +386,9 @@ def jpeg_compression(x, severity=1):
 
 
 def pixelate(x, severity=1):
-    print(x.shape)
     c = [0.6, 0.5, 0.4, 0.3, 0.25][severity - 1]
     x = np.resize(x, (int(512 * c), int(512 * c), 3))
     x = np.resize(x, (512, 512, 3))
-
     return x
 
 
@@ -474,8 +470,6 @@ def brightnessCircle(image, severity=1):
     cv2.circle(corr,(x,y),r,noise_amount,-1)
 
     hsv[:,:,2] = np.array(hsv[:,:,2])+corr 
-
-    print(x,y,r)
 
     img = cv2.cvtColor(np.array(np.clip(hsv,0,255),np.uint8),cv2.COLOR_HSV2BGR)
 

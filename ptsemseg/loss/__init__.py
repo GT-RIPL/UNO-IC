@@ -2,7 +2,7 @@ import copy
 import logging
 import functools
 
-from ptsemseg.loss.loss import cross_entropy2d
+from ptsemseg.loss.loss import cross_entropy2d, negative_log_likelihood2d
 from ptsemseg.loss.loss import bootstrapped_cross_entropy2d
 from ptsemseg.loss.loss import multi_scale_cross_entropy2d
 
@@ -10,6 +10,7 @@ from ptsemseg.loss.loss import multi_scale_cross_entropy2d
 logger = logging.getLogger('ptsemseg')
 
 key2loss = {'cross_entropy': cross_entropy2d,
+            'negative_log_likelihood': negative_log_likelihood2d,
             'bootstrapped_cross_entropy': bootstrapped_cross_entropy2d,
             'multi_scale_cross_entropy': multi_scale_cross_entropy2d,}
 

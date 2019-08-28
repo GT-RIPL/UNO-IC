@@ -81,24 +81,19 @@ def validate(cfg, writer, logger, logdir):
         models[model] = get_model(name=attr['arch'],
                                   n_classes=n_classes,
                                   input_size=(cfg['data']['img_rows'], cfg['data']['img_cols']),
-                                  batch_size=cfg['training']['batch_size'],
                                   in_channels=attr['in_channels'],
-                                  start_layer=attr['start_layer'],
-                                  end_layer=attr['end_layer'],
                                   mcdo_passes=attr['mcdo_passes'],
                                   dropoutP=attr['dropoutP'],
                                   full_mcdo=attr['full_mcdo'],
-                                  reduction=attr['reduction'],
                                   device=device,
-                                  recalibration=cfg['recalibration'],
-                                  recalibrator=cfg['recalibrator'],
-                                  bins=cfg['bins'],
                                   temperatureScaling=cfg['temperatureScaling'],
                                   freeze_seg=cfg['freeze_seg'],
                                   freeze_temp=cfg['freeze_temp'],
                                   pretrained_rgb=cfg['pretrained_rgb'],
                                   pretrained_d=cfg['pretrained_d'],
-                                  fusion_module=cfg['fusion_module']).to(device)
+                                  fusion_module=cfg['fusion_module'],
+                                  scaling_module=cfg['scaling_module']).to(device)
+
 
         models[model] = torch.nn.DataParallel(models[model], device_ids=range(torch.cuda.device_count()))
 

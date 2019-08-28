@@ -231,7 +231,7 @@ class tempnet(nn.Module):
         x = x / self.mcdo_passes
         return x
 
-    def forwardMCDO(self, inputs, softmax=False):
+    def forwardMCDO(self, inputs, softmax=False, entropy_scaling = False):
 
         for i in range(self.mcdo_passes):
             if i == 0:
@@ -265,12 +265,14 @@ class tempnet(nn.Module):
             # entropy = predictive_entropy(prob)
             # mutual_info = mutul_information(prob)
             entropy, mutual_info = mutualinfo_entropy(prob)  # (2,512,512)
-            if self.model == 'rgb':
-                RGB_EN_ratio = self.RGB_EN_MEAN /entropy.mean((1,2)).unsqueeze(-1).unsqueeze(-1).unsqueeze(-1) #.unsqueeze(1)#
-                mean = mean*RGB_EN_ratio
-            else:
-                D_EN_ratio = self.D_EN_MEAN /entropy.mean((1,2)).unsqueeze(-1).unsqueeze(-1).unsqueeze(-1) #.unsqueeze(1)
-                mean = mean*D_EN_ratio
+            if entropy_scaling:
+                if self.model == 'rgb':
+                    RGB_EN_ratio = self.RGB_EN_MEAN /entropy.mean((1,2)).unsqueeze(-1).unsqueeze(-1).unsqueeze(-1) #.unsqueeze(1)#
+                    mean = mean*RGB_EN_ratio
+                else:
+                    D_EN_ratio = self.D_EN_MEAN /entropy.mean((1,2)).unsqueeze(-1).unsqueeze(-1).unsqueeze(-1) #.unsqueeze(1)
+                    mean = mean*D_EN_ratio
+            
             return mean, variance, entropy, mutual_info,temp_map.squeeze(1),temp.view(-1),entropy.mean((1,2)),mutual_info.mean((1,2))
 
     def showCalibration(self, output, label, logdir, model, iteration):

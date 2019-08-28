@@ -80,6 +80,7 @@ def get_model(name,
     elif name == "tempnet":
         model = model(n_classes=n_classes,
                       input_size=input_size,
+                      model_name = 'rgb',
                       batch_size=batch_size,
                       version=version,
                       reduction=reduction,

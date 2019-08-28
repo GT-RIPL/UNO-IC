@@ -10,60 +10,22 @@ class segnet_mcdo(nn.Module):
                  n_classes=21,
                  in_channels=3,
                  is_unpooling=True,
-                 input_size=(473, 473),
-                 batch_size=2,
-                 version=None,
                  mcdo_passes=1,
                  dropoutP=0.1,
                  full_mcdo=False,
-                 start_layer="down1",
-                 end_layer="up1",
-                 reduction=1.0,
-                 device="cpu",
-                 recalibration="None",
-                 recalibrator="None",
-                 bins=0,
-                 temperatureScaling=False,
                  freeze_seg=False,
-                 freeze_temp=False):
+                 freeze_temp=False,
+                 temperatureScaling=False):
         super(segnet_mcdo, self).__init__()
 
         self.in_channels = in_channels
         self.is_unpooling = is_unpooling
         self.mcdo_passes = mcdo_passes
         self.n_classes = n_classes
-        self.batch_size = batch_size
         self.dropoutP = dropoutP
         self.full_mcdo = full_mcdo
-        self.device = device
         self.freeze_seg = freeze_seg
         self.freeze_temp = freeze_temp
-
-        # Select Recalibrator
-        self.temperatureScaling = temperatureScaling
-        self.recalibrator = recalibrator
-        self.recalibration = recalibration
-
-        if recalibrator != "None" and bins > 0:
-            self.ranges = list(zip([1. * a / bins for a in range(bins + 2)][:-2],
-                                   [1. * a / bins for a in range(bins + 2)][1:]))
-            if recalibrator == "HistogramFlat":
-                self.calibrationPerClass = [HistogramFlatRecalibrator(n, self.ranges, device) for n in
-                                            range(self.n_classes)]
-            elif recalibrator == "HistogramLinear":
-                self.calibrationPerClass = [HistogramLinearRecalibrator(n, self.ranges, device) for n in
-                                            range(self.n_classes)]
-            elif "Polynomial" in recalibrator:
-                degree = int(recalibrator.split("_")[-1])
-                self.calibrationPerClass = [PolynomialRecalibrator(n, self.ranges, degree, device) for n in
-                                            range(self.n_classes)]
-            elif "Isotonic" in recalibrator:
-                self.calibrationPerClass = [IsotonicRecalibrator(n, device) for n in range(self.n_classes)]
-            elif "Platt" in recalibrator:
-                self.calibrationPerClass = [PlattRecalibrator(n, device) for n in range(self.n_classes)]
-            else:
-                print("Recalibrator: Not Supported")
-                exit()
 
         if not self.full_mcdo:
 
@@ -213,112 +175,7 @@ class segnet_mcdo(nn.Module):
         mean = x.mean(-1)
         variance = x.var(-1)
 
-        # Uncalibrated Softmax Mean and Variance
-        if str(self.recalibration) != "None":
-
-            if str(self.recalibration) == "beforeMCDO":
-                for c in range(self.n_classes):
-                    x[:, c, :, :, :] = self.calibrationPerClass[c].predict(x[:, c, :, :, :].reshape(-1)).reshape(x[:, c, :, :, :].shape)
-                mean = self.softmaxMCDO(x).mean(-1)
-                variance = self.softmaxMCDO(x).var(-1)
-            elif str(self.recalibration) == "afterMCDO":
-                for c in range(self.n_classes):
-                    mean[:, c, :, :] = self.calibrationPerClass[c].predict(mean[:, c, :, :].reshape(-1)).reshape(mean[:, c, :, :].shape)
-
         prob = self.softmaxMCDO(x)
         entropy, mutual_info = mutualinfo_entropy(prob)  # (batch,512,512)
 
         return mean, variance, entropy, mutual_info
-
-    def applyCalibration(self, output):
-
-        for c in range(self.n_classes):
-            output[:, c, :, :] = self.calibrationPerClass[c].predict(output[:, c, :, :].reshape(-1)).reshape(
-                output[:, c, :, :].shape)
-
-        return output
-
-    def showCalibration(self, output, label, logdir, model, iteration):
-
-        recal_output = self.applyCalibration(output.clone())
-
-        ###########
-        # Overall #
-        ###########
-        fig, axes = plt.subplots(1, 2)
-
-        # Plot Predicted Variance Against Observed/Empirical Variance
-        x, y = calcStatistics(output, label, self.ranges)
-
-        x = list(x)
-        y = list(y)
-
-        axes[0].plot(x, y, '.')
-        axes[0].set_title("Uncalibrated")
-        axes[0].set_xlabel("uncalibrated confidence")
-        axes[0].set_ylabel("emperical probability")
-
-        # Convert Predicted Variances to Calibrated Variances
-        x, y = calcStatistics(recal_output, label, self.ranges)
-        x = list(x)
-        y = list(y)
-
-        axes[1].plot(x, y)
-        axes[1].set_title("Recalibrated")
-        axes[1].set_xlabel("calibrated confidence")
-        axes[1].set_ylabel("emperical probability")
-
-        # calculating expected calibration error
-        ECE = sum([abs(i - j) for i, j, in zip(x, y)]) / len(x)
-        fig.suptitle('Expected Calibration Error: {}'.format(ECE), fontsize=16)
-
-        path = "{}/{}/{}".format(logdir, 'calibration', model)
-        if not os.path.exists(path):
-            os.makedirs(path)
-        plt.tight_layout()
-        plt.savefig("{}/calibratedOverall{}.png".format(path, iteration))
-        plt.close(fig)
-
-        ############################
-        # All Classes Uncalibrated #
-        ############################
-        fig, axes = plt.subplots(3, self.n_classes // 3 + 1)
-
-        for c in range(self.n_classes):
-            x, y = calcClassStatistics(output, label, self.ranges, c)
-            x = list(x)
-            y = list(y)
-            axes[(c + 1) // (self.n_classes // 3 + 1), (c + 1) % (self.n_classes // 3 + 1)].plot(x, y)
-            axes[(c + 1) // (self.n_classes // 3 + 1), (c + 1) % (self.n_classes // 3 + 1)].set_title(
-                "Class: {}".format(c))
-
-        path = "{}/{}/{}".format(logdir, 'calibration', model)
-        if not os.path.exists(path):
-            os.makedirs(path)
-        plt.tight_layout()
-        plt.savefig("{}/uncalibratedPerClass{}.png".format(path, iteration))
-        plt.close(fig)
-
-        ##########################
-        # All Classes Calibrated #
-        ##########################
-        fig, axes = plt.subplots(3, self.n_classes // 3 + 1)
-
-        for c in range(self.n_classes):
-            x, y = calcClassStatistics(recal_output, label, self.ranges, c)
-            x = list(x)
-            y = list(y)
-
-            axes[(c + 1) // (self.n_classes // 3 + 1), (c + 1) % (self.n_classes // 3 + 1)].plot(x, y)
-            axes[(c + 1) // (self.n_classes // 3 + 1), (c + 1) % (self.n_classes // 3 + 1)].set_title(
-                "Class: {}".format(c))
-
-        path = "{}/{}/{}".format(logdir, 'calibration', model)
-        if not os.path.exists(path):
-            os.makedirs(path)
-
-        plt.tight_layout()
-        plt.savefig("{}/calibratedPerClass{}.png".format(path, iteration))
-        plt.close(fig)
-
-        torch.cuda.empty_cache()

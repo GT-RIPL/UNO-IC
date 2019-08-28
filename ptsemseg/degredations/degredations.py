@@ -147,18 +147,6 @@ def speckle_noise(x, severity=1):
     return np.clip(x + x * np.random.normal(size=x.shape, scale=c), 0, 1) * 255
 
 
-def fgsm(x, source_net, severity=1):
-    c = [8, 16, 32, 64, 128][severity - 1]
-
-    x = V(x, requires_grad=True)
-    logits = source_net(x)
-    source_net.zero_grad()
-    loss = F.cross_entropy(logits, V(logits.data.max(1)[1].squeeze_()), size_average=False)
-    loss.backward()
-
-    return standardize(torch.clamp(unstandardize(x.data) + c / 255. * unstandardize(torch.sign(x.grad.data)), 0, 1))
-
-
 def gaussian_blur(x, severity=1):
     c = [1, 2, 3, 4, 6][severity - 1]
 
@@ -258,7 +246,7 @@ def frost(x, severity=1):
     # randomly crop and convert to rgb
 
     x_start, y_start = np.random.randint(0, frost.shape[0] - 512), np.random.randint(0, frost.shape[1] - 512)
-    
+
     frost = frost[x_start:x_start + 512, y_start:y_start + 512][..., [2, 1, 0]]
 
     return np.clip(c[0] * np.array(x) + c[1] * frost, 0, 255)
@@ -378,7 +366,7 @@ def jpeg_compression(x, severity=1):
     c = [25, 18, 15, 10, 7][severity - 1]
 
     output = BytesIO()
-    
+
     Image.fromarray(x).save(output, 'JPEG', quality=c)
     x = np.array(PILImage.open(output))
 
@@ -386,24 +374,17 @@ def jpeg_compression(x, severity=1):
 
 
 def pixelate(x, severity=1):
-<<<<<<< HEAD
-    c = [0.6, 0.5, 0.4, 0.3, 0.25][severity - 1]
-    x = np.resize(x, (int(512 * c), int(512 * c), 3))
-    x = np.resize(x, (512, 512, 3))
-=======
-
     c = [0.6, 0.5, 0.4, 0.3, 0.25][severity - 1]
 
     x = cv2.resize(input, (int(512 * c), int(512 * c)), interpolation=cv2.INTER_LINEAR)
     x = cv2.resize(x, (512, 512), interpolation=cv2.INTER_NEAREST)
 
->>>>>>> 41c9fc72bb27ca2093e8f8471d2a62a96c006c0e
     return x
 
 
 # mod of https://gist.github.com/erniejunior/601cdf56d2b424757de5
 def elastic_transform(image, severity=1):
-    c = [(244 * 2, 244 * 0.7, 244 * 0.1),   # 244 should have been 512, but ultimately nothing is incorrect
+    c = [(244 * 2, 244 * 0.7, 244 * 0.1),  # 244 should have been 512, but ultimately nothing is incorrect
          (244 * 2, 244 * 0.08, 244 * 0.2),
          (244 * 0.05, 244 * 0.01, 244 * 0.02),
          (244 * 0.07, 244 * 0.01, 244 * 0.02),
@@ -435,51 +416,32 @@ def elastic_transform(image, severity=1):
 
 
 def blackoutNoise(image, severity=1):
-    image = np.zeros(image.shape,dtype=np.uint8)
-    m = (severity,severity,severity) 
-    s = (severity,severity,severity)
+    image = np.zeros(image.shape, dtype=np.uint8)
+    m = (severity, severity, severity)
+    s = (severity, severity, severity)
 
-    image = np.clip(cv2.randn(image,m,s),0,255)
-    
+    image = np.clip(cv2.randn(image, m, s), 0, 255)
+
     return image
 
 
 def additiveGaussianNoise(image, severity=1):
+    m = (severity, severity, severity)
+    s = (severity, severity, severity)
+    corr = cv2.randn(np.zeros(image.shape, dtype=np.uint8), m, s)
 
-    m = (severity,severity,severity) 
-    s = (severity,severity,severity)
-    corr = cv2.randn(np.zeros(image.shape,dtype=np.uint8),m,s)
-
-    image = np.clip(image.copy()+corr,0,255)
+    image = np.clip(image.copy() + corr, 0, 255)
     return image
+
 
 def occlusion(image, severity=1):
+    mask = np.ones(image.shape, dtype=np.uint8)
 
-    mask = np.ones(image.shape,dtype=np.uint8)
+    x = int(image.shape[0] * np.random.rand())
+    y = int(image.shape[1] * np.random.rand())
+    r = int((min(image.shape[:2]) / 4) * np.random.rand() + (min(image.shape[:2]) / 4))
 
-    x = int(image.shape[0]*np.random.rand())
-    y = int(image.shape[1]*np.random.rand())
-    r = int((min(image.shape[:2])/4)*np.random.rand()+(min(image.shape[:2])/4))
+    cv2.circle(mask, (x, y), r, 0, -1)
 
-    cv2.circle(mask,(x,y),r,0,-1)
-
-    image = np.clip(image.copy()*mask,0,255)
+    image = np.clip(image.copy() * mask, 0, 255)
     return image
-
-def brightnessCircle(image, severity=1):   
-
-    orig = cv2.imread(file)
-    hsv = cv2.cvtColor(orig,cv2.COLOR_BGR2HSV)
-    corr = np.zeros(hsv.shape[:2],dtype=np.uint8)
-
-    x = int(hsv.shape[0]*np.random.rand())
-    y = int(hsv.shape[1]*np.random.rand())
-    r = int((min(hsv.shape[:2])/2)*np.random.rand()+(min(hsv.shape[:2])/4))
-
-    cv2.circle(corr,(x,y),r,noise_amount,-1)
-
-    hsv[:,:,2] = np.array(hsv[:,:,2])+corr 
-
-    img = cv2.cvtColor(np.array(np.clip(hsv,0,255),np.uint8),cv2.COLOR_HSV2BGR)
-
-# /////////////// End Corruptions ///////////////

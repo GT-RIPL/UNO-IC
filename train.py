@@ -241,7 +241,7 @@ def train(cfg, writer, logger, logdir):
             outputs = {}
             loss = {}
             for m in cfg["models"].keys():
-                if cfg['temperatureScaling']:
+                if cfg["model"]["arch"] == "tempnet":
                     outputs[m],_,_ = models[m](images[m])
                 else:
                     outputs[m] = models[m](images[m])
@@ -364,7 +364,8 @@ def train(cfg, writer, logger, logdir):
                                     mean[m] = swag_models[m](images_val[m])
                                     variance[m] = torch.zeros(mean[m].shape)
                                 elif hasattr(models[m].module, 'forwardMCDO'):
-                                    if cfg['temperatureScaling']:
+
+                                    if cfg["model"]["arch"] == "tempnet":
                                         mean[m], variance[m], entropy[m], mutual_info[m],temp_map[m],_,_,_ = models[m].module.forwardMCDO(
                                             images_val[m])
                                     else:
@@ -412,9 +413,12 @@ def train(cfg, writer, logger, logdir):
                                 
                                 for m in cfg["models"].keys():
                                     prob = torch.nn.Softmax(dim=1)(mean[m].max(1))[0]
-                                    if 
-                                    labels = ['mutual info', 'entropy', 'probability', 'variance','temperature']                                    
-                                    values = [mutual_info[m], entropy[m], prob, torch.mean(variance[m], 1),temp_map[m]]
+                                    if cfg["model"]["arch"] == "tempnet":
+                                        labels = ['mutual info', 'entropy', 'probability', 'variance','temperature']                                    
+                                        values = [mutual_info[m], entropy[m], prob, torch.mean(variance[m], 1),temp_map[m]]
+                                    else:
+                                        labels = ['mutual info', 'entropy', 'probability', 'variance']                                    
+                                        values = [mutual_info[m], entropy[m], prob, torch.mean(variance[m], 1)]
                                     plotEverything(logdir, i, i_val, k + "/" + m, values, labels)
 
                             running_metrics_val[k].update(gt.cpu().numpy(), pred.cpu().numpy())

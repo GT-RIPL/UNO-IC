@@ -210,7 +210,7 @@ class tempnet(nn.Module):
             up2 = self.layers["up2"](up3, indices_2, unpool_shape2)
             up1 = self.layers["up1"](up2, indices_1, unpool_shape1)
 
-        if self.temperatureScaling::
+        if self.temperatureScaling:
             tdown1, tindices_1, tunpool_shape1 = self.layers["temp_down1"](inputs)
             tdown2, tindices_2, tunpool_shape2 = self.layers["temp_down2"](tdown1)
             tup2 = self.layers["temp_up2"](tdown2, tindices_2, tunpool_shape2)
@@ -235,10 +235,10 @@ class tempnet(nn.Module):
 
         for i in range(self.mcdo_passes):
             if i == 0:
-                x_bp, temp_map, avg_temp = self.forward(inputs, spatial=True)
+                x_bp, temp_map, avg_temp = self.forward(inputs)
                 x = x_bp.unsqueeze(-1)
             else:
-                x = torch.cat((x, self.forward(inputs[0], spatial=True)[0].unsqueeze(-1)), -1)
+                x = torch.cat((x, self.forward(inputs[0])[0].unsqueeze(-1)), -1)
 
         mean = x.mean(-1)
         variance = x.std(-1)

@@ -241,7 +241,10 @@ def train(cfg, writer, logger, logdir):
             outputs = {}
             loss = {}
             for m in cfg["models"].keys():
-                outputs[m] = models[m](images[m])
+                if cfg['temperatureScaling']:
+                    outputs[m],_,_ = models[m](images[m])
+                else:
+                    outputs[m] = models[m](images[m])
 
                 loss[m] = loss_fn(input=outputs[m], target=labels)
 
@@ -349,6 +352,7 @@ def train(cfg, writer, logger, logdir):
                             variance = {}
                             entropy = {}
                             mutual_info = {}
+                            temp_map = {}
                             val_loss = {}
 
                             for m in cfg["models"].keys():
@@ -360,7 +364,11 @@ def train(cfg, writer, logger, logdir):
                                     mean[m] = swag_models[m](images_val[m])
                                     variance[m] = torch.zeros(mean[m].shape)
                                 elif hasattr(models[m].module, 'forwardMCDO'):
-                                    mean[m], variance[m], entropy[m], mutual_info[m] = models[m].module.forwardMCDO(
+                                    if cfg['temperatureScaling']:
+                                        mean[m], variance[m], entropy[m], mutual_info[m],temp_map[m],_,_,_ = models[m].module.forwardMCDO(
+                                            images_val[m])
+                                    else:
+                                        mean[m], variance[m], entropy[m], mutual_info[m] = models[m].module.forwardMCDO(
                                         images_val[m])
                                 else:
                                     mean[m] = models[m](images_val[m])
@@ -398,14 +406,15 @@ def train(cfg, writer, logger, logdir):
 
                             if i_val % cfg["training"]["png_frames"] == 0:
                                 plotPrediction(logdir, cfg, n_classes, i, i_val, k, inputs_display, pred, gt)
-                                labels = ['mutual info', 'entropy', 'probability', 'variance']                                    
-                                values = [mi, e, prob, torch.zeros(mi.shape)]
+                                labels = ['mutual info', 'entropy', 'probability', 'variance','temperature']                                    
+                                values = [mi, e, prob, torch.zeros(mi.shape),torch.zeros(mi.shape)]
                                 plotEverything(logdir, i, i_val, k + "/stats", values, labels)
                                 
                                 for m in cfg["models"].keys():
                                     prob = torch.nn.Softmax(dim=1)(mean[m].max(1))[0]
-                                    labels = ['mutual info', 'entropy', 'probability', 'variance']                                    
-                                    values = [mutual_info[m], entropy[m], prob, torch.mean(variance[m], 1)]
+                                    if 
+                                    labels = ['mutual info', 'entropy', 'probability', 'variance','temperature']                                    
+                                    values = [mutual_info[m], entropy[m], prob, torch.mean(variance[m], 1),temp_map[m]]
                                     plotEverything(logdir, i, i_val, k + "/" + m, values, labels)
 
                             running_metrics_val[k].update(gt.cpu().numpy(), pred.cpu().numpy())
@@ -477,6 +486,10 @@ def train(cfg, writer, logger, logdir):
                                                          cfg['data']['dataset']))
                             torch.save(state, save_path)
 
+                        
+
+
+
                             if cfg['swa'] and i > cfg['swa']['start']:
                                 state = {
                                     "epoch": i,
@@ -492,20 +505,21 @@ def train(cfg, writer, logger, logdir):
 
                                 torch.save(state, save_path)
 
-                        # save current model
-                        state = {
-                            "epoch": i,
-                            "model_state": model.state_dict(),
-                            "optimizer_state": optimizer.state_dict(),
-                            "scheduler_state": scheduler.state_dict(),
-                            "mean_iou": mean_iou,
-                        }
-                        save_path = os.path.join(writer.file_writer.get_logdir(),
-                                                 "{}_{}_{}_best_model.pkl".format(
-                                                     m,
-                                                     cfg['models'][m]['arch'],
-                                                     cfg['data']['dataset']))
-                        torch.save(state, save_path)
+                        # save models
+                        if i%cfg['training']['save_iters'] == 0:
+                            state = {
+                                "epoch": i,
+                                "model_state": model.state_dict(),
+                                "optimizer_state": optimizer.state_dict(),
+                                "scheduler_state": scheduler.state_dict(),
+                                "mean_iou": mean_iou,
+                            }
+                            save_path = os.path.join(writer.file_writer.get_logdir(),
+                                                     "{}_{}_{}_{}_model.pkl".format(
+                                                         m,
+                                                         cfg['models'][m]['arch'],
+                                                         cfg['data']['dataset']),i)
+                            torch.save(state, save_path)
 
                         if cfg['swa'] and i > cfg['swa']['start']:
                             state = {

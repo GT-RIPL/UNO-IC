@@ -2,7 +2,7 @@ import torch.nn as nn
 from torch.autograd import Variable
 
 from ptsemseg.models.recalibrator import *
-from ptsemseg.utils import save_pred, mutualinfo_entropy
+from ptsemseg.utils import mutualinfo_entropy
 
 
 class segnet_mcdo(nn.Module):
@@ -28,7 +28,6 @@ class segnet_mcdo(nn.Module):
         self.freeze_temp = freeze_temp
 
         if not self.full_mcdo:
-
             self.layers = {
                 "down1": segnetDown2(self.in_channels, 64),
                 "down2": segnetDown2(64, 128),
@@ -41,9 +40,7 @@ class segnet_mcdo(nn.Module):
                 "up2": segnetUp2(128, 64),
                 "up1": segnetUp2(64, n_classes, relu=True),
             }
-
         else:
-
             self.layers = {
                 "down1": segnetDown2MCDO(self.in_channels, 64, pMCDO=dropoutP),
                 "down2": segnetDown2MCDO(64, 128, pMCDO=dropoutP),

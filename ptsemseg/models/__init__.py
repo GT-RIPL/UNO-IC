@@ -12,7 +12,7 @@ from ptsemseg.models.frrn import *
 from ptsemseg.models.fusion.SSMA import SSMA
 from ptsemseg.models.fusion.deeplab import DeepLab
 from ptsemseg.models.fusion.CAFnet import CAFnet
-from ptsemseg.models.tempnet import tempnet
+from ptsemseg.models.tempnet import TempNet
 
 
 def get_model(name,
@@ -51,7 +51,6 @@ def get_model(name,
                       dropoutP=dropoutP,
                       full_mcdo=full_mcdo,
                       in_channels=in_channels,
-                      device=device,
                       temperatureScaling=temperatureScaling,
                       freeze_seg=freeze_seg,
                       freeze_temp=freeze_temp)
@@ -66,7 +65,6 @@ def get_model(name,
                       dropoutP=dropoutP,
                       full_mcdo=full_mcdo,
                       in_channels=in_channels,
-                      device=device,
                       temperatureScaling=temperatureScaling,
                       pretrained_rgb=pretrained_rgb,
                       pretrained_d=pretrained_d, )
@@ -78,7 +76,6 @@ def get_model(name,
                       dropoutP=dropoutP,
                       full_mcdo=full_mcdo,
                       in_channels=in_channels,
-                      device=device,
                       temperatureScaling=temperatureScaling,
                       pretrained_rgb=pretrained_rgb,
                       pretrained_d=pretrained_d,
@@ -130,7 +127,7 @@ def _get_model_instance(name):
             "CAF_segnet": CAFnet,
             "SSMA": SSMA,
             "DeepLab": DeepLab,
-            "tempnet": tempnet,
+            "tempnet": TempNet,
         }[name]
     except:
         raise ("Model {} not available".format(name))

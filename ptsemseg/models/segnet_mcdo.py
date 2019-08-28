@@ -161,11 +161,11 @@ class segnet_mcdo(nn.Module):
         x = x / self.mcdo_passes
         return x
 
-    def forwardMCDO(self, inputs, softmax=False):
+    def forwardMCDO(self, inputs, mcdo=True):
         with torch.no_grad():
             for i in range(self.mcdo_passes):
                 if i == 0:
-                    x = self.forward(inputs).unsqueeze(-1)
+                    x = self.forward(inputs,mcdo=mcdo).unsqueeze(-1)
                 else:
                     x = torch.cat((x, self.forward(inputs).unsqueeze(-1)), -1)
 

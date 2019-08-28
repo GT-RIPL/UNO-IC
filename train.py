@@ -357,7 +357,7 @@ def train(cfg, writer, logger, logdir):
                                             images_val[m])
                                     else:
                                         mean[m], variance[m], entropy[m], mutual_info[m] = models[m].module.forwardMCDO(
-                                            images_val[m])
+                                            images_val[m],mcdo=False)
                                 else:
                                     mean[m] = models[m](images_val[m])
                                     variance[m] = torch.zeros(mean[m].shape)

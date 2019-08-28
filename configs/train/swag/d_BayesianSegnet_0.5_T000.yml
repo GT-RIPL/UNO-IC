@@ -19,7 +19,7 @@ models:
         start_layer: down1
         end_layer: up1
         reduction: 1.0
-        mcdo_passes: 6 # Number of Passes
+        mcdo_passes: 1 # Number of Passes
         mask_dir: models/DropoutMasks/Random # Directory of Indexed Masks
         masks: [0] # Number Mask Indices Should Equal Number of MCDO Passes
         fixed_mcdo: No # Yes: Fixed Masks per Pass; No: Randomized Masks per Pass

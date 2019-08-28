@@ -7,7 +7,7 @@ models:
         in_channels: 3
         start_layer: down1
         end_layer: up1
-        mcdo_passes: 6
+        mcdo_passes: 1
         dropoutP: 0.5
         full_mcdo: False
         reduction: 1.0

@@ -8,7 +8,7 @@ models:
         start_layer: down1
         end_layer: up1
         reduction: 1.0
-        mcdo_passes: 6 # Number of Passes
+        mcdo_passes: 1 # Number of Passes
         dropoutP: 0.5 # Dropout Probability
         resume: ./models/rgb_BayesianSegnet_0.5_T000/rgb_segnet_mcdo_airsim_best_model.pkl
     # d:

@@ -502,7 +502,8 @@ def train(cfg, writer, logger, logdir):
                                                      "{}_{}_{}_{}_model.pkl".format(
                                                          m,
                                                          cfg['models'][m]['arch'],
-                                                         cfg['data']['dataset']), i)
+                                                         cfg['data']['dataset'],
+                                                         i))
                             torch.save(state, save_path)
 
                         if cfg['swa'] and i > cfg['swa']['start']:

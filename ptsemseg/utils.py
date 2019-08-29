@@ -485,7 +485,7 @@ def plotMutualInfoEntropy(logdir, i, i_val, k, pred, variance):
 
 def plotEverything(logdir, i, i_val, k, values, labels):
     path = "{}/{}".format(logdir, k)
-    fig, axes = plt.subplots(2, len(values)//2)
+    fig, axes = plt.subplots(2, len(values)//2+1)
     #import ipdb; ipdb.set_trace()
         
     for i in range(len(values)):

@@ -231,7 +231,7 @@ def train(cfg, writer, logger, logdir):
             outputs = {}
             loss = {}
             for m in cfg["models"].keys():
-                if cfg["model"]["arch"] == "tempnet":
+                if cfg["models"][m]["arch"] == "tempnet":
                     outputs[m], _, _ = models[m](images[m])
                 else:
                     outputs[m] = models[m](images[m])
@@ -352,7 +352,7 @@ def train(cfg, writer, logger, logdir):
                                     mean[m] = swag_models[m](images_val[m])
                                     variance[m] = torch.zeros(mean[m].shape)
                                 elif hasattr(models[m].module, 'forwardMCDO'):
-                                    if cfg["model"]["arch"] == "tempnet":
+                                    if cfg["models"][m]["arch"] == "tempnet":
                                         mean[m], variance[m], entropy[m], mutual_info[m], temp_map[m], _, _, _ = models[m].module.forwardMCDO(
                                             images_val[m])
                                     else:
@@ -398,8 +398,8 @@ def train(cfg, writer, logger, logdir):
                                 plotEverything(logdir, i, i_val, k + "/stats", values, labels)
 
                                 for m in cfg["models"].keys():
-                                    prob = torch.nn.Softmax(dim=1)(mean[m].max(1))[0]
-                                    if cfg["model"]["arch"] == "tempnet":
+                                    prob = torch.nn.Softmax(dim=1)(mean[m].max(1)[0])
+                                    if cfg["models"][m]["arch"] == "tempnet":
                                         labels = ['mutual info', 'entropy', 'probability', 'variance', 'temperature']
                                         values = [mutual_info[m], entropy[m], prob, torch.mean(variance[m], 1), temp_map[m]]
                                     else:
@@ -504,7 +504,8 @@ def train(cfg, writer, logger, logdir):
                                                      "{}_{}_{}_{}_model.pkl".format(
                                                          m,
                                                          cfg['models'][m]['arch'],
-                                                         cfg['data']['dataset']), i)
+                                                         cfg['data']['dataset'],
+                                                         i))
                             torch.save(state, save_path)
 
                         if cfg['swa'] and i > cfg['swa']['start']:

@@ -52,20 +52,20 @@ def get_model(name,
                       full_mcdo=full_mcdo,
                       in_channels=in_channels,
                       temperatureScaling=temperatureScaling,
+                      scaling_module=scaling_module,
                       freeze_seg=freeze_seg,
                       freeze_temp=freeze_temp)
         vgg16 = models.vgg16(pretrained=True)
         model.init_vgg16_params(vgg16)
 
     elif name == "tempnet":
-        model = model(backbone="segnet",
-                      n_classes=n_classes,
+        model = model(n_classes=n_classes,
                       input_size=input_size,
                       mcdo_passes=mcdo_passes,
-                      dropoutP=dropoutP,
                       full_mcdo=full_mcdo,
                       in_channels=in_channels,
                       temperatureScaling=temperatureScaling,
+                      scaling_module=scaling_module,
                       pretrained_rgb=pretrained_rgb,
                       pretrained_d=pretrained_d, )
     elif name == "CAFnet" or name == "CAF_segnet":

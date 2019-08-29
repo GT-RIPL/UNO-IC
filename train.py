@@ -32,7 +32,6 @@ from ptsemseg.utils import bn_update, mem_report
 
 global logdir, cfg, n_classes, i, i_val, k
 
-
 def plot_grad_flow(module, i=0):
     ave_grads = []
     layers = []
@@ -232,7 +231,7 @@ def train(cfg, writer, logger, logdir):
             loss = {}
             for m in cfg["models"].keys():
                 if cfg["model"]["arch"] == "tempnet":
-                    outputs[m], _, _ = models[m](images[m])
+                    outputs[m], _, _,_,_ = models[m](images[m])
                 else:
                     outputs[m] = models[m](images[m])
 
@@ -353,8 +352,7 @@ def train(cfg, writer, logger, logdir):
                                     variance[m] = torch.zeros(mean[m].shape)
                                 elif hasattr(models[m].module, 'forwardMCDO'):
                                     if cfg["model"]["arch"] == "tempnet":
-                                        mean[m], variance[m], entropy[m], mutual_info[m], temp_map[m], _, _, _ = models[m].module.forwardMCDO(
-                                            images_val[m])
+                                        mean[m], variance[m], entropy[m], mutual_info[m], temp_map[m] = models[m](images_val[m])
                                     else:
                                         mean[m], variance[m], entropy[m], mutual_info[m] = models[m].module.forwardMCDO(
                                             images_val[m],mcdo=False)

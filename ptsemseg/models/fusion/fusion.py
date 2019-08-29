@@ -243,6 +243,25 @@ class UncertaintyScaling(nn.Module):
         out = self.norm(out)
         
         return out
+
+
+class GlobalEntropyScaling(nn.Module):
+    def __init__(self, n_classes=11,modality='rgb',isSpatialTemp=False,bias_init=None):
+        super(GlobalEntropyScaling, self).__init__()
+        if isSpatialTemp:
+            if modality == 'rgb': self.EN_MEAN = 0.269067225021285 #0.32459927664415256 (ENTROPY) rgb
+            elif modality == 'd':self.EN_MEAN = 0.3592196062005855 #0.31072759806505734 (ENTROPY) d
+            else:
+                print('Invalid modality')
+        else: 
+            if modality == 'rgb': self.EN_MEAN = 0.0763452350715729  #0.10211336450349237 rgb
+            elif modality == 'd':self.EN_MEAN = 0.1383940359074119  #0.18285040798521526 d
+            else:
+                print('Invalid modality')
+    def forward(self, mean, variance, mutual_info, entropy):
+        EN_ratio = self.EN_MEAN /entropy.mean((1,2)).unsqueeze(-1).unsqueeze(-1).unsqueeze(-1) #.unsqueeze(1)#
+        mean = mean * self.EN_ratio
+        return mean
         
 
     

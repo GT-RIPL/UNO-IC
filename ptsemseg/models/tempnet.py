@@ -8,15 +8,13 @@ from ptsemseg.utils import mutualinfo_entropy, plotEverything, plotPrediction
 
 class TempNet(nn.Module):
     def __init__(self,
-                 backbone="segnet",
                  n_classes=21,
                  in_channels=3,
                  mcdo_passes=1,
-                 dropoutP=0.1,
                  full_mcdo=False,
-                 temperatureScaling=False,
                  freeze_seg=True,
                  freeze_temp=True,
+                 scaling_module='None',
                  pretrained_rgb=None,
                  pretrained_d=None
                  ):
@@ -24,10 +22,10 @@ class TempNet(nn.Module):
 
         self.segnet = segnet_mcdo(n_classes=n_classes,
                                   mcdo_passes=mcdo_passes,
-                                  dropoutP=dropoutP,
+                                  dropoutP=0,
                                   full_mcdo=full_mcdo,
                                   in_channels=in_channels,
-                                  temperatureScaling=temperatureScaling,
+                                  temperatureScaling=False,
                                   freeze_seg=freeze_seg,
                                   freeze_temp=freeze_temp, )
 
@@ -47,15 +45,38 @@ class TempNet(nn.Module):
         for param in self.segnet.parameters():
             param.requires_grad = False
 
+        # initialize temp net
+        self.layers = {
+                "temp_down1": segnetDown2(in_channels, 64),
+                "temp_down2": segnetDown2(64, 128),
+                "temp_up2": segnetUp2(128, 64),
+                "temp_up1": segnetUp2(64, 1)}
+        
+        self.scale_logits = self._get_scale_module(scaling_module)
+
     def forward(self, inputs):
 
         # Freeze batchnorm
         self.segnet.eval()
 
         # computer logits and uncertainty measures
-        mean, variance, entropy, mutual_info = self.segnet.module.forwardMCDO(inputs)
+        up1 = self.segnet.module.forwardMCDO_logits(inputs) #(batch,11,512,512,passes)
 
-        return mean
+        tdown1, tindices_1, tunpool_shape1 = self.layers["temp_down1"](inputs)
+        tdown2, tindices_2, tunpool_shape2 = self.layers["temp_down2"](tdown1)
+        tup2 = self.layers["temp_up2"](tdown2, tindices_2, tunpool_shape2)
+        tup1 = self.layers["temp_up1"](tup2, tindices_1, tunpool_shape1) #[batch,1,512,512]
+        #temp = tup1.mean((2,3)).unsqueeze(-1).unsqueeze(-1) #(batch,1,1,1)
+
+        x = up1 * tup1.unsqueeze(-1)
+        mean = x.mean(-1) #[batch,classes,512,512]
+        mean = x.mean(-1) 
+        variance = x.std(-1)
+        prob = self.softmaxMCDO(x) #[batch,classes,512,512]
+        prob = prob.masked_fill(prob < 1e-9, 1e-9)
+        entropy,mutual_info = mutualinfo_entropy(prob)#(batch,512,512)
+        mean = self.scale_logits(mean, variance, mutual_info, entropy)
+        return mean, variance, entropy, mutual_info,temp_map.squeeze(1)#,temp.view(-1),entropy.mean((1,2)),mutual_info.mean((1,2))
 
     def loadModel(self, model, path):
         model_pkl = path
@@ -77,3 +98,17 @@ class TempNet(nn.Module):
         else:
             print("model not found")
             exit()
+
+    def _get_scale_module(self, name, n_classes=11, bias_init=None):
+
+        name = str(name)
+
+        return {
+            "temperature": TemperatureScaling(n_classes, bias_init),
+            "uncertainty": UncertaintyScaling(n_classes, bias_init),
+            "LocalUncertaintyScaling": LocalUncertaintyScaling(n_classes, bias_init),
+            "GlobalUncertainty": GlobalUncertaintyScaling(n_classes, bias_init),
+            "GlobalLocalUncertainty": GlobalLocalUncertaintyScaling(n_classes, bias_init),
+            "GlobalEntropyScaling" : GlobalEntropyScaling( n_classes=11,modality=self.modality,isSpatialTemp=True,bias_init)
+            "None": None
+        }[name]

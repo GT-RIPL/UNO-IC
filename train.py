@@ -106,6 +106,7 @@ def train(cfg, writer, logger, logdir):
         attr = defaultdict(lambda: None, attr)
 
         models[model] = get_model(name=attr['arch'],
+                                  modality = modality,
                                   n_classes=n_classes,
                                   input_size=(cfg['data']['img_rows'], cfg['data']['img_cols']),
                                   in_channels=attr['in_channels'],
@@ -351,11 +352,10 @@ def train(cfg, writer, logger, logdir):
                                     mean[m] = swag_models[m](images_val[m])
                                     variance[m] = torch.zeros(mean[m].shape)
                                 elif hasattr(models[m].module, 'forwardMCDO'):
-                                    if cfg["model"]["arch"] == "tempnet":
+                                    mean[m], variance[m], entropy[m], mutual_info[m] = models[m].module.forwardMCDO(
+                                        images_val[m],mcdo=False)
+                                elif cfg["model"]["arch"] == "tempnet":
                                         mean[m], variance[m], entropy[m], mutual_info[m], temp_map[m] = models[m](images_val[m])
-                                    else:
-                                        mean[m], variance[m], entropy[m], mutual_info[m] = models[m].module.forwardMCDO(
-                                            images_val[m],mcdo=False)
                                 else:
                                     mean[m] = models[m](images_val[m])
                                     variance[m] = torch.zeros(mean[m].shape)
@@ -396,7 +396,7 @@ def train(cfg, writer, logger, logdir):
                                 plotEverything(logdir, i, i_val, k + "/stats", values, labels)
 
                                 for m in cfg["models"].keys():
-                                    prob = torch.nn.Softmax(dim=1)(mean[m].max(1))[0]
+                                    prob = torch.nn.Softmax(dim=1)(mean[m]).max(1)[0]
                                     if cfg["model"]["arch"] == "tempnet":
                                         labels = ['mutual info', 'entropy', 'probability', 'variance', 'temperature']
                                         values = [mutual_info[m], entropy[m], prob, torch.mean(variance[m], 1), temp_map[m]]

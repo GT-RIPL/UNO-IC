@@ -16,7 +16,8 @@ from ptsemseg.models.tempnet import TempNet
 
 
 def get_model(name,
-              n_classes,
+              modality = 'rgb',
+              n_classes = 11,
               input_size=(512, 512),
               mcdo_passes=6,
               dropoutP=0.5,
@@ -47,6 +48,7 @@ def get_model(name,
 
     elif name == "segnet_mcdo":
         model = model(n_classes=n_classes,
+                      modality = modality,
                       mcdo_passes=mcdo_passes,
                       dropoutP=dropoutP,
                       full_mcdo=full_mcdo,
@@ -60,11 +62,10 @@ def get_model(name,
 
     elif name == "tempnet":
         model = model(n_classes=n_classes,
-                      input_size=input_size,
+                      modality = modality,
                       mcdo_passes=mcdo_passes,
                       full_mcdo=full_mcdo,
                       in_channels=in_channels,
-                      temperatureScaling=temperatureScaling,
                       scaling_module=scaling_module,
                       pretrained_rgb=pretrained_rgb,
                       pretrained_d=pretrained_d, )

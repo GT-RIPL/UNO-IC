@@ -260,7 +260,7 @@ class GlobalEntropyScaling(nn.Module):
                 print('Invalid modality')
     def forward(self, mean, variance, mutual_info, entropy):
         EN_ratio = self.EN_MEAN /entropy.mean((1,2)).unsqueeze(-1).unsqueeze(-1).unsqueeze(-1) #.unsqueeze(1)#
-        mean = mean * self.EN_ratio
+        mean = mean * EN_ratio
         return mean
         
 

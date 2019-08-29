@@ -15,7 +15,7 @@ import cv2
 from ptsemseg.models import get_model
 from ptsemseg.loss import get_loss_function
 from ptsemseg.loader import get_loaders
-from ptsemseg.utils import get_logger, parseEightCameras, plotPrediction, plotMeansVariances, plotEntropy, plotMutualInfo, plotSpatial, save_pred, plotEverything
+from ptsemseg.utils import get_logger, parseEightCameras, plotPrediction, plotMeansVariances, plotEntropy, plotMutualInfo, plotSpatial, save_pred, plotEverything,mutualinfo_entropy
 from ptsemseg.metrics import runningScore, averageMeter
 from ptsemseg.schedulers import get_scheduler
 from ptsemseg.optimizers import get_optimizer
@@ -79,6 +79,7 @@ def validate(cfg, writer, logger, logdir):
         attr = defaultdict(lambda: None, attr)
 
         models[model] = get_model(name=attr['arch'],
+                                  modality = model,
                                   n_classes=n_classes,
                                   input_size=(cfg['data']['img_rows'], cfg['data']['img_cols']),
                                   in_channels=attr['in_channels'],
@@ -110,6 +111,7 @@ def validate(cfg, writer, logger, logdir):
         loss_fn = get_loss_function(cfg)
         logger.info("Using loss {}".format(loss_fn))
 
+
         # Load pretrained weights
         if str(attr['resume']) is not "None":
 
@@ -125,17 +127,17 @@ def validate(cfg, writer, logger, logdir):
 
                 pretrained_dict = torch.load(model_pkl)['model_state']
                 model_dict = models[model].state_dict()
-
+                #import ipdb;ipdb.set_trace()
                 # 1. filter out unnecessary keys
                 pretrained_dict = {k: v.resize_(model_dict[k].shape) for k, v in pretrained_dict.items() if (
                         k in model_dict)}  # and ((model!="fuse") or (model=="fuse" and not start_layer in k))}
 
                 # 2. overwrite entries in the existing state dict
                 model_dict.update(pretrained_dict)
-
+                #import ipdb;ipdb.set_trace()
                 # 3. load the new state dict
                 models[model].load_state_dict(pretrained_dict, strict=False)
-
+                #import ipdb;ipdb.set_trace()
                 if attr['resume'] == 'same_yaml':
                     optimizers[model].load_state_dict(checkpoint["optimizer_state"])
                     schedulers[model].load_state_dict(checkpoint["scheduler_state"])
@@ -215,6 +217,7 @@ def validate(cfg, writer, logger, logdir):
                 entropy = {}
                 mutual_info = {}
                 val_loss = {}
+                temp_map = {}
 
                 for m in cfg["models"].keys():
 
@@ -224,10 +227,9 @@ def validate(cfg, writer, logger, logdir):
                         entropy[m] = torch.zeros(labels_val.shape)
                         mutual_info[m] = torch.zeros(labels_val.shape)
                     elif hasattr(models[m].module, 'forwardMCDO'):
-                        if cfg["model"]["arch"] == "tempnet":
-                            mean[m], variance[m], entropy[m], mutual_info[m], temp_map[m] = models[m](images_val[m])
-                        else:
-                            mean[m], variance[m], entropy[m], mutual_info[m] = models[m].module.forwardMCDO(images_val[m])
+                        mean[m], variance[m], entropy[m], mutual_info[m] = models[m].module.forwardMCDO(images_val[m])
+                    elif cfg["model"]["arch"] == "tempnet":
+                        mean[m], variance[m], entropy[m], mutual_info[m], temp_map[m] = models[m](images_val[m])
                     else:
                         mean[m] = models[m](images_val[m])
                         variance[m] = torch.zeros(mean[m].shape)
@@ -251,14 +253,15 @@ def validate(cfg, writer, logger, logdir):
                         rgb[:, n, :, :] = rgb[:, n, :, :] * rgb_var
                         d[:, n, :, :] = d[:, n, :, :] * d_var
                     outputs = rgb + d
-                elif cfg["fusion"] == "NoisyOr":
+                elif cfg["fusion"] == "Noisy-Or":
                     outputs = 1 - (1 - torch.nn.Softmax(dim=1)(mean["rgb"])) * (1 - torch.nn.Softmax(dim=1)(mean["d"]))
                 else:
                     print("Fusion Type Not Supported")
 
                 # plot ground truth vs mean/variance of outputs
-                pred = outputs.argmax(1)
+                prob, pred = outputs.max(1)
                 gt = labels_val
+                e, mi = mutualinfo_entropy(outputs.unsqueeze(-1))
                 # import ipdb;ipdb.set_trace()
                 if i_val % cfg["training"]["png_frames"] == 0:
                     plotPrediction(logdir, cfg, n_classes, i, i_val, k, inputs_display, pred, gt)
@@ -267,7 +270,7 @@ def validate(cfg, writer, logger, logdir):
                     plotEverything(logdir, i, i_val, k + "/stats", values, labels)
 
                     for m in cfg["models"].keys():
-                        prob = torch.nn.Softmax(dim=1)(mean[m].max(1))[0]
+                        prob = torch.nn.Softmax(dim=1)(mean[m]).max(1)[0]
                         if cfg["model"]["arch"] == "tempnet":
                             labels = ['mutual info', 'entropy', 'probability', 'variance', 'temperature']
                             values = [mutual_info[m], entropy[m], prob, torch.mean(variance[m], 1), temp_map[m]]

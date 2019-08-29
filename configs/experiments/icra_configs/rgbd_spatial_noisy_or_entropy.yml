@@ -3,29 +3,31 @@ model:
     arch: tempnet
 models:
     rgb:
+        arch: tempnet
         in_channels: 3
         start_layer: down1
         end_layer: up1
         reduction: 1.0
         mcdo_passes: 1 # Number of Passes
         dropoutP: 0 # Dropout Probability
-        resume: None
+        resume: /home/jtian73/pytorch-semseg/runs/rgbd_BayesianSegnet_mcdo_temp_0_50_500k_final/rgb_segnet_mcdo_airsim_best_model.pkl
     d:
+        arch: tempnet
         in_channels: 3
         start_layer: down1
         end_layer: up1
         reduction: 1.0
         mcdo_passes: 1
         dropoutP: 0
-        resume: None
+        resume: /home/jtian73/pytorch-semseg/runs/rgbd_BayesianSegnet_mcdo_temp_0_50_500k_final/d_segnet_mcdo_airsim_best_model.pkl
 
 fusion: Noisy-Or #{None,SoftmaxMultiply}
 recal: None #{None,afterMCDO,beforeMCDO}
 recalibrator: None #{Histogram,Polynomial_X}
 temperatureScaling: False
 
-pretrained_rgb: models/Segnet/rgb_Segnet/rgb_segnet_mcdo_airsim_T000+T050.pkl
-pretrained_d: models/Segnet/d_Segnet/d_segnet_mcdo_airsim_T000+T050.pkl
+pretrained_rgb: /home/wcheung8/pytorch-semseg/models/Segnet/rgb_Segnet/rgb_segnet_mcdo_airsim_T000+T050.pkl
+pretrained_d: /home/wcheung8/pytorch-semseg/models/Segnet/d_Segnet/d_segnet_mcdo_airsim_T000+T050.pkl
 fusion_module: None
 scaling_module: GlobalEntropyScaling
 
@@ -44,20 +46,20 @@ data:
     val_split: val
     val_subsplit: [
                    'async_fog_000_clear',
-                   'async_fog_050_clear',
-                   'async_fog_100_clear',
-                   "async_fog_100_clear__{'channel':'rgb','type':'blackoutNoise','value':'20'}",
-                   "async_fog_100_clear__{'channel':'d','type':'blackoutNoise','value':'20'}",
+                   #'async_fog_050_clear',
+                   #'async_fog_100_clear',
+                   #"async_fog_100_clear__{'channel':'rgb','type':'blackoutNoise','value':'20'}",
+                   #"async_fog_100_clear__{'channel':'d','type':'blackoutNoise','value':'20'}",
                   ]    
     val_reduction: 0.5
     img_rows: 512
     img_cols: 512
-    path: datasets/airsim_data_async #../../ros/data/airsim_03-30-2019/airsim_data_async
+    path: /home/jtian73/airsim_03-30-2019/airsim_data_async ##datasets/airsim_data_async #../../ros/data/airsim_03-30-2019/airsim_data_async
     noisy_type: None 
 training:
     train_iters: 100000
     batch_size: 2
-    val_interval: 50 #5000
+    val_interval: 10000 #5000
     n_workers: 8
     print_interval: 50
     png_frames: 50 #5000

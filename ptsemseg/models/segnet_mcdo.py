@@ -1,13 +1,14 @@
 import torch.nn as nn
 from torch.autograd import Variable
 
-from .fusion import *
+from .fusion.fusion import *
 from ptsemseg.models.recalibrator import *
 from ptsemseg.utils import mutualinfo_entropy
 
 
 class segnet_mcdo(nn.Module):
     def __init__(self,
+                 modality = 'rgb',
                  n_classes=21,
                  in_channels=3,
                  is_unpooling=True,
@@ -28,7 +29,8 @@ class segnet_mcdo(nn.Module):
         self.full_mcdo = full_mcdo
         self.freeze_seg = freeze_seg
         self.freeze_temp = freeze_temp
-
+        self.modality = modality
+        
         if not self.full_mcdo:
             self.layers = {
                 "down1": segnetDown2(self.in_channels, 64),
@@ -203,6 +205,6 @@ class segnet_mcdo(nn.Module):
             "LocalUncertaintyScaling": LocalUncertaintyScaling(n_classes, bias_init),
             "GlobalUncertainty": GlobalUncertaintyScaling(n_classes, bias_init),
             "GlobalLocalUncertainty": GlobalLocalUncertaintyScaling(n_classes, bias_init),
-            "GlobalEntropyScaling" : GlobalEntropyScaling( n_classes=11,modality=self.modality,isSpatialTemp=False,bias_init)
+            "GlobalEntropyScaling" : GlobalEntropyScaling( n_classes=11,modality=self.modality,isSpatialTemp=False,bias_init=bias_init),
             "None": None
         }[name]

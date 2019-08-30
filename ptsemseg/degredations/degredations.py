@@ -375,11 +375,12 @@ def jpeg_compression(x, severity=1):
 
 def pixelate(x, severity=1):
     c = [0.6, 0.5, 0.4, 0.3, 0.25][severity - 1]
+    x = Image.fromarray(x)
+    
+    x = x.resize((int(512 * c), int(512 * c)),resample=Image.BILINEAR)
+    x = x.resize((512, 512),Image.NEAREST)
 
-    x = cv2.resize(input, (int(512 * c), int(512 * c)), interpolation=cv2.INTER_LINEAR)
-    x = cv2.resize(x, (512, 512), interpolation=cv2.INTER_NEAREST)
-
-    return x
+    return np.array(x)
 
 
 # mod of https://gist.github.com/erniejunior/601cdf56d2b424757de5

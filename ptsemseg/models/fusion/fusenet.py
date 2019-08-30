@@ -6,7 +6,7 @@ import torch.nn.functional as F
 
 
 class FuseNet(nn.Module):
-    def __init__(self, num_labels, gpu_device=0, use_class=True):
+    def __init__(self, num_labels, use_class=False):
         super(FuseNet, self).__init__()
 
         # Load pre-trained VGG-16 weights to two separate variables.
@@ -17,8 +17,8 @@ class FuseNet(nn.Module):
         # Average the first layer of feats variable, the input-layer weights of VGG-16,
         # over the channel dimension, as depth encoder will be accepting one-dimensional
         # inputs instead of three.
-        avg = torch.mean(feats[0].cuda(gpu_device).weight.data, dim=1)
-        avg = avg.unsqueeze(1)
+        # avg = torch.mean(feats[0].cuda().weight.data, dim=1)
+        # avg = avg.unsqueeze(1)
 
         bn_moment = 0.1
         self.use_class = use_class
@@ -27,187 +27,188 @@ class FuseNet(nn.Module):
             num_classes = 10
 
         # DEPTH ENCODER
-        self.conv11d = nn.Conv2d(1, 64, kernel_size=3, padding=1).cuda(gpu_device)
-        self.conv11d.weight.data = avg
+        # self.conv11d = nn.Conv2d(3, 64, kernel_size=3, padding=1).cuda()
+        # self.conv11d.weight.data = avg
 
         self.CBR1_D = nn.Sequential(
-            nn.BatchNorm2d(64).cuda(gpu_device),
-            feats[1].cuda(gpu_device),
-            feats[2].cuda(gpu_device),
-            nn.BatchNorm2d(64).cuda(gpu_device),
-            feats[3].cuda(gpu_device),
+            feats2[0].cuda(),
+            nn.BatchNorm2d(64).cuda(),
+            feats[1].cuda(),
+            feats[2].cuda(),
+            nn.BatchNorm2d(64).cuda(),
+            feats[3].cuda(),
         )
         self.CBR2_D = nn.Sequential(
-            feats[5].cuda(gpu_device),
-            nn.BatchNorm2d(128).cuda(gpu_device),
-            feats[6].cuda(gpu_device),
-            feats[7].cuda(gpu_device),
-            nn.BatchNorm2d(128).cuda(gpu_device),
-            feats[8].cuda(gpu_device),
+            feats[5].cuda(),
+            nn.BatchNorm2d(128).cuda(),
+            feats[6].cuda(),
+            feats[7].cuda(),
+            nn.BatchNorm2d(128).cuda(),
+            feats[8].cuda(),
         )
         self.CBR3_D = nn.Sequential(
-            feats[10].cuda(gpu_device),
-            nn.BatchNorm2d(256).cuda(gpu_device),
-            feats[11].cuda(gpu_device),
-            feats[12].cuda(gpu_device),
-            nn.BatchNorm2d(256).cuda(gpu_device),
-            feats[13].cuda(gpu_device),
-            feats[14].cuda(gpu_device),
-            nn.BatchNorm2d(256).cuda(gpu_device),
-            feats[15].cuda(gpu_device),
+            feats[10].cuda(),
+            nn.BatchNorm2d(256).cuda(),
+            feats[11].cuda(),
+            feats[12].cuda(),
+            nn.BatchNorm2d(256).cuda(),
+            feats[13].cuda(),
+            feats[14].cuda(),
+            nn.BatchNorm2d(256).cuda(),
+            feats[15].cuda(),
         )
-        self.dropout3_d = nn.Dropout(p=0.5).cuda(gpu_device)
+        self.dropout3_d = nn.Dropout(p=0.5).cuda()
 
         self.CBR4_D = nn.Sequential(
-            feats[17].cuda(gpu_device),
-            nn.BatchNorm2d(512).cuda(gpu_device),
-            feats[18].cuda(gpu_device),
-            feats[19].cuda(gpu_device),
-            nn.BatchNorm2d(512).cuda(gpu_device),
-            feats[20].cuda(gpu_device),
-            feats[21].cuda(gpu_device),
-            nn.BatchNorm2d(512).cuda(gpu_device),
-            feats[22].cuda(gpu_device),
+            feats[17].cuda(),
+            nn.BatchNorm2d(512).cuda(),
+            feats[18].cuda(),
+            feats[19].cuda(),
+            nn.BatchNorm2d(512).cuda(),
+            feats[20].cuda(),
+            feats[21].cuda(),
+            nn.BatchNorm2d(512).cuda(),
+            feats[22].cuda(),
         )
-        self.dropout4_d = nn.Dropout(p=0.5).cuda(gpu_device)
+        self.dropout4_d = nn.Dropout(p=0.5).cuda()
 
         self.CBR5_D = nn.Sequential(
-            feats[24].cuda(gpu_device),
-            nn.BatchNorm2d(512).cuda(gpu_device),
-            feats[25].cuda(gpu_device),
-            feats[26].cuda(gpu_device),
-            nn.BatchNorm2d(512).cuda(gpu_device),
-            feats[27].cuda(gpu_device),
-            feats[28].cuda(gpu_device),
-            nn.BatchNorm2d(512).cuda(gpu_device),
-            feats[29].cuda(gpu_device),
+            feats[24].cuda(),
+            nn.BatchNorm2d(512).cuda(),
+            feats[25].cuda(),
+            feats[26].cuda(),
+            nn.BatchNorm2d(512).cuda(),
+            feats[27].cuda(),
+            feats[28].cuda(),
+            nn.BatchNorm2d(512).cuda(),
+            feats[29].cuda(),
         )
 
         # RGB ENCODER
         self.CBR1_RGB = nn.Sequential(
-            feats2[0].cuda(gpu_device),
-            nn.BatchNorm2d(64).cuda(gpu_device),
-            feats2[1].cuda(gpu_device),
-            feats2[2].cuda(gpu_device),
-            nn.BatchNorm2d(64).cuda(gpu_device),
-            feats2[3].cuda(gpu_device),
+            feats2[0].cuda(),
+            nn.BatchNorm2d(64).cuda(),
+            feats2[1].cuda(),
+            feats2[2].cuda(),
+            nn.BatchNorm2d(64).cuda(),
+            feats2[3].cuda(),
         )
 
         self.CBR2_RGB = nn.Sequential(
-            feats2[5].cuda(gpu_device),
-            nn.BatchNorm2d(128).cuda(gpu_device),
-            feats2[6].cuda(gpu_device),
-            feats2[7].cuda(gpu_device),
-            nn.BatchNorm2d(128).cuda(gpu_device),
-            feats2[8].cuda(gpu_device),
+            feats2[5].cuda(),
+            nn.BatchNorm2d(128).cuda(),
+            feats2[6].cuda(),
+            feats2[7].cuda(),
+            nn.BatchNorm2d(128).cuda(),
+            feats2[8].cuda(),
         )
 
         self.CBR3_RGB = nn.Sequential(
-            feats2[10].cuda(gpu_device),
-            nn.BatchNorm2d(256).cuda(gpu_device),
-            feats2[11].cuda(gpu_device),
-            feats2[12].cuda(gpu_device),
-            nn.BatchNorm2d(256).cuda(gpu_device),
-            feats2[13].cuda(gpu_device),
-            feats2[14].cuda(gpu_device),
-            nn.BatchNorm2d(256).cuda(gpu_device),
-            feats2[15].cuda(gpu_device),
+            feats2[10].cuda(),
+            nn.BatchNorm2d(256).cuda(),
+            feats2[11].cuda(),
+            feats2[12].cuda(),
+            nn.BatchNorm2d(256).cuda(),
+            feats2[13].cuda(),
+            feats2[14].cuda(),
+            nn.BatchNorm2d(256).cuda(),
+            feats2[15].cuda(),
         )
-        self.dropout3 = nn.Dropout(p=0.5).cuda(gpu_device)
+        self.dropout3 = nn.Dropout(p=0.5).cuda()
 
         self.CBR4_RGB = nn.Sequential(
-            feats2[17].cuda(gpu_device),
-            nn.BatchNorm2d(512).cuda(gpu_device),
-            feats2[18].cuda(gpu_device),
-            feats2[19].cuda(gpu_device),
-            nn.BatchNorm2d(512).cuda(gpu_device),
-            feats2[20].cuda(gpu_device),
-            feats2[21].cuda(gpu_device),
-            nn.BatchNorm2d(512).cuda(gpu_device),
-            feats2[22].cuda(gpu_device),
+            feats2[17].cuda(),
+            nn.BatchNorm2d(512).cuda(),
+            feats2[18].cuda(),
+            feats2[19].cuda(),
+            nn.BatchNorm2d(512).cuda(),
+            feats2[20].cuda(),
+            feats2[21].cuda(),
+            nn.BatchNorm2d(512).cuda(),
+            feats2[22].cuda(),
         )
-        self.dropout4 = nn.Dropout(p=0.5).cuda(gpu_device)
+        self.dropout4 = nn.Dropout(p=0.5).cuda()
 
         self.CBR5_RGB = nn.Sequential(
-            feats2[24].cuda(gpu_device),
-            nn.BatchNorm2d(512).cuda(gpu_device),
-            feats2[25].cuda(gpu_device),
-            feats2[26].cuda(gpu_device),
-            nn.BatchNorm2d(512).cuda(gpu_device),
-            feats2[27].cuda(gpu_device),
-            feats2[28].cuda(gpu_device),
-            nn.BatchNorm2d(512).cuda(gpu_device),
-            feats2[29].cuda(gpu_device),
+            feats2[24].cuda(),
+            nn.BatchNorm2d(512).cuda(),
+            feats2[25].cuda(),
+            feats2[26].cuda(),
+            nn.BatchNorm2d(512).cuda(),
+            feats2[27].cuda(),
+            feats2[28].cuda(),
+            nn.BatchNorm2d(512).cuda(),
+            feats2[29].cuda(),
         )
-        self.dropout5 = nn.Dropout(p=0.5).cuda(gpu_device)
+        self.dropout5 = nn.Dropout(p=0.5).cuda()
 
         if use_class:
             self.ClassHead = nn.Sequential(
-                # classifier[0].cuda(gpu_device),
-                nn.Linear(35840, 4096).cuda(gpu_device),
+                # classifier[0].cuda(),
+                nn.Linear(35840, 4096).cuda(),
                 nn.ReLU(),
-                nn.Dropout(p=0.5).cuda(gpu_device),
-                nn.Linear(4096, 4096).cuda(gpu_device),
-                # classifier[3].cuda(gpu_device),
+                nn.Dropout(p=0.5).cuda(),
+                nn.Linear(4096, 4096).cuda(),
+                # classifier[3].cuda(),
                 nn.ReLU(),
-                nn.Dropout(p=0.5).cuda(gpu_device),
-                nn.Linear(4096, num_classes).cuda(gpu_device)
+                nn.Dropout(p=0.5).cuda(),
+                nn.Linear(4096, num_classes).cuda()
             )
 
         # RGB DECODER
         self.CBR5_Dec = nn.Sequential(
-            nn.Conv2d(512, 512, kernel_size=3, padding=1).cuda(gpu_device),
-            nn.BatchNorm2d(512, momentum=bn_moment).cuda(gpu_device),
-            nn.ReLU().cuda(gpu_device),
-            nn.Conv2d(512, 512, kernel_size=3, padding=1).cuda(gpu_device),
-            nn.BatchNorm2d(512, momentum=bn_moment).cuda(gpu_device),
-            nn.ReLU().cuda(gpu_device),
-            nn.Conv2d(512, 512, kernel_size=3, padding=1).cuda(gpu_device),
-            nn.BatchNorm2d(512, momentum=bn_moment).cuda(gpu_device),
-            nn.ReLU().cuda(gpu_device),
-            nn.Dropout(p=0.5).cuda(gpu_device),
+            nn.Conv2d(512, 512, kernel_size=3, padding=1).cuda(),
+            nn.BatchNorm2d(512, momentum=bn_moment).cuda(),
+            nn.ReLU().cuda(),
+            nn.Conv2d(512, 512, kernel_size=3, padding=1).cuda(),
+            nn.BatchNorm2d(512, momentum=bn_moment).cuda(),
+            nn.ReLU().cuda(),
+            nn.Conv2d(512, 512, kernel_size=3, padding=1).cuda(),
+            nn.BatchNorm2d(512, momentum=bn_moment).cuda(),
+            nn.ReLU().cuda(),
+            nn.Dropout(p=0.5).cuda(),
         )
 
         self.CBR4_Dec = nn.Sequential(
-            nn.Conv2d(512, 512, kernel_size=3, padding=1).cuda(gpu_device),
-            nn.BatchNorm2d(512, momentum=bn_moment).cuda(gpu_device),
-            nn.ReLU().cuda(gpu_device),
-            nn.Conv2d(512, 512, kernel_size=3, padding=1).cuda(gpu_device),
-            nn.BatchNorm2d(512, momentum=bn_moment).cuda(gpu_device),
-            nn.ReLU().cuda(gpu_device),
-            nn.Conv2d(512, 256, kernel_size=3, padding=1).cuda(gpu_device),
-            nn.BatchNorm2d(256, momentum=bn_moment).cuda(gpu_device),
-            nn.ReLU().cuda(gpu_device),
-            nn.Dropout(p=0.5).cuda(gpu_device),
+            nn.Conv2d(512, 512, kernel_size=3, padding=1).cuda(),
+            nn.BatchNorm2d(512, momentum=bn_moment).cuda(),
+            nn.ReLU().cuda(),
+            nn.Conv2d(512, 512, kernel_size=3, padding=1).cuda(),
+            nn.BatchNorm2d(512, momentum=bn_moment).cuda(),
+            nn.ReLU().cuda(),
+            nn.Conv2d(512, 256, kernel_size=3, padding=1).cuda(),
+            nn.BatchNorm2d(256, momentum=bn_moment).cuda(),
+            nn.ReLU().cuda(),
+            nn.Dropout(p=0.5).cuda(),
         )
 
         self.CBR3_Dec = nn.Sequential(
-            nn.Conv2d(256, 256, kernel_size=3, padding=1).cuda(gpu_device),
-            nn.BatchNorm2d(256, momentum=bn_moment).cuda(gpu_device),
-            nn.ReLU().cuda(gpu_device),
-            nn.Conv2d(256, 256, kernel_size=3, padding=1).cuda(gpu_device),
-            nn.BatchNorm2d(256, momentum=bn_moment).cuda(gpu_device),
-            nn.ReLU().cuda(gpu_device),
-            nn.Conv2d(256,  128, kernel_size=3, padding=1).cuda(gpu_device),
-            nn.BatchNorm2d(128, momentum=bn_moment).cuda(gpu_device),
-            nn.ReLU().cuda(gpu_device),
-            nn.Dropout(p=0.5).cuda(gpu_device),
+            nn.Conv2d(256, 256, kernel_size=3, padding=1).cuda(),
+            nn.BatchNorm2d(256, momentum=bn_moment).cuda(),
+            nn.ReLU().cuda(),
+            nn.Conv2d(256, 256, kernel_size=3, padding=1).cuda(),
+            nn.BatchNorm2d(256, momentum=bn_moment).cuda(),
+            nn.ReLU().cuda(),
+            nn.Conv2d(256,  128, kernel_size=3, padding=1).cuda(),
+            nn.BatchNorm2d(128, momentum=bn_moment).cuda(),
+            nn.ReLU().cuda(),
+            nn.Dropout(p=0.5).cuda(),
         )
 
         self.CBR2_Dec = nn.Sequential(
-            nn.Conv2d(128, 128, kernel_size=3, padding=1).cuda(gpu_device),
-            nn.BatchNorm2d(128, momentum=bn_moment).cuda(gpu_device),
-            nn.ReLU().cuda(gpu_device),
-            nn.Conv2d(128, 64, kernel_size=3, padding=1).cuda(gpu_device),
-            nn.BatchNorm2d(64, momentum=bn_moment).cuda(gpu_device),
-            nn.ReLU().cuda(gpu_device),
+            nn.Conv2d(128, 128, kernel_size=3, padding=1).cuda(),
+            nn.BatchNorm2d(128, momentum=bn_moment).cuda(),
+            nn.ReLU().cuda(),
+            nn.Conv2d(128, 64, kernel_size=3, padding=1).cuda(),
+            nn.BatchNorm2d(64, momentum=bn_moment).cuda(),
+            nn.ReLU().cuda(),
         )
 
         self.CBR1_Dec = nn.Sequential(
-            nn.Conv2d(64, 64, kernel_size=3, padding=1).cuda(gpu_device),
-            nn.BatchNorm2d(64, momentum=bn_moment).cuda(gpu_device),
-            nn.ReLU().cuda(gpu_device),
-            nn.Conv2d(64, num_labels, kernel_size=3, padding=1).cuda(gpu_device),
+            nn.Conv2d(64, 64, kernel_size=3, padding=1).cuda(),
+            nn.BatchNorm2d(64, momentum=bn_moment).cuda(),
+            nn.ReLU().cuda(),
+            nn.Conv2d(64, num_labels, kernel_size=3, padding=1).cuda(),
         )
 
         print('[INFO] FuseNet model has been created')
@@ -223,11 +224,15 @@ class FuseNet(nn.Module):
                 variance = np.sqrt(4.0/(fan_in + fan_out))
                 m.weight.data.normal_(0.0, variance)
 
-    def forward(self, rgb_inputs, depth_inputs):
+    def forward(self, inputs):
+        rgb_inputs = inputs[:, :3, :, :]
+        depth_inputs = inputs[:, 3:, :, :]
+        
+        # import ipdb; ipdb.set_trace()
         # DEPTH ENCODER
         # Stage 1
-        x = self.conv11d(depth_inputs)
-        x_1 = self.CBR1_D(x)
+        # x = self.conv11d(depth_inputs)
+        x_1 = self.CBR1_D(depth_inputs)
         x, id1_d = F.max_pool2d(x_1, kernel_size=2, stride=2, return_indices=True)
 
         # Stage 2

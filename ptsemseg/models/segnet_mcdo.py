@@ -158,18 +158,6 @@ class segnet_mcdo(nn.Module):
 
         return up1
 
-    def forwardAvg(self, inputs):
-
-        for i in range(self.mcdo_passes):
-            if i == 0:
-                x = self.forward(inputs)
-            else:
-                x = x + self.forward(inputs)
-
-        x = x / self.mcdo_passes
-        return x
-
-
     def forwardMCDO(self, inputs, mcdo=True):
         with torch.no_grad():
             for i in range(self.mcdo_passes):

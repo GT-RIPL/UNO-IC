@@ -106,7 +106,7 @@ def train(cfg, writer, logger, logdir):
         attr = defaultdict(lambda: None, attr)
 
         models[model] = get_model(name=attr['arch'],
-                                  modality = modality,
+                                  modality=model,
                                   n_classes=n_classes,
                                   input_size=(cfg['data']['img_rows'], cfg['data']['img_cols']),
                                   in_channels=attr['in_channels'],
@@ -490,7 +490,7 @@ def train(cfg, writer, logger, logdir):
                                 torch.save(state, save_path)
 
                         # save models
-                        if i % cfg['training']['save_iters'] == 0:
+                        if 'save_iters' not in cfg['training'].keys() or i % cfg['training']['save_iters'] == 0:
                             state = {
                                 "epoch": i,
                                 "model_state": model.state_dict(),

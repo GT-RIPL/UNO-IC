@@ -12,6 +12,7 @@ from ptsemseg.models.frrn import *
 from ptsemseg.models.fusion.SSMA import SSMA
 from ptsemseg.models.fusion.deeplab import DeepLab
 from ptsemseg.models.fusion.CAFnet import CAFnet
+from ptsemseg.models.fusion.fusenet import FuseNet
 from ptsemseg.models.tempnet import TempNet
 
 
@@ -82,12 +83,8 @@ def get_model(name,
                       pretrained_d=pretrained_d,
                       fusion_module=fusion_module,
                       scaling_module=scaling_module)
-
-    elif name == "fused_segnet":
-        model = model(n_classes=n_classes)
-        vgg16 = models.vgg16(pretrained=True)
-        model.rgb_segnet.init_vgg16_params(vgg16)
-        model.d_segnet.init_vgg16_params(vgg16)
+    elif name == "fusenet":
+        model = model(n_classes, use_class=False)
 
     elif name == "unet":
         model = model(n_classes=n_classes)
@@ -100,9 +97,9 @@ def get_model(name,
                       in_channels=in_channels, )
 
     elif name == "SSMA":
-        model = model(backbone='resnet', output_stride=16, num_classes=n_classes, sync_bn=True, freeze_bn=False)
+        model = model(backbone='segnet', output_stride=16, num_classes=n_classes, sync_bn=True, freeze_bn=False)
     elif name == "DeepLab":
-        model = model(backbone='resnet', output_stride=16, num_classes=n_classes, sync_bn=True, freeze_bn=False)
+        model = model(backbone='segnet', output_stride=16, num_classes=n_classes, sync_bn=True, freeze_bn=False)
     else:
         model = model(n_classes=n_classes)
 
@@ -128,6 +125,7 @@ def _get_model_instance(name):
             "CAF_segnet": CAFnet,
             "SSMA": SSMA,
             "DeepLab": DeepLab,
+            "fusenet": FuseNet,
             "tempnet": TempNet,
         }[name]
     except:

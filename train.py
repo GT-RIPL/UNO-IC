@@ -106,7 +106,7 @@ def train(cfg, writer, logger, logdir):
         attr = defaultdict(lambda: None, attr)
 
         models[model] = get_model(name=attr['arch'],
-                                  modality = modality,
+                                  modality=model,
                                   n_classes=n_classes,
                                   input_size=(cfg['data']['img_rows'], cfg['data']['img_cols']),
                                   in_channels=attr['in_channels'],
@@ -231,7 +231,7 @@ def train(cfg, writer, logger, logdir):
             outputs = {}
             loss = {}
             for m in cfg["models"].keys():
-                if cfg["model"]["arch"] == "tempnet":
+                if cfg["models"][m]["arch"] == "tempnet":
                     outputs[m], _, _,_,_ = models[m](images[m])
                 else:
                     outputs[m] = models[m](images[m])
@@ -354,7 +354,7 @@ def train(cfg, writer, logger, logdir):
                                 elif hasattr(models[m].module, 'forwardMCDO'):
                                     mean[m], variance[m], entropy[m], mutual_info[m] = models[m].module.forwardMCDO(
                                         images_val[m],mcdo=False)
-                                elif cfg["model"]["arch"] == "tempnet":
+                                elif cfg["models"][m]["arch"] == "tempnet":
                                         mean[m], variance[m], entropy[m], mutual_info[m], temp_map[m] = models[m](images_val[m])
                                 else:
                                     mean[m] = models[m](images_val[m])
@@ -397,7 +397,7 @@ def train(cfg, writer, logger, logdir):
 
                                 for m in cfg["models"].keys():
                                     prob = torch.nn.Softmax(dim=1)(mean[m]).max(1)[0]
-                                    if cfg["model"]["arch"] == "tempnet":
+                                    if cfg["models"][m]["arch"] == "tempnet":
                                         labels = ['mutual info', 'entropy', 'probability', 'variance', 'temperature']
                                         values = [mutual_info[m], entropy[m], prob, torch.mean(variance[m], 1), temp_map[m]]
                                     else:
@@ -490,7 +490,7 @@ def train(cfg, writer, logger, logdir):
                                 torch.save(state, save_path)
 
                         # save models
-                        if i % cfg['training']['save_iters'] == 0:
+                        if 'save_iters' not in cfg['training'].keys() or i % cfg['training']['save_iters'] == 0:
                             state = {
                                 "epoch": i,
                                 "model_state": model.state_dict(),

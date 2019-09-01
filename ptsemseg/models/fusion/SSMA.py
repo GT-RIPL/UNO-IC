@@ -7,22 +7,29 @@ from ..segnet import segnet
 from .deeplab import DeepLab
 from .decoder import build_decoder
 
+import torchvision.models as models
+
 
 class SSMA(nn.Module):
-    def __init__(self, backbone='resnet', expert='segnet', output_stride=16, num_classes=21,
+    def __init__(self, backbone='segnet', output_stride=16, num_classes=21,
                  sync_bn=True, freeze_bn=False):
 
         super(SSMA, self).__init__()
 
-        if expert == 'segnet':
+        if backbone == 'segnet':
             self.expert_A = segnet(n_classes=num_classes, in_channels=3, is_unpooling=True)
             self.expert_B = segnet(n_classes=num_classes, in_channels=3, is_unpooling=True)
+            vgg16 = models.vgg16(pretrained=True)
+            self.expert_A.init_vgg16_params(vgg16)
+            self.expert_B.init_vgg16_params(vgg16)
+            self.SSMA_skip1 = _SSMABlock(64, 4)
+            self.SSMA_ASPP = _SSMABlock(512, 4)
         else:
             self.expert_A = DeepLab(backbone, output_stride, num_classes, sync_bn, freeze_bn)
             self.expert_B = DeepLab(backbone, output_stride, num_classes, sync_bn, freeze_bn)
+            self.SSMA_skip1 = _SSMABlock(24, 4)
+            self.SSMA_ASPP = _SSMABlock(256, 4)
 
-        self.SSMA_skip1 = _SSMABlock(24, 4)
-        self.SSMA_ASPP = _SSMABlock(256, 4)
 
         if sync_bn == True:
             BatchNorm = SynchronizedBatchNorm2d

@@ -37,7 +37,6 @@ def label_region_n_compute_distance(i,path_tuple):
         else:
             region = 'skyscraper'
 
-
     # update tuple
     path_tuple = (i,)+path_tuple + (distance, region,)
 
@@ -256,11 +255,12 @@ class airsimLoader(data.Dataset):
 
     mean_rgbd = {
         # "airsim": [103.939, 116.779, 123.68, 120.00],
-        "airsim": [21,22,21,45]
+        # "airsim": [21,22,21,45]
+        "airsim": [41.454376, 46.093113, 42.958637, 4.464941, 5.1877136, 167.58365
     }  # pascal mean for PSPNet and ICNet pre-trained model
 
     std_rgbd = {
-        "airsim": [8,7,8,36]
+        "airsim": [37.94737, 37.26296, 36.74846, 22.874805, 28.264046, 39.39389] 
     }
 
 
@@ -355,8 +355,8 @@ class airsimLoader(data.Dataset):
                     '''
 
 
-        print('scene_back_image num',n)
-        print('valid sample pairs',k)
+        print('scene_back_image num', n)
+        print('valid sample pairs', k)
 
         if not self.imgs[self.split][self.cam_pos[0]][self.image_modes[0]]:
             raise Exception(
@@ -385,31 +385,73 @@ class airsimLoader(data.Dataset):
         print("Modes:     {}".format(", ".join(list(self.imgs[self.split][self.cam_pos[0]].keys()))))
 
         savefile = "{}_dataset_statistics.p".format(self.split)
+        savefile2 = "{}_pixels.p".format(self.split)
 
-        if os.path.isfile(savefile):
+
+        rgb_mean = []
+        rgb_std = []
+        d_mean = []
+        d_std = []
+        for index in tqdm(range(int(1.0*len(self.imgs[self.split][self.cam_pos[0]][self.image_modes[0]])))):
+            input_list, lbl_list = self.__getitem__(index)
+            img_list, aux_list = input_list['rgb'], input_list['d']
+            # shape (batch_size, 3, height, width)
+            numpy_image = torch.stack(img_list, 0).numpy()
+            numpy_depth = torch.stack(aux_list, 0).numpy()
+            
+            # shape (3,)
+            batch_mean = np.mean(numpy_image, axis=(0,2,3))
+            batch_std = np.std(numpy_image, axis=(0,2,3), ddof=1)
+            
+            rgb_mean.append(batch_mean)
+            rgb_std.append(batch_std)
+            
+            
+            # shape (3,)
+            batch_mean = np.mean(numpy_depth, axis=(0,2,3))
+            batch_std = np.std(numpy_depth, axis=(0,2,3), ddof=1)
+            
+            d_mean.append(batch_mean)
+            d_std.append(batch_std)
+
+            
+
+        # shape (num_iterations, 3) -> (mean across 0th axis) -> shape (3,)
+        rgb_mean = np.array(rgb_mean).mean(axis=0)
+        rgb_std = np.array(rgb_std).mean(axis=0)
+        # shape (num_iterations, 3) -> (mean across 0th axis) -> shape (3,)
+        d_mean = np.array(d_mean).mean(axis=0)
+        d_std = np.array(d_std).mean(axis=0)
+        
+        print("rgb: mean - {}, std - {}".format(rgb_mean, rgb_std))
+        print("d: mean - {}, std - {}".format(d_mean, d_std))
+
+        # if os.path.isfile(savefile):
+        if False:
             pixel_stats = pickle.load( open(savefile,"rb"))
+            pixel_dump = pickle.load( open(savefile2,"rb"))
 
         else:        
             pixel_stats = {p:{n:[] for n in self.name2id} for p in self.cam_pos}
-
+            
             for index in tqdm(range(int(1.0*len(self.imgs[self.split][self.cam_pos[0]][self.image_modes[0]])))):
-                img_list, lbl_list, aux_list = self.__getitem__(index)
-
+                input_list, lbl_list = self.__getitem__(index)
+                img_list, aux_list = input_list['rgb'], input_list['d']
+                
                 for i,p in enumerate(self.cam_pos):
                     for n in self.name2id:
                         pixel_stats[p][n].append( (1.*torch.sum(lbl_list[i]==self.name2id[n]).tolist()/(list(lbl_list[i].size())[0]*list(lbl_list[i].size())[1])) ) 
-
-
-            pickle.dump( pixel_stats, open(savefile,"wb"))
-
-
+                
+            
+            pickle.dump(pixel_stats, open(savefile,"wb"))
+        
         pixel_stats_summary = {p:{n:{"mean":0} for n in self.name2id} for p in self.cam_pos}
         for i,p in enumerate(self.cam_pos):
             for n in self.name2id:
                 pixel_stats_summary[p][n]["mean"] = np.mean(pixel_stats[p][n])
-                # pixel_stats_summary[m][n]["var"] = np.var(pixel_stats[m][n])
+                pixel_stats_summary[p][n]["var"] = np.std(pixel_stats[p][n])
 
-        print(pixel_stats_summary)
+        # print(pixel_stats_summary)
 
 
 
@@ -633,32 +675,35 @@ class airsimLoader(data.Dataset):
                 depth_raw = np.array(cv2.imread(depth_path),dtype=np.uint8)
                 depth = np.array((256**3)*depth_raw[:,:,0]+
                                  (256**2)*depth_raw[:,:,1]+
-                                 (256**1)*depth_raw[:,:,2]+
-                                 (256**0)*depth_raw[:,:,3],dtype=np.uint32).view(np.float32)
+                                 (256**1)*depth_raw[:,:,2],dtype=np.uint32).view(np.float32)
             else:
                 depth_path = self.imgs[self.split][camera]['depth'][index]
-                depth = np.array(cv2.imread(depth_path),dtype=np.uint8)[:,:,:3]
+                depth = np.array(cv2.imread(depth_path),dtype=np.uint8)
+                
+                
 
             degradation = self.dgrd[self.split][camera]['scene'][index]
             if not degradation is None:
                 img, depth = self.degradation(degradation, img, depth)
-
-            aux = depth            
+            
+            
             lbl = self.ignore_index*np.ones((img.shape[0],img.shape[1]),dtype=np.uint8)
             for i,name in self.id2name.items():
                 for color in self.name2color[name]:
                     lbl[(mask==color[::-1]).all(-1)] = i
 
             if self.augmentations is not None:
-                img, lbl, aux = self.augmentations(img, lbl, aux)
+                img, lbl, depth = self.augmentations(img, lbl, depth)
+
 
             if self.is_transform:
-                img, lbl, aux, img_display, aux_display = self.transform(img, lbl, aux)
-            
+                img, lbl, depth, img_display, depth_display = self.transform(img, lbl, depth)
+
+
             input_list['rgb'].append(img)
-            input_list['d'].append(aux)
+            input_list['d'].append(depth)
             input_list['rgb_display'].append(img_display)
-            input_list['d_display'].append(aux_display)
+            input_list['d_display'].append(depth_display)
             
             lbl_list.append(lbl)
 
@@ -687,14 +732,14 @@ class airsimLoader(data.Dataset):
         :param lbl:
         """
         img = cv2.resize(img, (self.img_size[0], self.img_size[1]))  # uint8 with RGB mode
-        aux = cv2.resize(aux, (self.img_size[0], self.img_size[1]))  # uint8 with Depth mode
-        img = img[:, :, ::-1]  # RGB -> BGR
+        aux = cv2.resize(aux, (self.img_size[0], self.img_size[1]))  # uint8 with RGB mode
+
         img = img.astype(np.float64)
         aux = aux.astype(np.float64)
         
-        img_display = img
-        aux_display = aux
-        
+        img_display = img.copy()
+        aux_display = aux.copy()
+
         if self.img_norm:
             img = np.divide((img.astype(float) - self.mean[:3]),self.std[:3])
             aux = np.divide((aux.astype(float) - self.mean[3:]),self.std[3:])
@@ -702,7 +747,7 @@ class airsimLoader(data.Dataset):
         # NHWC -> NCHW
         img = img.transpose(2, 0, 1)
         img_display = img_display.transpose(2, 0, 1)
-        
+
         if not any(['depth_encoded'==mode for mode in self.image_modes]):
             aux = aux.transpose(2, 0, 1)
             aux_display = aux_display.transpose(2, 0, 1)
@@ -712,17 +757,13 @@ class airsimLoader(data.Dataset):
         lbl = cv2.resize(lbl, (self.img_size[0], self.img_size[1]), interpolation=cv2.INTER_NEAREST) #, "nearest", mode="F")
         lbl = lbl.astype(int)
 
-        # aux = aux.astype(float)
-        # aux = m.imresize(aux, (self.img_size[0], self.img_size[1]), "nearest", mode="F")
-        # aux = aux.astype(int)
-
         # if not np.all(classes == np.unique(lbl)):
         #     print("WARN: resizing labels yielded fewer classes")
 
         if not np.all(np.unique(lbl[lbl != self.ignore_index]) < self.n_classes):
             print("after det", classes, np.unique(lbl))
             raise ValueError("Segmentation map contained invalid class values")
-
+        
         img = torch.from_numpy(img).float()
         aux = torch.from_numpy(aux).float()
         img_display = torch.from_numpy(img_display).float()

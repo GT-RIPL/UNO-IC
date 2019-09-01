@@ -256,7 +256,7 @@ class airsimLoader(data.Dataset):
     mean_rgbd = {
         # "airsim": [103.939, 116.779, 123.68, 120.00],
         # "airsim": [21,22,21,45]
-        "airsim": [41.454376, 46.093113, 42.958637, 4.464941, 5.1877136, 167.58365
+        "airsim": [41.454376, 46.093113, 42.958637, 4.464941, 5.1877136, 167.58365]
     }  # pascal mean for PSPNet and ICNet pre-trained model
 
     std_rgbd = {

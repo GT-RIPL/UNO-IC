@@ -1,35 +1,35 @@
-id: rgbd_BayesianSegnet_Spatial_Noisy_Or_Entropy_T000+T050_val
+id: rgbd_BayesianSegnet_Noisy_Or_T000_old_val
 model:
-    arch: tempnet
+    arch: segnet_mcdo
 models:
     rgb:
-        arch: tempnet
+        arch: segnet_mcdo
         in_channels: 3
         start_layer: down1
         end_layer: up1
         reduction: 1.0
         mcdo_passes: 1 # Number of Passes
         dropoutP: 0 # Dropout Probability
-        resume: /home/jtian73/pytorch-semseg/runs/rgbd_BayesianSegnet_mcdo_temp_0_50_500k_final/rgb_segnet_mcdo_airsim_best_model.pkl
+        resume:  /home/wcheung8/rgb_segnet_T000/best_model/rgb_segnet_mcdo_airsim_T000.pkl #/home/wcheung8/pytorch-semseg/runs/train/rgb_segnet_T000+T050/rgb_segnet_mcdo_airsim_500000_model.pkl
     d:
-        arch: tempnet
+        arch: segnet_mcdo
         in_channels: 3
         start_layer: down1
         end_layer: up1
         reduction: 1.0
         mcdo_passes: 1
         dropoutP: 0
-        resume: /home/jtian73/pytorch-semseg/runs/rgbd_BayesianSegnet_mcdo_temp_0_50_500k_final/d_segnet_mcdo_airsim_best_model.pkl
+        resume: /home/wcheung8/d_segnet_T000/best_model/d_segnet_mcdo_airsim_T000.pkl #/home/wcheung8/pytorch-semseg/runs/train/d_segnet_T000+T050/d_segnet_mcdo_airsim_500000_model.pkl
 
 fusion: Noisy-Or #{None,SoftmaxMultiply}
 recal: None #{None,afterMCDO,beforeMCDO}
 recalibrator: None #{Histogram,Polynomial_X}
 temperatureScaling: False
 
-pretrained_rgb: /home/wcheung8/pytorch-semseg/models/Segnet/rgb_Segnet/rgb_segnet_mcdo_airsim_T000+T050.pkl
-pretrained_d: /home/wcheung8/pytorch-semseg/models/Segnet/d_Segnet/d_segnet_mcdo_airsim_T000+T050.pkl
+#pretrained_rgb: /home/wcheung8/pytorch-semseg/models/Segnet/rgb_Segnet/rgb_segnet_mcdo_airsim_T000+T050.pkl
+#pretrained_d: /home/wcheung8/pytorch-semseg/models/Segnet/d_Segnet/d_segnet_mcdo_airsim_T000+T050.pkl
 fusion_module: None
-scaling_module: GlobalEntropyScaling
+scaling_module: None
 
 # training
 freeze_seg: True

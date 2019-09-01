@@ -83,7 +83,8 @@ class TempNet(nn.Module):
         prob = self.softmaxMCDO(x) #[batch,classes,512,512]
         prob = prob.masked_fill(prob < 1e-9, 1e-9)
         entropy,mutual_info = mutualinfo_entropy(prob)#(batch,512,512)
-        mean = self.scale_logits(mean, variance, mutual_info, entropy)
+        if self.scale_logits != None:
+          mean = self.scale_logits(mean, variance, mutual_info, entropy)
         return mean, variance, entropy, mutual_info,tup1.squeeze(1)#,temp.view(-1),entropy.mean((1,2)),mutual_info.mean((1,2))
 
     def loadModel(self, model, path):

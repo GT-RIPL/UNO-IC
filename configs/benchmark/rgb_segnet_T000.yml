@@ -53,6 +53,7 @@ data:
                    "async_fog_000_clear__{'channel':'rgb','type':'shotNoise','value':'3'}",
                    "async_fog_000_clear__{'channel':'rgb','type':'impulseNoise','value':'3'}",
                    "async_fog_000_clear__{'channel':'rgb','type':'defocusBlur','value':'3'}",
+                   # "async_fog_000_clear__{'channel':'rgb','type':'glassBlur','value':'3'}", # very slow
                    "async_fog_000_clear__{'channel':'rgb','type':'motionBlur','value':'3'}",
                    "async_fog_000_clear__{'channel':'rgb','type':'zoomBlur','value':'3'}",
                    "async_fog_000_clear__{'channel':'rgb','type':'snow','value':'3'}",
@@ -60,7 +61,7 @@ data:
                    "async_fog_000_clear__{'channel':'rgb','type':'fog','value':'3'}",
                    "async_fog_000_clear__{'channel':'rgb','type':'brightness','value':'3'}",
                    "async_fog_000_clear__{'channel':'rgb','type':'contrast','value':'3'}",
-                   "async_fog_000_clear__{'channel':'rgb','type':'elastic','value':'3'}",
+                   # "async_fog_000_clear__{'channel':'rgb','type':'elastic','value':'3'}", # cv function doesn't return
                    "async_fog_000_clear__{'channel':'rgb','type':'pixelate','value':'3'}",
                    "async_fog_000_clear__{'channel':'rgb','type':'jpeg','value':'3'}",
                   ]

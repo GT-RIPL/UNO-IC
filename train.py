@@ -550,6 +550,14 @@ if __name__ == "__main__":
         help="Directory to rerun",
     )
 
+    parser.add_argument(
+        "--seed",
+        nargs="?",
+        type=int,
+        default=-1,
+        help="Directory to rerun",
+    )
+
     args = parser.parse_args()
 
     # cfg is a  with two-level dictionary ['training','data','model']['batch_size']
@@ -589,7 +597,12 @@ if __name__ == "__main__":
     path = shutil.copy(args.config, logdir)
     logger = get_logger(logdir)
 
-    # generate seed if none present
+
+    # set seed if flag set
+    if args.seed != -1:
+        cfg['seed'] = args.seed
+
+    # generate seed if none present       
     if cfg['seed'] is None:
         seed = int(time.time())
         cfg['seed'] = seed
@@ -599,6 +612,8 @@ if __name__ == "__main__":
             data = original.read()
         with open(path, 'w') as modified:
             modified.write("seed: {}\n".format(seed) + data)
+            
+    print("using seed {}".format(cfg['seed']))
 
     train(cfg, writer, logger, logdir)
 

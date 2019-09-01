@@ -30,7 +30,6 @@ class segnet_mcdo(nn.Module):
         self.freeze_seg = freeze_seg
         self.freeze_temp = freeze_temp
         self.modality = modality
-        
         if not self.full_mcdo:
             self.layers = {
                 "down1": segnetDown2(self.in_channels, 64),
@@ -183,7 +182,8 @@ class segnet_mcdo(nn.Module):
 
         prob = self.softmaxMCDO(x)
         entropy, mutual_info = mutualinfo_entropy(prob)  # (batch,512,512)
-        mean = self.scale_logits(mean, variance, mutual_info, entropy)
+        if self.scale_logits != None:
+            mean = self.scale_logits(mean, variance, mutual_info, entropy)
         return mean, variance, entropy, mutual_info
 
     def forwardMCDO_logits(self, inputs, mcdo=True):   

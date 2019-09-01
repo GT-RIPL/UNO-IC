@@ -1,9 +1,9 @@
-id: rgbd_BayesianSegnet_Spatial_Noisy_Or_Entropy_T000+T050_val
+id: rgbd_BayesianSegnet_Noisy_Or_Entropy_T000+T050_val
 model:
-    arch: tempnet
+    arch: segnet_mcdo
 models:
     rgb:
-        arch: tempnet
+        arch: segnet_mcdo
         in_channels: 3
         start_layer: down1
         end_layer: up1
@@ -12,7 +12,7 @@ models:
         dropoutP: 0 # Dropout Probability
         resume: /home/jtian73/pytorch-semseg/runs/rgbd_BayesianSegnet_mcdo_temp_0_50_500k_final/rgb_segnet_mcdo_airsim_best_model.pkl
     d:
-        arch: tempnet
+        arch: segnet_mcdo
         in_channels: 3
         start_layer: down1
         end_layer: up1
@@ -26,8 +26,8 @@ recal: None #{None,afterMCDO,beforeMCDO}
 recalibrator: None #{Histogram,Polynomial_X}
 temperatureScaling: False
 
-pretrained_rgb: /home/wcheung8/pytorch-semseg/models/Segnet/rgb_Segnet/rgb_segnet_mcdo_airsim_T000+T050.pkl
-pretrained_d: /home/wcheung8/pytorch-semseg/models/Segnet/d_Segnet/d_segnet_mcdo_airsim_T000+T050.pkl
+#pretrained_rgb: /home/wcheung8/pytorch-semseg/models/Segnet/rgb_Segnet/rgb_segnet_mcdo_airsim_T000+T050.pkl
+#pretrained_d: /home/wcheung8/pytorch-semseg/models/Segnet/d_Segnet/d_segnet_mcdo_airsim_T000+T050.pkl
 fusion_module: None
 scaling_module: GlobalEntropyScaling
 

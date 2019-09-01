@@ -202,7 +202,7 @@ def validate(cfg, writer, logger, logdir):
                 inputs, labels = parseEightCameras(input_list['rgb'], labels_list, input_list['d'], device)
                 inputs_display, _ = parseEightCameras(input_list['rgb_display'], labels_list, input_list['d_display'],
                                                       device)
-
+                #import ipdb;ipdb.set_trace()
                 # Read batch from only one camera
                 bs = cfg['training']['batch_size']
                 images_val = {m: inputs[m][:bs, :, :, :] for m in cfg["models"].keys()}
@@ -241,6 +241,7 @@ def validate(cfg, writer, logger, logdir):
                     outputs = torch.nn.Softmax(dim=1)(mean[list(cfg["models"].keys())[0]])
                 elif cfg["fusion"] == "SoftmaxMultiply":
                     outputs = torch.nn.Softmax(dim=1)(mean["rgb"]) * torch.nn.Softmax(dim=1)(mean["d"])
+
                 elif cfg["fusion"] == "SoftmaxAverage":
                     outputs = torch.nn.Softmax(dim=1)(mean["rgb"]) + torch.nn.Softmax(dim=1)(mean["d"])
                 elif cfg["fusion"] == "WeightedVariance":
@@ -254,11 +255,12 @@ def validate(cfg, writer, logger, logdir):
                         d[:, n, :, :] = d[:, n, :, :] * d_var
                     outputs = rgb + d
                 elif cfg["fusion"] == "Noisy-Or":
-                    outputs = 1 - (1 - torch.nn.Softmax(dim=1)(mean["rgb"])) * (1 - torch.nn.Softmax(dim=1)(mean["d"]))
+                    outputs = 1 - (1 - torch.nn.Softmax(dim=1)(mean["rgb"])) * (1 - torch.nn.Softmax(dim=1)(mean["d"])) #[batch,22,512,512,1]
                 else:
                     print("Fusion Type Not Supported")
 
                 # plot ground truth vs mean/variance of outputs
+                outputs = outputs/outputs.mean(1).unsqueeze(1)
                 prob, pred = outputs.max(1)
                 gt = labels_val
                 e, mi = mutualinfo_entropy(outputs.unsqueeze(-1))
@@ -267,7 +269,7 @@ def validate(cfg, writer, logger, logdir):
                     plotPrediction(logdir, cfg, n_classes, i, i_val, k, inputs_display, pred, gt)
                     labels = ['mutual info', 'entropy', 'probability', 'variance', 'temperature']
                     values = [mi, e, prob, torch.zeros(mi.shape), torch.zeros(mi.shape)]
-                    plotEverything(logdir, i, i_val, k + "/stats", values, labels)
+                    plotEverything(logdir, i, i_val, k + "/fused", values, labels)
 
                     for m in cfg["models"].keys():
                         prob = torch.nn.Softmax(dim=1)(mean[m]).max(1)[0]
@@ -355,7 +357,7 @@ if __name__ == "__main__":
         with open(args.config) as fp:
             cfg = defaultdict(lambda: None, yaml.load(fp))
 
-        logdir = "/".join(["runs"] + args.config.split("/")[1:])[:-4]
+        logdir = "/".join(["runs"] + args.config.split("/")[1:])[:-4]+'/'+cfg['id']
 
         # append tag
         if args.tag:

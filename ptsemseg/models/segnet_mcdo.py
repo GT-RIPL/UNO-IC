@@ -1,12 +1,14 @@
 import torch.nn as nn
 from torch.autograd import Variable
 
+from .fusion.fusion import *
 from ptsemseg.models.recalibrator import *
 from ptsemseg.utils import mutualinfo_entropy
 
 
 class segnet_mcdo(nn.Module):
     def __init__(self,
+                 modality = 'rgb',
                  n_classes=21,
                  in_channels=3,
                  is_unpooling=True,
@@ -15,6 +17,7 @@ class segnet_mcdo(nn.Module):
                  full_mcdo=False,
                  freeze_seg=False,
                  freeze_temp=False,
+                 scaling_module = 'None',
                  temperatureScaling=False):
         super(segnet_mcdo, self).__init__()
 
@@ -26,7 +29,7 @@ class segnet_mcdo(nn.Module):
         self.full_mcdo = full_mcdo
         self.freeze_seg = freeze_seg
         self.freeze_temp = freeze_temp
-
+        self.modality = modality
         if not self.full_mcdo:
             self.layers = {
                 "down1": segnetDown2(self.in_channels, 64),
@@ -71,6 +74,8 @@ class segnet_mcdo(nn.Module):
 
         for k, v in self.layers.items():
             setattr(self, k, v)
+
+        self.scale_logits = self._get_scale_module(scaling_module)
 
     def init_vgg16_params(self, vgg16):
         blocks = [self.down1, self.down2, self.down3, self.down4, self.down5]
@@ -152,17 +157,6 @@ class segnet_mcdo(nn.Module):
 
         return up1
 
-    def forwardAvg(self, inputs):
-
-        for i in range(self.mcdo_passes):
-            if i == 0:
-                x = self.forward(inputs)
-            else:
-                x = x + self.forward(inputs)
-
-        x = x / self.mcdo_passes
-        return x
-
     def forwardMCDO(self, inputs, mcdo=True):
         with torch.no_grad():
             for i in range(self.mcdo_passes):
@@ -176,5 +170,29 @@ class segnet_mcdo(nn.Module):
 
         prob = self.softmaxMCDO(x)
         entropy, mutual_info = mutualinfo_entropy(prob)  # (batch,512,512)
-
+        if self.scale_logits != None:
+            mean = self.scale_logits(mean, variance, mutual_info, entropy)
         return mean, variance, entropy, mutual_info
+
+    def forwardMCDO_logits(self, inputs, mcdo=True):   
+        with torch.no_grad():
+            for i in range(self.mcdo_passes):
+                if i == 0:
+                    x = self.forward(inputs,mcdo=mcdo).unsqueeze(-1)
+                else:
+                    x = torch.cat((x, self.forward(inputs).unsqueeze(-1)), -1)
+        return x
+
+    def _get_scale_module(self, name, n_classes=11, bias_init=None):
+
+        name = str(name)
+
+        return {
+            "temperature": TemperatureScaling(n_classes, bias_init),
+            "uncertainty": UncertaintyScaling(n_classes, bias_init),
+            "LocalUncertaintyScaling": LocalUncertaintyScaling(n_classes, bias_init),
+            "GlobalUncertainty": GlobalUncertaintyScaling(n_classes, bias_init),
+            "GlobalLocalUncertainty": GlobalLocalUncertaintyScaling(n_classes, bias_init),
+            "GlobalEntropyScaling" : GlobalEntropyScaling( n_classes=11,modality=self.modality,isSpatialTemp=False,bias_init=bias_init),
+            "None": None
+        }[name]

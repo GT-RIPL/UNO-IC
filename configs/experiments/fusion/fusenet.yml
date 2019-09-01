@@ -1,17 +1,9 @@
 seed: 1337
-id: rgb_segnet_T000+T050
+id: fusenet_T000+T050
 models:
-    rgb:
+    rgbd:
         # model settings
-        arch: segnet_mcdo
-        in_channels: 3
-        start_layer: down1
-        end_layer: up1
-        mcdo_passes: 1
-        dropoutP: 0.0
-        full_mcdo: False
-        reduction: 1.0
-        resume: models/Segnet/rgb_Segnet/rgb_segnet_mcdo_airsim_T000+T050.pkl
+        arch: fusenet
 
 # recalibration
 recalibration: None #{None, afterMCDO, beforeMCDO}
@@ -43,12 +35,13 @@ data:
     recal_reduction: 0.5
     val_split: val
     val_subsplit: [
-                   "async_fog_000_clear__{'channel':'rgb','type':'brightness','value':'3'}",
-                   "async_fog_000_clear__{'channel':'rgb','type':'contrast','value':'3'}",
-                   "async_fog_000_clear__{'channel':'rgb','type':'pixelate','value':'3'}",
-                   "async_fog_000_clear__{'channel':'rgb','type':'jpeg','value':'3'}",
+                   'async_fog_000_clear',
+                   'async_fog_050_clear',
+                   'async_fog_100_clear',
+                   "async_fog_100_clear__{'channel':'rgb','type':'blackoutNoise','value':'20'}",
+                   "async_fog_100_clear__{'channel':'d','type':'blackoutNoise','value':'20'}",
                   ]
-    val_reduction: 0.001
+    val_reduction: 0.5
     img_rows: 512
     img_cols: 512
     path: datasets/airsim_data_async #../../ros/data/airsim_03-30-2019/airsim_data_async

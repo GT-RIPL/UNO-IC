@@ -24,7 +24,8 @@ class CAFnet(nn.Module):
                  ):
         super(CAFnet, self).__init__()
 
-        self.rgb_segnet = segnet_mcdo(n_classes=n_classes,
+        self.rgb_segnet = segnet_mcdo(modality = 'rgb',
+                                      n_classes=n_classes,
                                       mcdo_passes=mcdo_passes,
                                       dropoutP=dropoutP,
                                       full_mcdo=full_mcdo,
@@ -33,7 +34,8 @@ class CAFnet(nn.Module):
                                       freeze_seg=freeze_seg,
                                       freeze_temp=freeze_temp, )
 
-        self.d_segnet = segnet_mcdo(n_classes=n_classes,
+        self.d_segnet = segnet_mcdo(modality = 'd',
+                                    n_classes=n_classes,
                                     mcdo_passes=mcdo_passes,
                                     dropoutP=dropoutP,
                                     full_mcdo=full_mcdo,

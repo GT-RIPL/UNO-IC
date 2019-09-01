@@ -32,7 +32,6 @@ from ptsemseg.utils import bn_update, mem_report
 
 global logdir, cfg, n_classes, i, i_val, k
 
-
 def plot_grad_flow(module, i=0):
     ave_grads = []
     layers = []
@@ -107,6 +106,7 @@ def train(cfg, writer, logger, logdir):
         attr = defaultdict(lambda: None, attr)
 
         models[model] = get_model(name=attr['arch'],
+                                  modality=model,
                                   n_classes=n_classes,
                                   input_size=(cfg['data']['img_rows'], cfg['data']['img_cols']),
                                   in_channels=attr['in_channels'],
@@ -232,7 +232,7 @@ def train(cfg, writer, logger, logdir):
             loss = {}
             for m in cfg["models"].keys():
                 if cfg["models"][m]["arch"] == "tempnet":
-                    outputs[m], _, _ = models[m](images[m])
+                    outputs[m], _, _,_,_ = models[m](images[m])
                 else:
                     outputs[m] = models[m](images[m])
 
@@ -352,12 +352,10 @@ def train(cfg, writer, logger, logdir):
                                     mean[m] = swag_models[m](images_val[m])
                                     variance[m] = torch.zeros(mean[m].shape)
                                 elif hasattr(models[m].module, 'forwardMCDO'):
-                                    if cfg["models"][m]["arch"] == "tempnet":
-                                        mean[m], variance[m], entropy[m], mutual_info[m], temp_map[m], _, _, _ = models[m].module.forwardMCDO(
-                                            images_val[m])
-                                    else:
-                                        mean[m], variance[m], entropy[m], mutual_info[m] = models[m].module.forwardMCDO(
-                                            images_val[m],mcdo=False)
+                                    mean[m], variance[m], entropy[m], mutual_info[m] = models[m].module.forwardMCDO(
+                                        images_val[m],mcdo=False)
+                                elif cfg["models"][m]["arch"] == "tempnet":
+                                        mean[m], variance[m], entropy[m], mutual_info[m], temp_map[m] = models[m](images_val[m])
                                 else:
                                     mean[m] = models[m](images_val[m])
                                     variance[m] = torch.zeros(mean[m].shape)
@@ -398,7 +396,7 @@ def train(cfg, writer, logger, logdir):
                                 plotEverything(logdir, i, i_val, k + "/stats", values, labels)
 
                                 for m in cfg["models"].keys():
-                                    prob = torch.nn.Softmax(dim=1)(mean[m].max(1)[0])
+                                    prob = torch.nn.Softmax(dim=1)(mean[m]).max(1)[0]
                                     if cfg["models"][m]["arch"] == "tempnet":
                                         labels = ['mutual info', 'entropy', 'probability', 'variance', 'temperature']
                                         values = [mutual_info[m], entropy[m], prob, torch.mean(variance[m], 1), temp_map[m]]
@@ -492,7 +490,7 @@ def train(cfg, writer, logger, logdir):
                                 torch.save(state, save_path)
 
                         # save models
-                        if i % cfg['training']['save_iters'] == 0:
+                        if 'save_iters' not in cfg['training'].keys() or i % cfg['training']['save_iters'] == 0:
                             state = {
                                 "epoch": i,
                                 "model_state": model.state_dict(),

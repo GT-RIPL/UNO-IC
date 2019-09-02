@@ -582,6 +582,18 @@ if __name__ == "__main__":
 
         logdir = args.run
 
+    elif args.seed != -1:
+        # set seed if flag set
+        cfg['seed'] = args.seed
+        with open(args.config) as fp:
+            cfg = defaultdict(lambda: None, yaml.load(fp))
+
+        logdir = "/".join(["runs"] + args.config.split("/")[1:])[:-4]
+
+        # append tag 
+        if args.tag:
+            logdir += "/" + args.seed
+
     else:
         with open(args.config) as fp:
             cfg = defaultdict(lambda: None, yaml.load(fp))
@@ -598,9 +610,6 @@ if __name__ == "__main__":
     logger = get_logger(logdir)
 
 
-    # set seed if flag set
-    if args.seed != -1:
-        cfg['seed'] = args.seed
 
     # generate seed if none present       
     if cfg['seed'] is None:

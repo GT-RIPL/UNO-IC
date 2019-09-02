@@ -172,6 +172,7 @@ class segnet_mcdo(nn.Module):
         entropy, mutual_info = mutualinfo_entropy(prob)  # (batch,512,512)
         if self.scale_logits != None:
             mean = self.scale_logits(mean, variance, mutual_info, entropy)
+
         return mean, variance, entropy, mutual_info
 
     def forwardMCDO_logits(self, inputs, mcdo=True):   

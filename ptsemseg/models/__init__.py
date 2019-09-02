@@ -73,7 +73,6 @@ def get_model(name,
     elif name == "CAFnet" or name == "CAF_segnet":
         model = model(backbone="segnet",
                       n_classes=n_classes,
-                      input_size=input_size,
                       mcdo_passes=mcdo_passes,
                       dropoutP=dropoutP,
                       full_mcdo=full_mcdo,

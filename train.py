@@ -242,8 +242,8 @@ def train(cfg, writer, logger, logdir):
                 loss[m].backward()
 
                 # for n, p in models[m].module.named_parameters():
-                # if (p.requires_grad) and ("bias" not in n):
-                # print(n, p, p.grad)
+                    # if (p.requires_grad) and ("bias" not in n):
+                        # print(n, p, p.grad)
 
                 # plot_grad_flow(models[m].module.fusion, i)
 
@@ -582,18 +582,6 @@ if __name__ == "__main__":
 
         logdir = args.run
 
-    elif args.seed != -1:
-        # set seed if flag set
-        cfg['seed'] = args.seed
-        with open(args.config) as fp:
-            cfg = defaultdict(lambda: None, yaml.load(fp))
-
-        logdir = "/".join(["runs"] + args.config.split("/")[1:])[:-4]
-
-        # append tag 
-        if args.tag:
-            logdir += "/" + args.seed
-
     else:
         with open(args.config) as fp:
             cfg = defaultdict(lambda: None, yaml.load(fp))
@@ -603,13 +591,16 @@ if __name__ == "__main__":
         # append tag 
         if args.tag:
             logdir += "/" + args.tag
-
+        
+        # set seed if flag set
+        if args.seed != -1:
+            cfg['seed'] = args.seed
+            logdir += "/" + str(args.seed)
+            
     # baseline train (concatenation, warping baselines)
     writer = SummaryWriter(logdir)
     path = shutil.copy(args.config, logdir)
     logger = get_logger(logdir)
-
-
 
     # generate seed if none present       
     if cfg['seed'] is None:

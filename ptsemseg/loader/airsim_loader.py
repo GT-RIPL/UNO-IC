@@ -691,21 +691,10 @@ class airsimLoader(data.Dataset):
                     lbl[(mask==color[::-1]).all(-1)] = i
 
             if self.augmentations is not None:
-<<<<<<< HEAD
                 img, lbl, depth = self.augmentations(img, lbl, depth)
-
 
             if self.is_transform:
                 img, lbl, depth, img_display, depth_display = self.transform(img, lbl, depth)
-
-
-=======
-                img, lbl, aux = self.augmentations(img, lbl, aux)
-            #import ipdb;ipdb.set_trace()
-            if self.is_transform:
-                img, lbl, aux, img_display, aux_display = self.transform(img, lbl, aux)
-            #import ipdb;ipdb.set_trace()
->>>>>>> bd8f9ba44de8d5bd7eb3a6c9b083fd872a3482b2
             input_list['rgb'].append(img)
             input_list['d'].append(depth)
             input_list['rgb_display'].append(img_display)

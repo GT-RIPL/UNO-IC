@@ -96,10 +96,6 @@ class CAFnet(nn.Module):
         variance['rgb'] = torch.mean(variance['rgb'], 1).unsqueeze(1)
         variance['d'] = torch.mean(variance['d'], 1).unsqueeze(1)
 
-        if self.normalize:
-            variance['rgb'] = self.bn_rgb(variance['rgb'])
-            variance['d'] = self.bn_d(variance['d'])
-
         if self.scale_d is not None:
             mean['rgb'] = self.scale_rgb(mean['rgb'], variance['rgb'], entropy['rgb'], mutual_info['rgb'])
             mean['d'] = self.scale_d(mean['d'], variance['d'], entropy['d'], mutual_info['d'])  # [bs, n, 512, 512]
@@ -107,6 +103,7 @@ class CAFnet(nn.Module):
         # fuse outputs
         x = self.fusion(mean, variance, entropy, mutual_info)  # [bs, n, 512, 512]
 
+        import ipdb; ipdb.set_trace()
         # plot uncertainty
         self.i += 1
         # if (self.i) % 5 == 0:
@@ -164,6 +161,7 @@ class CAFnet(nn.Module):
             "1.0": GatedFusion(n_classes),
             "1.1": ConditionalAttentionFusion(n_classes),
             "1.3": UncertaintyGatedFusion(n_classes),
+            "1.4": FullyUncertaintyGatedFusion(n_classes),
 
             "GatedFusion": GatedFusion(n_classes),
             "CAF": ConditionalAttentionFusion(n_classes),

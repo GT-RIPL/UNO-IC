@@ -68,10 +68,10 @@ class GatedFusion(nn.Module):
 
 # 1.1
 class ConditionalAttentionFusion(nn.Module):
-    def __init__(self, n_channels):
+    def __init__(self, n_classes):
         super(ConditionalAttentionFusion, self).__init__()
-        self.gate = nn.Sequential(nn.Conv2d(2 * n_channels + 4,
-                                            n_channels,
+        self.gate = nn.Sequential(nn.Conv2d(2 * n_classes + 4,
+                                            n_classes,
                                             3,
                                             stride=1,
                                             padding=1,
@@ -100,10 +100,10 @@ class ConditionalAttentionFusion(nn.Module):
         return P_fusion.log()
 # 1.2
 class UncertaintyGatedFusion(nn.Module):
-    def __init__(self, n_channels):
+    def __init__(self, n_classes):
         super(UncertaintyGatedFusion, self).__init__()
         self.gate = nn.Sequential(nn.Conv2d(6,
-                                            n_channels,
+                                            n_classes,
                                             3,
                                             stride=1,
                                             padding=1,
@@ -132,21 +132,38 @@ class UncertaintyGatedFusion(nn.Module):
 
 # 2.2
 class FullyUncertaintyGatedFusion(nn.Module):
-    def __init__(self, n_channels):
-        super(UncertaintyGatedFusion, self).__init__()
-        self.d1 = segnetDown2(1, 64)
+    def __init__(self, n_classes):
+        super(FullyUncertaintyGatedFusion, self).__init__()
+        self.d1 = segnetDown2(2, 64)
         self.d2 = segnetDown2(64, 128)
         self.u2 = segnetUp2(128, 64)
-        self.u1 = segnetUp2(64, 1)
+        self.u1 = segnetUp2(64, n_classes)
         
+        self.sigmoid = nn.Sigmoid()
 
     def forward(self, mean, variance, mutual_info, entropy):
     
         rgb, rgb_var, rgb_mi, rgb_entropy = mean['rgb'], variance['rgb'], mutual_info['rgb'].unsqueeze(1), entropy['rgb'].unsqueeze(1)
         d, d_var, d_mi, d_entropy = mean['d'], variance['d'], mutual_info['d'].unsqueeze(1), entropy['d'].unsqueeze(1)
         
+        uncertainty = torch.cat([d_entropy, rgb_entropy], dim=1)
         
+        down1, indices_1, unpool_shape1 = self.d1(uncertainty)
+        down2, indices_2, unpool_shape2 = self.d2(down1)
+        up2 = self.u2(down2, indices_2, unpool_shape2)
+        up1 = self.u1(up2, indices_1, unpool_shape1)
+        G = self.sigmoid(up1)
         
+        G_rgb = G
+        G_d = torch.ones(G_rgb.shape, dtype=torch.float, device=G_rgb.device) - G_rgb
+
+        # take weighted average of probabilities
+        P_rgb = rgb * G_rgb
+        P_d = d * G_d
+
+        P_fusion = (P_rgb + P_d) / 2
+
+
         return P_fusion.log()
 
 
@@ -205,6 +222,7 @@ class GlobalUncertaintyScaling(nn.Module):
         s = self.scale(entropy.mean().unsqueeze(0))
         out = mean / s
         out = self.norm(out)
+        out = out.masked_fill(out < 1e-9, 1e-9)
         
         return out
 
@@ -234,6 +252,7 @@ class GlobalLocalUncertaintyScaling(nn.Module):
         s_global = self.scale_global(entropy.mean().unsqueeze(0))
         out = mean / (s_local + s_global)
         out = self.norm(out)
+        out = out.masked_fill(out < 1e-9, 1e-9)
         
         return out
         
@@ -261,6 +280,7 @@ class UncertaintyScaling(nn.Module):
         
         out = mean * tup1
         out = self.norm(out)
+        out = out.masked_fill(out < 1e-9, 1e-9)
         
         return out
 

@@ -8,7 +8,7 @@ class Average(nn.Module):
     def __init__(self, n_classes):
         super(Average, self).__init__()
 
-    def forward(self, mean, variance, mutual_info, entropy):
+    def forward(self, mean, variance, entropy, mutual_info):
 
         return mean['rgb'] + mean['d']
         
@@ -16,7 +16,7 @@ class Multiply(nn.Module):
     def __init__(self, n_classes):
         super(Multiply, self).__init__()
 
-    def forward(self, mean, variance, mutual_info, entropy):
+    def forward(self, mean, variance, entropy, mutual_info):
 
         return mean['rgb'] * mean['d']
 
@@ -24,9 +24,10 @@ class NoisyOr(nn.Module):
     def __init__(self, n_classes):
         super(NoisyOr, self).__init__()
 
-    def forward(self, mean, variance, mutual_info, entropy):
-
-        return 1 - (1 - mean['rgb']) * (1 - mean['d'])
+    def forward(self, mean, variance, entropy, mutual_info):
+        x = (1 - (1 - mean['rgb']) * (1 - mean['d']))
+        x = x.masked_fill(x < 1e-9, 1e-9)
+        return x.log()
 
 class GatedFusion(nn.Module):
     def __init__(self, n_classes):
@@ -43,7 +44,7 @@ class GatedFusion(nn.Module):
         )
         self.sigmoid = nn.Sigmoid()
 
-    def forward(self, mean, variance, mutual_info, entropy):
+    def forward(self, mean, variance, entropy, mutual_info):
     
         rgb, rgb_var, rgb_mi, rgb_entropy = mean['rgb'], variance['rgb'], mutual_info['rgb'].unsqueeze(1), entropy['rgb'].unsqueeze(1)
         d, d_var, d_mi, d_entropy = mean['d'], variance['d'], mutual_info['d'].unsqueeze(1), entropy['d'].unsqueeze(1)
@@ -79,7 +80,7 @@ class ConditionalAttentionFusion(nn.Module):
                                             dilation=1),
                                   nn.Sigmoid())
 
-    def forward(self, mean, variance, mutual_info, entropy):
+    def forward(self, mean, variance, entropy, mutual_info):
     
         rgb, rgb_var, rgb_mi, rgb_entropy = mean['rgb'], variance['rgb'], mutual_info['rgb'].unsqueeze(1), entropy['rgb'].unsqueeze(1)
         d, d_var, d_mi, d_entropy = mean['d'], variance['d'], mutual_info['d'].unsqueeze(1), entropy['d'].unsqueeze(1)
@@ -111,7 +112,7 @@ class UncertaintyGatedFusion(nn.Module):
                                             dilation=1),
                                   nn.Sigmoid())
 
-    def forward(self, mean, variance, mutual_info, entropy):
+    def forward(self, mean, variance, entropy, mutual_info):
     
         rgb, rgb_var, rgb_mi, rgb_entropy = mean['rgb'], variance['rgb'], mutual_info['rgb'].unsqueeze(1), entropy['rgb'].unsqueeze(1)
         d, d_var, d_mi, d_entropy = mean['d'], variance['d'], mutual_info['d'].unsqueeze(1), entropy['d'].unsqueeze(1)
@@ -141,7 +142,7 @@ class FullyUncertaintyGatedFusion(nn.Module):
         
         self.sigmoid = nn.Sigmoid()
 
-    def forward(self, mean, variance, mutual_info, entropy):
+    def forward(self, mean, variance, entropy, mutual_info):
     
         rgb, rgb_var, rgb_mi, rgb_entropy = mean['rgb'], variance['rgb'], mutual_info['rgb'].unsqueeze(1), entropy['rgb'].unsqueeze(1)
         d, d_var, d_mi, d_entropy = mean['d'], variance['d'], mutual_info['d'].unsqueeze(1), entropy['d'].unsqueeze(1)
@@ -173,7 +174,7 @@ class TemperatureScaling(nn.Module):
         super(TemperatureScaling,  self).__init__()
         self.temperature = nn.Parameter(torch.ones(1))
 
-    def forward(self, mean, variance, mutual_info, entropy):
+    def forward(self, mean, variance, entropy, mutual_info):
     
         return mean / self.temperature
 
@@ -197,7 +198,7 @@ class LocalUncertaintyScaling(nn.Module):
             self.scale.bias = torch.nn.Parameter(torch.tensor([1.0]))
         
 
-    def forward(self, mean, variance, mutual_info, entropy):
+    def forward(self, mean, variance, entropy, mutual_info):
     
         x = torch.cat([entropy.unsqueeze(1)], dim=1)
         s = self.scale(x)
@@ -217,7 +218,7 @@ class GlobalUncertaintyScaling(nn.Module):
         
         self.norm = nn.Sequential(nn.Softmax(dim=1))
 
-    def forward(self, mean, variance, mutual_info, entropy):
+    def forward(self, mean, variance, entropy, mutual_info):
 
         s = self.scale(entropy.mean().unsqueeze(0))
         out = mean / s
@@ -247,7 +248,7 @@ class GlobalLocalUncertaintyScaling(nn.Module):
         
         self.norm = nn.Sequential(nn.Softmax(dim=1))
 
-    def forward(self, mean, variance, mutual_info, entropy):
+    def forward(self, mean, variance, entropy, mutual_info):
         s_local = self.scale_local(entropy.unsqueeze(1))
         s_global = self.scale_global(entropy.mean().unsqueeze(0))
         out = mean / (s_local + s_global)
@@ -267,7 +268,7 @@ class UncertaintyScaling(nn.Module):
         self.norm = nn.Sequential(nn.Softmax(dim=1))
         
 
-    def forward(self, mean, variance, mutual_info, entropy):
+    def forward(self, mean, variance, entropy, mutual_info):
     
         x = torch.cat([entropy.unsqueeze(1)], dim=1)
         tdown1, tindices_1, tunpool_shape1 = self.d1(x)
@@ -275,11 +276,10 @@ class UncertaintyScaling(nn.Module):
 
         tup2 = self.u2(tdown2, tindices_2, tunpool_shape2)
         tup1 = self.u1(tup2, tindices_1, tunpool_shape1)  # [batch,1,512,512]
-
-        avg_temp = tup1.mean((2, 3)).unsqueeze(-1).unsqueeze(-1)  # (batch,1,1,1)
         
         out = mean * tup1
         out = self.norm(out)
+        
         out = out.masked_fill(out < 1e-9, 1e-9)
         
         return out
@@ -298,7 +298,7 @@ class GlobalEntropyScaling(nn.Module):
             elif modality == 'd':self.EN_MEAN = 0.1383940359074119  #0.18285040798521526 d
             else:
                 print('Invalid modality')
-    def forward(self, mean, variance, mutual_info, entropy):
+    def forward(self, mean, variance, entropy, mutual_info):
         EN_ratio = self.EN_MEAN /entropy.mean((1,2)).unsqueeze(-1).unsqueeze(-1).unsqueeze(-1) #.unsqueeze(1)#
         mean = mean * EN_ratio
         return mean

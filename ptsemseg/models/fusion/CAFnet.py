@@ -103,7 +103,6 @@ class CAFnet(nn.Module):
         # fuse outputs
         x = self.fusion(mean, variance, entropy, mutual_info)  # [bs, n, 512, 512]
 
-        import ipdb; ipdb.set_trace()
         # plot uncertainty
         self.i += 1
         # if (self.i) % 5 == 0:

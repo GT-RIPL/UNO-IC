@@ -260,6 +260,7 @@ class airsimLoader(data.Dataset):
     }  # pascal mean for PSPNet and ICNet pre-trained model
 
     std_rgbd = {
+        # "airsim": [8,7,8,36],
         "airsim": [37.94737, 37.26296, 36.74846, 22.874805, 28.264046, 39.39389] 
     }
 
@@ -728,6 +729,7 @@ class airsimLoader(data.Dataset):
         """
         img = cv2.resize(img, (self.img_size[0], self.img_size[1]))  # uint8 with RGB mode
         aux = cv2.resize(aux, (self.img_size[0], self.img_size[1]))  # uint8 with RGB mode
+        # img = img[:, :, ::-1]  # RGB -> BGR
 
         img = img.astype(np.float64)
         aux = aux.astype(np.float64)

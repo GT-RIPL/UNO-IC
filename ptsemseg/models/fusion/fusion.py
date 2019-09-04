@@ -130,6 +130,26 @@ class UncertaintyGatedFusion(nn.Module):
         return P_fusion.log()
 
 
+# 2.2
+class FullyUncertaintyGatedFusion(nn.Module):
+    def __init__(self, n_channels):
+        super(UncertaintyGatedFusion, self).__init__()
+        self.d1 = segnetDown2(1, 64)
+        self.d2 = segnetDown2(64, 128)
+        self.u2 = segnetUp2(128, 64)
+        self.u1 = segnetUp2(64, 1)
+        
+
+    def forward(self, mean, variance, mutual_info, entropy):
+    
+        rgb, rgb_var, rgb_mi, rgb_entropy = mean['rgb'], variance['rgb'], mutual_info['rgb'].unsqueeze(1), entropy['rgb'].unsqueeze(1)
+        d, d_var, d_mi, d_entropy = mean['d'], variance['d'], mutual_info['d'].unsqueeze(1), entropy['d'].unsqueeze(1)
+        
+        
+        
+        return P_fusion.log()
+
+
 # 0.0
 class TemperatureScaling(nn.Module):
     def __init__(self, n_classes=11, bias_init=None):

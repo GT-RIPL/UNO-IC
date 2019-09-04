@@ -324,23 +324,15 @@ def parseEightCameras(images, labels, aux, device='cuda'):
     labels = torch.cat(labels, 0)
     aux = torch.cat(aux, 0)
 
-    images = images.to(device)
+    rgb = images.to(device)
     labels = labels.to(device)
+    depth = aux.to(device)
 
-    if len(aux.shape) < len(images.shape):
+    if len(depth.shape) < len(rgb.shape):
         aux = aux.unsqueeze(1).to(device)
-        depth = torch.cat((aux, aux, aux), 1)
-    else:
-        aux = aux.to(device)
-        depth = torch.cat((aux[:, 0, :, :].unsqueeze(1),
-                           aux[:, 1, :, :].unsqueeze(1),
-                           aux[:, 2, :, :].unsqueeze(1)), 1)
+        depth = torch.cat((depth, depth, depth), 1)
 
-    fused = torch.cat((images, aux), 1)
-
-    rgb = torch.cat((images[:, 0, :, :].unsqueeze(1),
-                     images[:, 1, :, :].unsqueeze(1),
-                     images[:, 2, :, :].unsqueeze(1)), 1)
+    fused = torch.cat((rgb, depth), 1)
 
     inputs = {"rgb": rgb,
               "d": depth,
@@ -363,11 +355,11 @@ def plotPrediction(logdir, cfg, n_classes, i, i_val, k, inputs, pred, gt):
     pred_norm[0, 0] = 0
     pred_norm[0, 1] = n_classes
 
-    # BGR -> RGB and normalize
-    axes[0, 0].imshow(inputs['rgb'][0, :, :, :].permute(1, 2, 0).cpu().numpy()[:, :, ::-1] / 255)
+    # normalize
+    axes[0, 0].imshow(inputs['rgb'][0, :, :, :].permute(1, 2, 0).cpu().numpy() / 255)
     axes[0, 0].set_title("RGB")
 
-    axes[0, 1].imshow(inputs['d'][0, :, :, :].permute(1, 2, 0).cpu().numpy()[:, :, 2])
+    axes[0, 1].imshow(inputs['d'][0, :, :, :].permute(1, 2, 0).cpu().numpy() / 255)
     axes[0, 1].set_title("D")
 
     axes[0, 2].imshow(gt_norm)

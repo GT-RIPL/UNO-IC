@@ -74,7 +74,7 @@ class TempNet(nn.Module):
         tdown2, tindices_2, tunpool_shape2 = self.temp_down2(tdown1)
         tup2 = self.temp_up2(tdown2, tindices_2, tunpool_shape2)
         tup1 = self.temp_up1(tup2, tindices_1, tunpool_shape1) #[batch,1,512,512]
-        #temp = tup1.mean((2,3)).unsqueeze(-1).unsqueeze(-1) #(batch,1,1,1)
+        temp = tup1.mean((2,3)).unsqueeze(-1).unsqueeze(-1) #(batch,1,1,1)
 
         x = up1 * tup1.unsqueeze(-1)
         mean = x.mean(-1) #[batch,classes,512,512]
@@ -85,7 +85,7 @@ class TempNet(nn.Module):
         entropy,mutual_info = mutualinfo_entropy(prob)#(batch,512,512)
         if self.scale_logits != None:
           mean = self.scale_logits(mean, variance, mutual_info, entropy)
-        return mean, variance, entropy, mutual_info,tup1.squeeze(1)#,temp.view(-1),entropy.mean((1,2)),mutual_info.mean((1,2))
+        return mean, variance, entropy, mutual_info,tup1.squeeze(1), temp.view(-1),entropy.mean((1,2)),mutual_info.mean((1,2))
 
     def loadModel(self, model, path):
         model_pkl = path

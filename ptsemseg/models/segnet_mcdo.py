@@ -175,6 +175,25 @@ class segnet_mcdo(nn.Module):
 
         return mean, variance, entropy, mutual_info
 
+    def forwardMCDO_junjiao(self, inputs, mcdo=True):
+        with torch.no_grad():
+            for i in range(self.mcdo_passes):
+                if i == 0:
+                    x = self.forward(inputs,mcdo=mcdo).unsqueeze(-1)
+                else:
+                    x = torch.cat((x, self.forward(inputs).unsqueeze(-1)), -1)
+
+        mean = x.mean(-1)
+        variance = x.var(-1)
+
+        prob = self.softmaxMCDO(x)
+        entropy, mutual_info = mutualinfo_entropy(prob)  # (batch,512,512)
+        if self.scale_logits != None:
+            mean = self.scale_logits(mean, variance, mutual_info, entropy)
+        return mean, variance, entropy, mutual_info, entropy.mean((1,2)),mutual_info.mean((1,2))
+
+
+
     def forwardMCDO_logits(self, inputs, mcdo=True):   
         with torch.no_grad():
             for i in range(self.mcdo_passes):

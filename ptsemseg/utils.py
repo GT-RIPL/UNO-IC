@@ -17,6 +17,8 @@ import logging
 import datetime
 import numpy as np
 import gc
+import pandas as pd
+from pandas import DataFrame
 
 from pandas import DataFrame
 from collections import OrderedDict
@@ -342,7 +344,7 @@ def parseEightCameras(images, labels, aux, device='cuda'):
     return inputs, labels
 
 
-def plotPrediction(logdir, cfg, n_classes, i, i_val, k, inputs, pred, gt):
+def plotPrediction(logdir, cfg, n_classes, i, i_val, k,inputs, pred, gt):
     fig, axes = plt.subplots(3, 4)
     [axi.set_axis_off() for axi in axes.ravel()]
 
@@ -631,3 +633,12 @@ def save_pred(logdir,loc,k,i_val,i,pred,mutual_info,entropy):
     df = DataFrame(prediction,index=classes)  
     #print(df)
     df.to_excel ('{}/{}_{}_{}_{}.xlsx'.format(path, i_val, i,loc[0],loc[1]), index = True, header=True)
+
+
+
+def save_stats(logdir,dict,k,cfg,metric='_temp_'):
+    stat = {}
+    for m in cfg["models"].keys():
+        stat[m+'_'+k+metric+'stats'] = dict[m]
+    df = DataFrame(stat) 
+    df.to_excel ('{}/{}/rgbd{}stats.xlsx'.format(logdir,k,metric), index = True, header=True)

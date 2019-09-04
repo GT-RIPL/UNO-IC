@@ -155,41 +155,6 @@ def validate(cfg, writer, logger, logdir):
     print(i)
 
     [models[m].eval() for m in models.keys()]
-
-    #################################################################################
-    # Recalibration
-    #################################################################################
-    if str(cfg["recalibrator"]) != "None":
-        print("=" * 10, "RECALIBRATING", "=" * 10)
-
-        for m in cfg["models"].keys():
-
-            bs = cfg['training']['batch_size']
-            output_all = torch.zeros(
-                (len(loaders['recal']) * bs, n_classes, cfg['data']['img_rows'], cfg['data']['img_cols']))
-            labels_all = torch.zeros(
-                (len(loaders['recal']) * bs, cfg['data']['img_rows'], cfg['data']['img_cols']), dtype=torch.long)
-
-            with torch.no_grad():
-                for i_recal, (images_list, labels_list, aux_list) in tqdm(enumerate(loaders['recal'])):
-                    inputs, labels = parseEightCameras(images_list, labels_list, aux_list, device)
-
-                    # Read batch from only one camera
-                    images_recal = inputs[m][:bs, :, :, :]
-                    labels_recal = labels[:bs, :, :]
-
-                    # Run Models
-                    mean, variance = models[m].module.forwardMCDO(images_recal)
-
-                    # concat results
-                    output_all[bs * i_recal:bs * (i_recal + 1), :, :, :] = torch.nn.Softmax(dim=1)(mean)
-                    labels_all[bs * i_recal:bs * (i_recal + 1), :, :] = labels_recal
-
-            # fit calibration models
-            for c in range(n_classes):
-                models[m].module.calibrationPerClass[c].fit(output_all, labels_all)
-            models[m].module.showCalibration(output_all, labels_all, logdir, m, i)
-
     #################################################################################
     # Validation
     #################################################################################
@@ -237,7 +202,7 @@ def validate(cfg, writer, logger, logdir):
                         entropy[m] = torch.zeros(labels_val.shape)
                         mutual_info[m] = torch.zeros(labels_val.shape)
                     elif hasattr(models[m].module, 'forwardMCDO'):
-                        mean[m], variance[m], entropy[m], mutual_info[m] = models[m].module.forwardMCDO(images_val[m])
+                        mean[m], variance[m], entropy[m], mutual_info[m],entropy_ave[m],MI_ave[m] = models[m].module.forwardMCDO_junjiao(images_val[m])
                     elif cfg["models"][m]["arch"] == "tempnet":
                         mean[m], variance[m], entropy[m], mutual_info[m], temp_map[m],temp_ave[m],entropy_ave[m],MI_ave[m] = models[m](images_val[m])
                     else:

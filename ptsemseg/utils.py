@@ -342,7 +342,7 @@ def parseEightCameras(images, labels, aux, device='cuda'):
     return inputs, labels
 
 
-def plotPrediction(logdir, cfg, n_classes, i, i_val, k, inputs, pred, gt):
+def plotPrediction(logdir, cfg, n_classes, i, i_val, k,inputs, pred, gt):
     fig, axes = plt.subplots(3, 4)
     [axi.set_axis_off() for axi in axes.ravel()]
 

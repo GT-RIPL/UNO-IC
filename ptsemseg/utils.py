@@ -479,13 +479,13 @@ def plotMutualInfoEntropy(logdir, i, i_val, k, pred, variance):
 
 def plotEverything(logdir, i, i_val, k, values, labels):
     path = "{}/{}".format(logdir, k)
-    fig, axes = plt.subplots(2, len(values)//2+(len(values) % 2))
+    fig, axes = plt.subplots(len(values)//2+(len(values) % 2),2,squeeze=False)
     #import ipdb; ipdb.set_trace()
         
     for i in range(len(values)):
-        axes[i % 2, i // 2].set_title(labels[i])
-        im = axes[i % 2, i // 2].imshow(values[i][0, :, :].detach().cpu().numpy())
-        divider = make_axes_locatable(axes[i % 2, i // 2])
+        axes[i // 2,i % 2 ].set_title(labels[i])
+        im = axes[i // 2,i % 2].imshow(values[i][0, :, :].detach().cpu().numpy())
+        divider = make_axes_locatable(axes[ i // 2,i % 2])
         cax = divider.append_axes("right", size="5%", pad=0.05)
         fig.colorbar(im, cax=cax)
         

@@ -1,4 +1,4 @@
-id: rgbd_BayesianSegnet_Spatial_Noisy_Or_Entropy_T000+T050_val
+id: rgbd_Tempnet_T000+T050_val
 model:
     arch: tempnet
 models:
@@ -10,7 +10,7 @@ models:
         reduction: 1.0
         mcdo_passes: 1 # Number of Passes
         dropoutP: 0 # Dropout Probability
-        resume: /home/jtian73/pytorch-semseg/runs/rgbd_BayesianSegnet_mcdo_temp_0_50_500k_final/rgb_segnet_mcdo_airsim_best_model.pkl
+        resume: None #/home/jtian73/pytorch-semseg/runs/rgbd_BayesianSegnet_mcdo_temp_0_50_500k_final/rgb_segnet_mcdo_airsim_best_model.pkl
     d:
         arch: tempnet
         in_channels: 3
@@ -19,7 +19,7 @@ models:
         reduction: 1.0
         mcdo_passes: 1
         dropoutP: 0
-        resume: /home/jtian73/pytorch-semseg/runs/rgbd_BayesianSegnet_mcdo_temp_0_50_500k_final/d_segnet_mcdo_airsim_best_model.pkl
+        resume: None #/home/jtian73/pytorch-semseg/runs/rgbd_BayesianSegnet_mcdo_temp_0_50_500k_final/d_segnet_mcdo_airsim_best_model.pkl
 
 fusion: Noisy-Or #{None,SoftmaxMultiply}
 recal: None #{None,afterMCDO,beforeMCDO}
@@ -47,24 +47,24 @@ data:
     val_subsplit: [
                    'async_fog_000_clear',
                    'async_fog_050_clear',
-                   'async_fog_100_clear',
-                   "async_fog_000_clear__{'channel':'rgb','type':'defocusBlur','value':'3'}",
-                   "async_fog_000_clear__{'channel':'rgb','type':'glassBlur','value':'3'}",
-                   "async_fog_000_clear__{'channel':'rgb','type':'motionBlur','value':'3'}",
-                   "async_fog_000_clear__{'channel':'rgb','type':'zoomBlur','value':'3'}",
-                   "async_fog_000_clear__{'channel':'rgb','type':'snow','value':'3'}",
-                   "async_fog_000_clear__{'channel':'rgb','type':'frost','value':'3'}",
-                   "async_fog_000_clear__{'channel':'rgb','type':'fog','value':'3'}",
-                   "async_fog_000_clear__{'channel':'rgb','type':'brightness','value':'3'}",
-                   "async_fog_000_clear__{'channel':'rgb','type':'contrast','value':'3'}",
-                   "async_fog_000_clear__{'channel':'rgb','type':'elastic','value':'3'}",
+                   #'async_fog_100_clear',
+                   #"async_fog_000_clear__{'channel':'rgb','type':'defocusBlur','value':'3'}",
+                   #"async_fog_000_clear__{'channel':'rgb','type':'glassBlur','value':'3'}",
+                   #"async_fog_000_clear__{'channel':'rgb','type':'motionBlur','value':'3'}",
+                   #"async_fog_000_clear__{'channel':'rgb','type':'zoomBlur','value':'3'}",
+                   #"async_fog_000_clear__{'channel':'rgb','type':'snow','value':'3'}",
+                   #"async_fog_000_clear__{'channel':'rgb','type':'frost','value':'3'}",
+                   #"async_fog_000_clear__{'channel':'rgb','type':'fog','value':'3'}",
+                   #"async_fog_000_clear__{'channel':'rgb','type':'brightness','value':'3'}",
+                   #"async_fog_000_clear__{'channel':'rgb','type':'contrast','value':'3'}",
+                   #"async_fog_000_clear__{'channel':'rgb','type':'elastic','value':'3'}",
                    #"async_fog_000_clear__{'channel':'rgb','type':'pixelate','value':'3'}",
-                   "async_fog_000_clear__{'channel':'rgb','type':'jpeg','value':'3'}",
-                   "async_fog_000_clear__{'channel':'rgb','type':'blackoutNoise','value':'20'}",
-                   "async_fog_000_clear__{'channel':'d','type':'gaussianNoise','value':'3'}",
-                   "async_fog_000_clear__{'channel':'d','type':'shotNoise','value':'3'}",
-                   "async_fog_000_clear__{'channel':'d','type':'impulseNoise','value':'3'}",
-                   "async_fog_000_clear__{'channel':'d','type':'blackoutNoise','value':'20'}",
+                   #"async_fog_000_clear__{'channel':'rgb','type':'jpeg','value':'3'}",
+                   #"async_fog_000_clear__{'channel':'rgb','type':'blackoutNoise','value':'20'}",
+                   #"async_fog_000_clear__{'channel':'d','type':'gaussianNoise','value':'3'}",
+                   #"async_fog_000_clear__{'channel':'d','type':'shotNoise','value':'3'}",
+                   #"async_fog_000_clear__{'channel':'d','type':'impulseNoise','value':'3'}",
+                   #"async_fog_000_clear__{'channel':'d','type':'blackoutNoise','value':'20'}",
                   ]    
     val_reduction: 0.2
     img_rows: 512
@@ -75,6 +75,7 @@ training:
     train_iters: 100000
     batch_size: 2
     val_interval: 10000 #5000
+    save_iters: 10000
     n_workers: 8
     print_interval: 50
     png_frames: 10 #5000

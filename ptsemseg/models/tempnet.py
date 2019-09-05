@@ -62,7 +62,7 @@ class TempNet(nn.Module):
         self.softmaxMCDO = torch.nn.Softmax(dim=1)
         self.scale_logits = self._get_scale_module(scaling_module)
 
-    def forward(self, inputs):
+    def forward(self, inputs,inputs2):
 
         # Freeze batchnorm
         self.segnet.eval()
@@ -70,7 +70,7 @@ class TempNet(nn.Module):
         # computer logits and uncertainty measures
         up1 = self.segnet.module.forwardMCDO_logits(inputs) #(batch,11,512,512,passes)
 
-        tdown1, tindices_1, tunpool_shape1 = self.temp_down1(inputs)
+        tdown1, tindices_1, tunpool_shape1 = self.temp_down1(inputs2)
         tdown2, tindices_2, tunpool_shape2 = self.temp_down2(tdown1)
         tup2 = self.temp_up2(tdown2, tindices_2, tunpool_shape2)
         tup1 = self.temp_up1(tup2, tindices_1, tunpool_shape1) #[batch,1,512,512]

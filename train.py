@@ -197,6 +197,18 @@ def train(cfg, writer, logger, logdir):
                 logger.info("No checkpoint found at '{}'".format(model_pkl))
                 print("No checkpoint found at '{}'".format(model_pkl))
                 exit()
+                
+        # setup weight for unbalanced dataset
+        if cfg['training']['weight'] is not None:
+            weight = torch.Tensor(cfg['training']['weight']).cuda()
+        else:
+            weight = None
+
+        # setup weight for unbalanced dataset
+        if cfg['training']['weight'] is not None:
+            weight = torch.Tensor(cfg['training']['weight']).cuda()
+        else:
+            weight = None
 
     plt.clf()
     i = start_iter
@@ -232,11 +244,15 @@ def train(cfg, writer, logger, logdir):
             loss = {}
             for m in cfg["models"].keys():
                 if cfg["models"][m]["arch"] == "tempnet":
-                    outputs[m], _, _,_,_ = models[m](images[m])
+                    if m == 'rgb':
+                        m_temp = 'd'
+                    else:
+                        m_temp = 'rgb' 
+                    outputs[m], _, _,_,_,_,_,_ = models[m](images[m],images[m_temp])
                 else:
                     outputs[m] = models[m](images[m])
 
-                loss[m] = loss_fn(input=outputs[m], target=labels)
+                loss[m] = loss_fn(input=outputs[m], target=labels, weight=weight)
 
                 # import ipdb; ipdb.set_trace()
                 loss[m].backward()
@@ -355,11 +371,19 @@ def train(cfg, writer, logger, logdir):
                                     mean[m], variance[m], entropy[m], mutual_info[m] = models[m].module.forwardMCDO(
                                         images_val[m],mcdo=False)
                                 elif cfg["models"][m]["arch"] == "tempnet":
-                                        mean[m], variance[m], entropy[m], mutual_info[m], temp_map[m] = models[m](images_val[m])
+                                        if m == 'rgb':
+                                            m_temp = 'd'
+                                        else:
+                                            m_temp = 'rgb' 
+                                        mean[m], variance[m], entropy[m], mutual_info[m], temp_map[m],_,_,_ = models[m](images_val[m],images_val[m_temp])
                                 else:
                                     mean[m] = models[m](images_val[m])
                                     variance[m] = torch.zeros(mean[m].shape)
-                                val_loss[m] = loss_fn(input=mean[m], target=labels_val)
+<<<<<<< HEAD
+                                val_loss[m] = loss_fn(input=mean[m], target=labels_val,weight=weight)
+=======
+                                val_loss[m] = loss_fn(input=mean[m], target=labels_val, weight=weight)
+>>>>>>> 61f829896489e512dc764be5f7b430cc434e8e25
 
                             # Fusion Type
                             if cfg["fusion"] == "None":
@@ -385,24 +409,26 @@ def train(cfg, writer, logger, logdir):
                                 print("Fusion Type Not Supported")
 
                             # plot ground truth vs mean/variance of outputs
+                            outputs = outputs/outputs.sum(1).unsqueeze(1)
                             prob, pred = outputs.max(1)
                             gt = labels_val
-                            e, mi = mutualinfo_entropy(outputs.unsqueeze(-1))
+                            e, _ = mutualinfo_entropy(outputs.unsqueeze(-1))
 
                             if i_val % cfg["training"]["png_frames"] == 0:
                                 plotPrediction(logdir, cfg, n_classes, i, i_val, k, inputs_display, pred, gt)
-                                labels = ['mutual info', 'entropy', 'probability', 'variance', 'temperature']
-                                values = [mi, e, prob, torch.zeros(mi.shape), torch.zeros(mi.shape)]
-                                plotEverything(logdir, i, i_val, k + "/stats", values, labels)
+                                labels = ['mutual info', 'probability']
+                                values = [e, prob]
+                                plotEverything(logdir, i, i_val, k + "/fused", values, labels)
 
                                 for m in cfg["models"].keys():
-                                    prob = torch.nn.Softmax(dim=1)(mean[m]).max(1)[0]
+                                    prob,pred_m = torch.nn.Softmax(dim=1)(mean[m]).max(1)
                                     if cfg["models"][m]["arch"] == "tempnet":
-                                        labels = ['mutual info', 'entropy', 'probability', 'variance', 'temperature']
-                                        values = [mutual_info[m], entropy[m], prob, torch.mean(variance[m], 1), temp_map[m]]
+                                        labels = ['mutual info', 'entropy', 'probability','temperature']
+                                        values = [mutual_info[m], entropy[m], prob, temp_map[m]]
                                     else:
-                                        labels = ['mutual info', 'entropy', 'probability', 'variance']
-                                        values = [mutual_info[m], entropy[m], prob, torch.mean(variance[m], 1)]
+                                        labels = ['mutual info', 'entropy', 'probability']
+                                        values = [mutual_info[m], entropy[m], prob]
+                                    plotPrediction(logdir, cfg, n_classes, i, i_val, k + "/" + m, inputs_display, pred_m, gt)
                                     plotEverything(logdir, i, i_val, k + "/" + m, values, labels)
 
                             running_metrics_val[k].update(gt.cpu().numpy(), pred.cpu().numpy())

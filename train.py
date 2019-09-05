@@ -197,6 +197,12 @@ def train(cfg, writer, logger, logdir):
                 logger.info("No checkpoint found at '{}'".format(model_pkl))
                 print("No checkpoint found at '{}'".format(model_pkl))
                 exit()
+                
+        # setup weight for unbalanced dataset
+        if cfg['training']['weight'] is not None:
+            weight = torch.Tensor(cfg['training']['weight']).cuda()
+        else:
+            weight = None
 
     plt.clf()
     i = start_iter
@@ -236,7 +242,7 @@ def train(cfg, writer, logger, logdir):
                 else:
                     outputs[m] = models[m](images[m])
 
-                loss[m] = loss_fn(input=outputs[m], target=labels)
+                loss[m] = loss_fn(input=outputs[m], target=labels, weight=weight)
 
                 # import ipdb; ipdb.set_trace()
                 loss[m].backward()
@@ -359,7 +365,7 @@ def train(cfg, writer, logger, logdir):
                                 else:
                                     mean[m] = models[m](images_val[m])
                                     variance[m] = torch.zeros(mean[m].shape)
-                                val_loss[m] = loss_fn(input=mean[m], target=labels_val)
+                                val_loss[m] = loss_fn(input=mean[m], target=labels_val, weight=weight)
 
                             # Fusion Type
                             if cfg["fusion"] == "None":

@@ -15,6 +15,9 @@ class segnet(nn.Module):
         self.down3 = segnetDown3(128, 256)
         self.down4 = segnetDown3(256, 512)
         self.down5 = segnetDown3(512, 512)
+        
+        self.llf1 = conv2DBatchNormRelu(128,24,1,1,0)
+        self.llf2 = conv2DBatchNormRelu(512,24,1,1,0)
 
         self.up5 = segnetUp3(512, 512)
         self.up4 = segnetUp3(512, 256)
@@ -45,6 +48,9 @@ class segnet(nn.Module):
         down3, indices_3, unpool_shape3 = self.down3(down2)
         down4, indices_4, unpool_shape4 = self.down4(down3)
         down5, indices_5, unpool_shape5 = self.down5(down4)
+        
+        llf1 = self.llf1(down2)
+        llf2 = self.llf2(down4)
 
         up5 = self.up5(down5, indices_5, unpool_shape5)
         up4 = self.up4(up5, indices_4, unpool_shape4)
@@ -52,7 +58,7 @@ class segnet(nn.Module):
         up2 = self.up2(up3, indices_2, unpool_shape2)
         up1 = self.up1(up2, indices_1, unpool_shape1)
 
-        return up1, down5, down1
+        return up1, llf1, llf2, down5
     def init_vgg16_params(self, vgg16):
         blocks = [self.down1, self.down2, self.down3, self.down4, self.down5]
 

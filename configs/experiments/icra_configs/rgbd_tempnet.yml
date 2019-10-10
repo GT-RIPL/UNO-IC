@@ -1,4 +1,4 @@
-id: rgbd_CompNet_T000+T050_val
+id: rgbd_TempNet_T000+T050_pretrain_1_val #rgbd_tempnet_no_weight_T000+T050_val #  #rgbd_tempnet_weighted_T000+T050_val
 model:
     arch: tempnet
 models:
@@ -10,7 +10,7 @@ models:
         reduction: 1.0
         mcdo_passes: 1 # Number of Passes
         dropoutP: 0 # Dropout Probability
-        resume: None #/home/wcheung8/pytorch-semseg/runs/train/rgb_segnet_T000+T050/1234/rgb_segnet_mcdo_airsim_500000_model.pkl #/home/jtian73/pytorch-semseg/runs/rgbd_BayesianSegnet_mcdo_temp_0_50_500k_final/rgb_segnet_mcdo_airsim_best_model.pkl
+        resume:  /home/jtian73/pytorch-semseg/runs/configs/experiments/icra_configs/rgbd_tempnet/rgbd_TempNet_T000+T050_pretrain_1/rgb_tempnet_airsim_100000_model.pkl #/home/wcheung8/pytorch-semseg/runs/train/rgb_segnet_T000+T050/1234/rgb_segnet_mcdo_airsim_500000_model.pkl #/home/jtian73/pytorch-semseg/runs/rgbd_BayesianSegnet_mcdo_temp_0_50_500k_final/rgb_segnet_mcdo_airsim_best_model.pkl
     d:
         arch: tempnet
         in_channels: 3
@@ -19,17 +19,18 @@ models:
         reduction: 1.0
         mcdo_passes: 1
         dropoutP: 0
-        resume: None #/home/wcheung8/pytorch-semseg/runs/train/d_segnet_T000+T050/1234/d_segnet_mcdo_airsim_500000_model.pkl# #/home/jtian73/pytorch-semseg/runs/rgbd_BayesianSegnet_mcdo_temp_0_50_500k_final/d_segnet_mcdo_airsim_best_model.pNone #kl
+        resume:  /home/jtian73/pytorch-semseg/runs/configs/experiments/icra_configs/rgbd_tempnet/rgbd_TempNet_T000+T050_pretrain_1/d_tempnet_airsim_100000_model.pkl #/home/wcheung8/pytorch-semseg/runs/train/d_segnet_T000+T050/1234/d_segnet_mcdo_airsim_500000_model.pkl# #/home/jtian73/pytorch-semseg/runs/rgbd_BayesianSegnet_mcdo_temp_0_50_500k_final/d_segnet_mcdo_airsim_best_model.pNone #kl
 
 fusion: Noisy-Or #{None,SoftmaxMultiply}
 recal: None #{None,afterMCDO,beforeMCDO}
 recalibrator: None #{Histogram,Polynomial_X}
 temperatureScaling: False
 
-pretrained_rgb:  /home/wcheung8/pytorch-semseg/runs/train/rgb_segnet_T000+T050/1234/rgb_segnet_mcdo_airsim_500000_model.pkl #/home/wcheung8/pytorch-semseg/models/Segnet/rgb_Segnet/rgb_segnet_mcdo_airsim_T000+T050.pkl
-pretrained_d:  /home/wcheung8/pytorch-semseg/runs/train/d_segnet_T000+T050/1234/d_segnet_mcdo_airsim_500000_model.pkl #/home/wcheung8/pytorch-semseg/models/Segnet/d_Segnet/d_segnet_mcdo_airsim_T000+T050.pkl
+pretrained_rgb: None #/home/wcheung8/pytorch-semseg/runs/train/rgb_segnet_T000+T050/1/best_model/rgb_segnet_mcdo_airsim_best_model.pkl  #/home/jtian73/pytorch-semseg/runs/configs/experiments/icra_configs/train/rgbd_temp_train/weighted/rgb_tempnet_airsim_100000_model.pkl # /home/wcheung8/pytorch-semseg/runs/train/rgb_segnet_T000+T050/1234/rgb_segnet_mcdo_airsim_500000_model.pkl #/home/wcheung8/pytorch-semseg/models/Segnet/rgb_Segnet/rgb_segnet_mcdo_airsim_T000+T050.pkl
+pretrained_d: None #/home/wcheung8/pytorch-semseg/runs/train/d_segnet_T000+T050/1/best_model/d_segnet_mcdo_airsim_best_model.pkl  #/home/jtian73/pytorch-semseg/runs/configs/experiments/icra_configs/train/rgbd_temp_train/weighted/d_tempnet_airsim_100000_model.pkl # /home/wcheung8/pytorch-semseg/runs/train/d_segnet_T000+T050/1234/d_segnet_mcdo_airsim_500000_model.pkl #/home/wcheung8/pytorch-semseg/models/Segnet/d_Segnet/d_segnet_mcdo_airsim_T000+T050.pkl
 fusion_module: None
 scaling_module: None
+scaling_metrics: None 
 
 # training
 freeze_seg: True
@@ -43,11 +44,11 @@ data:
     recal_split: recal
     recal_subsplit: ['async_fog_000_clear']
     recal_reduction: 0.2
-    val_split: val
+    val_split: Train
     val_subsplit: [
                    'async_fog_000_clear',
                    'async_fog_050_clear',
-                   'async_fog_100_clear',
+                   #'async_fog_100_clear',
                    #"async_fog_000_clear__{'channel':'rgb','type':'defocusBlur','value':'3'}",
                    #"async_fog_000_clear__{'channel':'rgb','type':'glassBlur','value':'3'}",
                    #"async_fog_000_clear__{'channel':'rgb','type':'motionBlur','value':'3'}",
@@ -64,15 +65,15 @@ data:
                    #"async_fog_000_clear__{'channel':'d','type':'gaussianNoise','value':'3'}",
                    #"async_fog_000_clear__{'channel':'d','type':'shotNoise','value':'3'}",
                    #"async_fog_000_clear__{'channel':'d','type':'impulseNoise','value':'3'}",
-                   #"async_fog_000_clear__{'channel':'d','type':'blackoutNoise','value'd:'20'}",
+                   #"async_fog_000_clear__{'channel':'d','type':'blackoutNoise','value':'20'}",
                   ]    
     val_reduction: 0.5
     img_rows: 512
     img_cols: 512
-    path: /home/wcheung8/airsim_03-30-2019/airsim_data_async ##datasets/airsim_data_async #../../ros/data/airsim_03-30-2019/airsim_data_async
+    path: /home/jtian73/airsim_03-30-2019/airsim_data_async ##datasets/airsim_data_async #../../ros/data/airsim_03-30-2019/airsim_data_async
     noisy_type: None 
 training:
-    weight: [32.93554, 575.20610, 4.87791, 1.0, 21.79751, 204.85757, 4.60879, 8.74993, 81.57046412795533, 41.01965, 7.37522]
+    weight: None #[32.93554, 575.20610, 4.87791, 1.0, 21.79751, 204.85757, 4.60879, 8.74993, 81.57046412795533, 41.01965, 7.37522]
     train_iters: 100000
     batch_size: 2
     val_interval: 10000 #5000

@@ -171,7 +171,7 @@ class segnet_mcdo(nn.Module):
         prob = self.softmaxMCDO(x)
         entropy, mutual_info = mutualinfo_entropy(prob)  # (batch,512,512)
         if self.scale_logits != None:
-            mean = self.scale_logits(mean, variance, mutual_info, entropy)
+            mean = self.scale_logits(variance, mutual_info, entropy)
 
         return mean, variance, entropy, mutual_info
 
@@ -213,6 +213,6 @@ class segnet_mcdo(nn.Module):
             "LocalUncertaintyScaling": LocalUncertaintyScaling(n_classes, bias_init),
             "GlobalUncertainty": GlobalUncertaintyScaling(n_classes, bias_init),
             "GlobalLocalUncertainty": GlobalLocalUncertaintyScaling(n_classes, bias_init),
-            "GlobalEntropyScaling" : GlobalEntropyScaling( n_classes=11,modality=self.modality,isSpatialTemp=False,bias_init=bias_init),
+            "GlobalScaling" :  GlobalScaling(modality=self.modality),
             "None": None
         }[name]

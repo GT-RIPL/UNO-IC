@@ -182,8 +182,8 @@ def train(cfg, writer, logger, logdir):
                     start_iter = checkpoint["epoch"]
 
                 # start_iter = 0
-                logger.info("Loaded checkpoint '{}' (iter {})".format(model_pkl, checkpoint["epoch"]))
-
+                logger.info("Loaded checkpoint '{}' (iter {}), parameters {}".format(model_pkl, checkpoint["epoch"],len(pretrained_dict.keys())))
+                print("Loaded checkpoint '{}' (iter {}), parameters {}".format(model_pkl, checkpoint["epoch"],len(pretrained_dict.keys())))
             else:
                 logger.info("No checkpoint found at '{}'".format(model_pkl))
                 print("No checkpoint found at '{}'".format(model_pkl))
@@ -199,16 +199,10 @@ def train(cfg, writer, logger, logdir):
                 exit()
                 
         # setup weight for unbalanced dataset
-        if cfg['training']['weight'] is not None:
+        if cfg['training']['weight'] != "None":
             weight = torch.Tensor(cfg['training']['weight']).cuda()
         else:
-            weight = None
-
-        # setup weight for unbalanced dataset
-        if cfg['training']['weight'] is not None:
-            weight = torch.Tensor(cfg['training']['weight']).cuda()
-        else:
-            weight = None
+            weight = None #[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
 
     plt.clf()
     i = start_iter
@@ -379,11 +373,8 @@ def train(cfg, writer, logger, logdir):
                                 else:
                                     mean[m] = models[m](images_val[m])
                                     variance[m] = torch.zeros(mean[m].shape)
-<<<<<<< HEAD
-                                val_loss[m] = loss_fn(input=mean[m], target=labels_val,weight=weight)
-=======
+
                                 val_loss[m] = loss_fn(input=mean[m], target=labels_val, weight=weight)
->>>>>>> 61f829896489e512dc764be5f7b430cc434e8e25
 
                             # Fusion Type
                             if cfg["fusion"] == "None":
@@ -416,7 +407,7 @@ def train(cfg, writer, logger, logdir):
 
                             if i_val % cfg["training"]["png_frames"] == 0:
                                 plotPrediction(logdir, cfg, n_classes, i, i_val, k, inputs_display, pred, gt)
-                                labels = ['mutual info', 'probability']
+                                labels = ['entropy', 'probability']
                                 values = [e, prob]
                                 plotEverything(logdir, i, i_val, k + "/fused", values, labels)
 
@@ -612,7 +603,7 @@ if __name__ == "__main__":
         with open(args.config) as fp:
             cfg = defaultdict(lambda: None, yaml.load(fp))
 
-        logdir = "/".join(["runs"] + args.config.split("/")[1:])[:-4]
+        logdir = "/".join(["runs"] + args.config.split("/")[1:])[:-4]+'/'+cfg['id']
 
         # append tag 
         if args.tag:

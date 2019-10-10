@@ -15,7 +15,7 @@ import cv2
 from ptsemseg.models import get_model
 from ptsemseg.loss import get_loss_function
 from ptsemseg.loader import get_loaders
-from ptsemseg.utils import get_logger, parseEightCameras, plotPrediction, plotMeansVariances, plotEntropy, plotMutualInfo, plotSpatial, save_pred, plotEverything,mutualinfo_entropy,save_stats,plotAll
+from ptsemseg.utils import get_logger, parseEightCameras, plotPrediction, plotMeansVariances, plotEntropy, plotMutualInfo, plotSpatial, save_pred, plotEverything,mutualinfo_entropy,save_stats
 from ptsemseg.metrics import runningScore, averageMeter
 from ptsemseg.schedulers import get_scheduler
 from ptsemseg.optimizers import get_optimizer
@@ -53,8 +53,8 @@ def validate(cfg, writer, logger, logdir):
     loaders, n_classes = get_loaders(cfg["data"]["dataset"], cfg)
 
     # Setup Metrics
-    running_metrics_ssma = runningScore(n_classes)# {env: runningScore(n_classes) for env in loaders['val'].keys()}
-    running_metrics_uno = runningScore(n_classes) #{env: runningScore(n_classes) for env in loaders['val'].keys()}
+    running_metrics_val = {env: runningScore(n_classes) for env in loaders['val'].keys()}
+
     # Setup Meters
     val_loss_meter = {m: {env: averageMeter() for env in loaders['val'].keys()} for m in cfg["models"].keys()}
     val_CE_loss_meter = {env: averageMeter() for env in loaders['val'].keys()}
@@ -98,27 +98,41 @@ def validate(cfg, writer, logger, logdir):
 
         models[model] = torch.nn.DataParallel(models[model], device_ids=range(torch.cuda.device_count()))
 
+        # Setup optimizer, lr_scheduler and loss function
+        optimizer_cls = get_optimizer(cfg)
+        optimizer_params = {k: v for k, v in cfg['training']['optimizer'].items()
+                            if k != 'name'}
+
+        optimizers[model] = optimizer_cls(models[model].parameters(), **optimizer_params)
+        logger.info("Using optimizer {}".format(optimizers[model]))
+
+        schedulers[model] = get_scheduler(optimizers[model], cfg['training']['lr_schedule'])
+
+        loss_fn = get_loss_function(cfg)
+        logger.info("Using loss {}".format(loss_fn))
+
+
         # Load pretrained weights
-        # if str(attr['resume']) != "None" or str(attr['resume_temp']) != "None" :
-        model_dict = models[model].state_dict()
-        
-        model_pkl_dict = {}
+        if str(attr['resume']) != "None" or str(attr['resume_temp']) != "None" or str(attr['resume_comp']) != "None" :
+            model_dict = models[model].state_dict()
+            
+            model_pkl_dict = {}
 
-        if attr['resume'] != "None":
-            model_pkl_dict["single"]= attr['resume']
-            #if attr['resume'] == 'same_yaml':
-            #    model_pkl = "{}/{}_pspnet_airsim_best_model.pkl".format(logdir, model)
+            if attr['resume'] != "None":
+                model_pkl_dict["single"]= attr['resume']
+                #if attr['resume'] == 'same_yaml':
+                #    model_pkl = "{}/{}_pspnet_airsim_best_model.pkl".format(logdir, model)
 
-        if attr['resume_temp'] != "None":
-            model_pkl_dict["temp"] = attr['resume_temp']
+            if attr['resume_temp'] != "None":
+                model_pkl_dict["temp"] = attr['resume_temp']
 
-        if attr['resume_temp_d'] != "None":
-            model_pkl_dict["temp_d"] = attr['resume_temp_d']
+            if attr['resume_temp_d'] != "None":
+                model_pkl_dict["temp_d"] = attr['resume_temp_d']
 
-        if attr['resume_temp_rgb'] != "None":
-            model_pkl_dict["temp_rgb"] = attr['resume_temp_rgb']
+            if attr['resume_temp_rgb'] != "None":
+                model_pkl_dict["temp_rgb"] = attr['resume_temp_rgb']
 
-        
+            
 
             #import ipdb;ipdb.set_trace()
 
@@ -199,7 +213,7 @@ def validate(cfg, writer, logger, logdir):
                 entropy_dict_per_loader[m] = []
                 MI_dict_per_loader[m]=[]
             for i_val, (input_list, labels_list) in tqdm(enumerate(valloader)):
-                #import ipdb;ipdb.set_trace()
+
                 inputs, labels = parseEightCameras(input_list['rgb'], labels_list, input_list['d'], device)
                 inputs_display, _ = parseEightCameras(input_list['rgb_display'], labels_list, input_list['d_display'],
                                                       device)
@@ -249,7 +263,6 @@ def validate(cfg, writer, logger, logdir):
                         mutual_info[m] = torch.zeros(labels_val.shape)
 
                 # Fusion Type
-                #import ipdb;ipdb.set_trace()
                 if cfg["fusion"] == "None":
                     outputs = torch.nn.Softmax(dim=1)(mean[list(cfg["models"].keys())[0]])
                 elif cfg["fusion"] == "SoftmaxMultiply":
@@ -279,6 +292,7 @@ def validate(cfg, writer, logger, logdir):
                         outputs = 1 - (1 - torch.nn.Softmax(dim=1)(mean["rgb"])) * (1 - torch.nn.Softmax(dim=1)(mean["d"])) #[batch,11,512,512,1]
                 else:
                     print("Fusion Type Not Supported")
+
                 # aggregate training stats
                 for m in cfg["models"].keys():
                     entropy_dict_per_loader[m].extend(entropy_ave[m].cpu().numpy().tolist())
@@ -289,58 +303,50 @@ def validate(cfg, writer, logger, logdir):
                 outputs = outputs/outputs.sum(1).unsqueeze(1)
                 #import ipdb;ipdb.set_trace()
                 prob, pred = outputs.max(1)
-                _,ssma = mean["rgbd"].max(1)
-
                 gt = labels_val
                 e, _ = mutualinfo_entropy(outputs.unsqueeze(-1))
                 #import ipdb;ipdb.set_trace()
-                # if i_val % cfg["training"]["png_frames"] == 0:
-                
-                    # plotPrediction(logdir, cfg, n_classes, i, i_val, k, inputs_display, pred, gt)
+                if i_val % cfg["training"]["png_frames"] == 0:
+                    plotPrediction(logdir, cfg, n_classes, i, i_val, k, inputs_display, pred, gt)
+                    labels = ['entropy', 'probability']
+                    values = [e, prob]
+                    plotEverything(logdir, i, i_val, k + "/fused", values, labels)
+                    for m in cfg["models"].keys():
+                        prob,pred_m = torch.nn.Softmax(dim=1)(mean[m]).max(1)
+                        if cfg["models"][m]["arch"] == "tempnet":
+                            labels = ['mutual info', 'entropy', 'probability','temperature']
+                            values = [mutual_info[m], entropy[m], prob, temp_map[m]]
+                        else:
+                            labels = ['mutual info', 'entropy', 'probability']
+                            values = [mutual_info[m], entropy[m], prob]
+                        plotPrediction(logdir, cfg, n_classes, i, i_val, k + "/" + m, inputs_display, pred_m, gt)
+                        plotEverything(logdir, i, i_val, k + "/" + m, values, labels)
                 #import ipdb;ipdb.set_trace()
-                running_metrics_ssma.update(gt.data.cpu().numpy(), ssma.cpu().numpy())
-                running_metrics_uno.update(gt.data.cpu().numpy(), pred.cpu().numpy())
-                score_ssma, _ = running_metrics_ssma.get_scores()
-                score_uno, _ = running_metrics_uno.get_scores()
-                running_metrics_ssma.reset()
-                running_metrics_uno.reset()
-                #import ipdb;ipdb.set_trace()
-                import matplotlib.pyplot as plt 
-                
-                stuff = [inputs_display['rgb'], inputs_display['d'], gt,ssma, pred,[miou_ssma,miou_uno]]
+                running_metrics_val[k].update(gt.data.cpu().numpy(), pred.cpu().numpy())
 
-                plotAll(logdir, i, i_val, k, stuff)
-                #import ipdb;ipdb.set_trace()
-                # labels = ['mutual info', 'entropy', 'probability', 'variance', 'temperature']
-                # values = [mi, e, prob, torch.zeros(mi.shape), torch.zeros(mi.shape)]
-                # plotEverything(logdir, i, i_val, k + "/fused", values, labels)
-
-                #import ipdb;ipdb.set_trace()
-               
-
-            # if cfg["models"][m]["arch"] == "tempnet":
-            #     save_stats(logdir,temp_dict_per_loader,k,cfg,"_temp_")
-            # save_stats(logdir,entropy_dict_per_loader,k,cfg,"_entropy_")
-            # save_stats(logdir,MI_dict_per_loader,k,cfg,"_MutualInfo_")
+            if cfg["models"][m]["arch"] == "tempnet":
+                save_stats(logdir,temp_dict_per_loader,k,cfg,"_temp_")
+            save_stats(logdir,entropy_dict_per_loader,k,cfg,"_entropy_")
+            save_stats(logdir,MI_dict_per_loader,k,cfg,"_MutualInfo_")
 
         for m in cfg["models"].keys():
             for k in loaders['val'].keys():
                 writer.add_scalar('loss/val_loss/{}/{}'.format(m, k), val_loss_meter[m][k].avg, i + 1)
                 logger.info("%s %s Iter %d Loss: %.4f" % (m, k, i + 1, val_loss_meter[m][k].avg))
 
-    # for env, valloader in loaders['val'].items():
-    #     score, class_iou = running_metrics_val[env].get_scores()
-    #     for k, v in score.items():
-    #         logger.info('{}: {}'.format(k, v))
-    #         writer.add_scalar('val_metrics/{}/{}'.format(env, k), v, i + 1)
+    for env, valloader in loaders['val'].items():
+        score, class_iou = running_metrics_val[env].get_scores()
+        for k, v in score.items():
+            logger.info('{}: {}'.format(k, v))
+            writer.add_scalar('val_metrics/{}/{}'.format(env, k), v, i + 1)
 
-    #     for k, v in class_iou.items():
-    #         logger.info('{}: {}'.format(k, v))
-    #         writer.add_scalar('val_metrics/{}/cls_{}'.format(env, k), v, i + 1)
+        for k, v in class_iou.items():
+            logger.info('{}: {}'.format(k, v))
+            writer.add_scalar('val_metrics/{}/cls_{}'.format(env, k), v, i + 1)
 
-    #     for m in cfg["models"].keys():
-    #         val_loss_meter[m][env].reset()
-    #     running_metrics_val[env].reset()
+        for m in cfg["models"].keys():
+            val_loss_meter[m][env].reset()
+        running_metrics_val[env].reset()
 
 
 if __name__ == "__main__":

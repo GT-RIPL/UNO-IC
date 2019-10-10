@@ -400,7 +400,7 @@ def plotPrediction(logdir, cfg, n_classes, i, i_val, k,inputs, pred, gt):
         os.makedirs(path)
     plt.tight_layout()
     plt.savefig("{}/{}_{}.png".format(path, i_val, i))
-    plt.close(fig)
+    plt.close('all')
 
 
 def plotMeansVariances(logdir, cfg, n_classes, i, i_val, m, k, inputs, pred, gt, mean, variance):
@@ -430,8 +430,7 @@ def plotMeansVariances(logdir, cfg, n_classes, i, i_val, m, k, inputs, pred, gt,
     axes[0].imshow(variance[0, :, :, :].mean(0).cpu().numpy())
     axes[1].imshow(mean[0, :, :, :].max(0)[0].cpu().numpy())
     plt.savefig("{}/{}_{}avg.png".format(path, i_val, i))
-    plt.close(fig)
-
+    plt.close('all')
 
 def plotEntropy(logdir, i, i_val, k, pred, variance):
     path = "{}/{}".format(logdir, k)
@@ -442,7 +441,7 @@ def plotEntropy(logdir, i, i_val, k, pred, variance):
         os.makedirs(path)
     # import ipdb;ipdb.set_trace()
     plt.savefig("{}/{}_{}_entropy.png".format(path, i_val, i))
-    plt.close(fig)
+    plt.close('all')
 
 
 def plotMutualInfo(logdir, i, i_val, k, pred, variance):
@@ -453,7 +452,7 @@ def plotMutualInfo(logdir, i, i_val, k, pred, variance):
     if not os.path.exists(path):
         os.makedirs(path)
     plt.savefig("{}/{}_{}_mutual_info.png".format(path, i_val, i))
-    plt.close(fig)
+    plt.close('all')
     
 def plotSpatial(logdir, i, i_val, k, pred, variance):
     path = "{}/{}".format(logdir, k)
@@ -464,7 +463,7 @@ def plotSpatial(logdir, i, i_val, k, pred, variance):
         os.makedirs(path)
     plt.colorbar()
     plt.savefig("{}/{}_{}_spatial.png".format(path, i_val, i))
-    plt.close(fig)
+    plt.close('all')
 
 def plotMutualInfoEntropy(logdir, i, i_val, k, pred, variance):
     path = "{}/{}".format(logdir, k)
@@ -475,7 +474,7 @@ def plotMutualInfoEntropy(logdir, i, i_val, k, pred, variance):
         os.makedirs(path)
     plt.colorbar()
     plt.savefig("{}/{}_{}_mutual_info_entropy.png".format(path, i_val, i))
-    plt.close(fig)
+    plt.close('all')
 
 def plotEverything(logdir, i, i_val, k, values, labels):
     path = "{}/{}".format(logdir, k)
@@ -493,7 +492,7 @@ def plotEverything(logdir, i, i_val, k, values, labels):
         os.makedirs(path)
     fig.tight_layout()
     plt.savefig("{}/{}_{}_everything.png".format(path, i_val, i))
-    plt.close(fig)
+    plt.close('all')
 
 def save_pred(logdir, loc, k, i_val, i, pred, mutual_info, entropy):
     # pred [batch,11,512,512,num_passes]
@@ -642,3 +641,40 @@ def save_stats(logdir,dict,k,cfg,metric='_temp_'):
         stat[m+'_'+k+metric+'stats'] = dict[m]
     df = DataFrame(stat) 
     df.to_excel ('{}/{}/rgbd{}stats.xlsx'.format(logdir,k,metric), index = True, header=True)
+
+def plotAll(logdir, i, i_val, k, plot,miou):
+    path = "{}/{}/all/".format(logdir, k)
+    
+    plt.axis('off')
+    fig, axes = plt.subplots(1, 1)
+    ax1 = plt.subplot2grid(shape=(2,6), loc=(0,1), colspan=2)
+    ax2 = plt.subplot2grid((2,6), (0,3), colspan=2)
+    ax3 = plt.subplot2grid((2,6), (1,0), colspan=2)
+    ax4 = plt.subplot2grid((2,6), (1,2), colspan=2)
+    ax5 = plt.subplot2grid((2,6), (1,4), colspan=2)
+    
+    ax1.imshow(plot[0][0, :, :, :].permute(1, 2, 0).cpu().numpy() / 255)
+    ax1.set_title("RGB")
+    ax1.set_axis_off()
+    
+    ax2.imshow(plot[1][0, :, :, :].permute(1, 2, 0).cpu().numpy() / 255)
+    ax2.set_title("D")
+    ax2.set_axis_off()
+    
+    ax3.imshow(plot[2][0, :, :].cpu().numpy())
+    ax3.set_title("Ground Truth")
+    ax3.set_axis_off()
+    
+    ax4.imshow(plot[3][0, :, :].cpu().numpy())
+    ax4.set_title("SSMA: {}".format(miou[0]))
+    ax4.set_axis_off()
+   
+    ax5.imshow(plot[4][0, :, :].cpu().numpy())
+    ax5.set_title("UNO++: {}".format(miou[1]))
+    ax5.set_axis_off()
+
+    if not os.path.exists(path):
+        os.makedirs(path)
+    plt.savefig("{}/{}_{}_all.png".format(path, i_val, i),dpi=300)
+    plt.close(fig)
+

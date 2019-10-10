@@ -5,8 +5,44 @@ from .fusion.fusion import *
 from ptsemseg.models.segnet_mcdo import *
 from ptsemseg.utils import mutualinfo_entropy, plotEverything, plotPrediction
 
+class _tempnet(nn.Module):
+  def __init__(self,in_channels=3): 
+        super(_tempnet, self).__init__()
+        self.temp_down1 =  segnetDown2(in_channels, 64)
+        self.temp_down2 = segnetDown2(64, 128)
+        self.temp_up2 = segnetUp2(128, 64)
+        self.temp_up1 = segnetUp2(64, 1)
 
-class TempNet(nn.Module):
+  def forward(self,inputs):
+       
+        tdown1, tindices_1, tunpool_shape1 = self.temp_down1(inputs)
+        tdown2, tindices_2, tunpool_shape2 = self.temp_down2(tdown1)
+        tup2 = self.temp_up2(tdown2, tindices_2, tunpool_shape2)
+        tup1 = self.temp_up1(tup2, tindices_1, tunpool_shape1) #[batch,1,512,512]
+        temp = tup1.mean((2,3)).unsqueeze(-1).unsqueeze(-1) #(batch,1,1,1)
+        tup1 = tup1.masked_fill(tup1 < 0.3, 0.3)
+        return  tup1.squeeze(1),temp.view(-1)
+
+class _compnet(nn.Module):
+  def __init__(self,in_channels=6): 
+        super(_compnet, self).__init__()
+        self.temp_down1 =  segnetDown2(in_channels, 64)
+        self.temp_down2 = segnetDown2(64, 128)
+        self.temp_up2 = segnetUp2(128, 64)
+        self.temp_up1 = segnetUp2(64, 1)
+
+  def forward(self,inputs,inputs2):
+        inputs2 = torch.cat((inputs,inputs2),1)
+        tdown1, tindices_1, tunpool_shape1 = self.temp_down1(inputs2)
+        tdown2, tindices_2, tunpool_shape2 = self.temp_down2(tdown1)
+        tup2 = self.temp_up2(tdown2, tindices_2, tunpool_shape2)
+        tup1 = self.temp_up1(tup2, tindices_1, tunpool_shape1) #[batch,1,512,512]
+        temp = tup1.mean((2,3)).unsqueeze(-1).unsqueeze(-1) #(batch,1,1,1)
+        tup1 = tup1.masked_fill(tup1 < 0.3, 0.3)
+        return  tup1.squeeze(1),temp.view(-1)
+
+
+class CoTempNet(nn.Module):
     def __init__(self,
                  modality = 'rgb',
                  n_classes=21,
@@ -20,7 +56,7 @@ class TempNet(nn.Module):
                  pretrained_rgb=None,
                  pretrained_d=None
                  ):
-        super(TempNet, self).__init__()
+        super(CoTempNet, self).__init__()
 
 
         self.modality = modality
@@ -37,10 +73,8 @@ class TempNet(nn.Module):
 
         # initialize temp net
         
-        self.temp_down1 =  segnetDown2(in_channels*2, 64)
-        self.temp_down2 = segnetDown2(64, 128)
-        self.temp_up2 = segnetUp2(128, 64)
-        self.temp_up1 = segnetUp2(64, 1)
+        self.tempnet = _tempnet()
+        #self.compnet = _compnet()
 
         self.segnet = torch.nn.DataParallel(self.segnet, device_ids=range(torch.cuda.device_count()))
 
@@ -62,35 +96,39 @@ class TempNet(nn.Module):
         self.softmaxMCDO = torch.nn.Softmax(dim=1)
         self.scale_logits = self._get_scale_module(scaling_module)
 
+
     def forward(self,inputs,inputs2,scaling_metrics="softmax entropy"):
 
         # Freeze batchnorm
         self.segnet.eval()
 
         # computer logits and uncertainty measures
-        up1 = self.segnet.module.forwardMCDO_logits(inputs) #(batch,11,512,512,passes)
+        seg = self.segnet.module.forwardMCDO_logits(inputs) #(batch,11,512,512,passes)
 
-        inputs2 = torch.cat((inputs,inputs2),1)
-        #import ipdb;ipdb.set_trace()
-        tdown1, tindices_1, tunpool_shape1 = self.temp_down1(inputs2)
-        tdown2, tindices_2, tunpool_shape2 = self.temp_down2(tdown1)
-        tup2 = self.temp_up2(tdown2, tindices_2, tunpool_shape2)
-        tup1 = self.temp_up1(tup2, tindices_1, tunpool_shape1) #[batch,1,512,512]
-        temp = tup1.mean((2,3)).unsqueeze(-1).unsqueeze(-1) #(batch,1,1,1)
-        tup1 = tup1.masked_fill(tup1 < 0.3, 0.3)
+        temp_map, temp = self.tempnet(inputs) #(batch,512,512)
+        #comp_map, comp = self.compnet(inputs,inputs2) #(batch,512,512)
         #tup1 = tup1.masked_fill(tup1 > 1, 1)
-        x = up1 #* tup1.unsqueeze(-1)
-        mean = x.mean(-1) #[batch,classes,512,512]
-        variance = x.std(-1)
+        #x = seg #* torch.min(temp_map,comp_map).unsqueeze(-1) #* tup1.unsqueeze(-1)
+        mean = seg.mean(-1) #[batch,classes,512,512]
     
-        prob = self.softmaxMCDO(x) #[batch,classes,512,512]
+        prob = self.softmaxMCDO(seg) #[batch,classes,512,512]
         prob = prob.masked_fill(prob < 1e-9, 1e-9)
         entropy,mutual_info = mutualinfo_entropy(prob)#(batch,512,512)
+
+        #prob_spatial = self.softmaxMCDO(x) #[batch,classes,512,512]
+        #prob_spatial = prob_spatial.masked_fill(prob_spatial < 1e-9, 1e-9)
+        #entropy_spatial,mutual_info_spatial = mutualinfo_entropy(prob_spatial)#(batch,512,512)
+
+        #import ipdb;ipdb.set_trace()
+        #import ipdb;ipdb.set_trace()
         if self.scale_logits != None:
-          DR = self.scale_logits(variance, entropy,mutual_info, tup1.squeeze(1),mode=scaling_metrics) #(batch,1,1,1)
-          #mean = mean * torch.min(tup1,DR)
+          DR = self.scale_logits(entropy,mutual_info, temp1=temp_map,mode=scaling_metrics) #(batch,1,1,1)
+          #mean_comp = mean * torch.min(DR,comp_map.unsqueeze(1))
           mean = mean * DR
-        return mean, variance, entropy, mutual_info,tup1.squeeze(1), temp.view(-1),entropy.mean((1,2)),mutual_info.mean((1,2))
+          #import ipdb;ipdb.set_trace() 
+        else:
+          DR = 0
+        return mean, entropy, mutual_info,temp_map,temp,entropy.mean((1,2)),mutual_info.mean((1,2)),DR
 
     def loadModel(self, model, path):
         model_pkl = path
@@ -127,3 +165,4 @@ class TempNet(nn.Module):
             "GlobalScaling" : GlobalScaling(modality=self.modality),
             "None": None
         }[name]
+ 

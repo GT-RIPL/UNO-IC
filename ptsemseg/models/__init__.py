@@ -14,7 +14,7 @@ from ptsemseg.models.fusion.deeplab import DeepLab
 from ptsemseg.models.fusion.CAFnet import CAFnet
 from ptsemseg.models.fusion.fusenet import FuseNet
 from ptsemseg.models.tempnet import TempNet
-
+from ptsemseg.models.cotempnet import CoTempNet
 
 def get_model(name,
               modality = 'rgb',
@@ -65,11 +65,12 @@ def get_model(name,
         model = model(n_classes=n_classes,
                       modality = modality,
                       mcdo_passes=mcdo_passes,
+                      dropoutP=dropoutP,
                       full_mcdo=full_mcdo,
                       in_channels=in_channels,
                       scaling_module=scaling_module,
                       pretrained_rgb=pretrained_rgb,
-                      pretrained_d=pretrained_d, )
+                      pretrained_d=pretrained_d)
     elif name == "CAFnet" or name == "CAF_segnet":
         model = model(backbone="segnet",
                       n_classes=n_classes,
@@ -96,9 +97,9 @@ def get_model(name,
                       in_channels=in_channels, )
 
     elif name == "SSMA":
-        model = model(backbone='segnet', output_stride=16, num_classes=n_classes, sync_bn=True, freeze_bn=False)
+        model = model(backbone='segnet', output_stride=16, n_classes=n_classes, sync_bn=True, freeze_bn=False)
     elif name == "DeepLab":
-        model = model(backbone='segnet', output_stride=16, num_classes=n_classes, sync_bn=True, freeze_bn=False)
+        model = model(backbone='segnet', output_stride=16, n_classes=n_classes, sync_bn=True, freeze_bn=False)
     else:
         model = model(n_classes=n_classes)
 
@@ -125,7 +126,7 @@ def _get_model_instance(name):
             "SSMA": SSMA,
             "DeepLab": DeepLab,
             "fusenet": FuseNet,
-            "tempnet": TempNet,
+            "tempnet": CoTempNet#TempNet,
         }[name]
     except:
         raise ("Model {} not available".format(name))

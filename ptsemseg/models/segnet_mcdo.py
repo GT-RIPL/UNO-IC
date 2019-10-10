@@ -75,6 +75,8 @@ class segnet_mcdo(nn.Module):
         for k, v in self.layers.items():
             setattr(self, k, v)
 
+        self.llf1 = conv2DBatchNormRelu(128,24,1,1,0)
+        self.llf2 = conv2DBatchNormRelu(512,24,1,1,0)
         self.scale_logits = self._get_scale_module(scaling_module)
 
     def init_vgg16_params(self, vgg16):
@@ -193,6 +195,36 @@ class segnet_mcdo(nn.Module):
         return mean, variance, entropy, mutual_info, entropy.mean((1,2)),mutual_info.mean((1,2))
 
 
+    def forward_SSMA(self, inputs, mcdo=True):
+        if self.freeze_seg:
+            self.eval()
+
+        if self.full_mcdo:
+            down1, indices_1, unpool_shape1 = self.layers["down1"](inputs, MCDO=mcdo)
+            down2, indices_2, unpool_shape2 = self.layers["down2"](down1, MCDO=mcdo)
+        else:
+            down1, indices_1, unpool_shape1 = self.layers["down1"](inputs)
+            down2, indices_2, unpool_shape2 = self.layers["down2"](down1)
+
+        down3, indices_3, unpool_shape3 = self.layers["down3"](down2, MCDO=mcdo)
+        down4, indices_4, unpool_shape4 = self.layers["down4"](down3, MCDO=mcdo)
+        down5, indices_5, unpool_shape5 = self.layers["down5"](down4, MCDO=mcdo)
+
+        llf1 = self.llf1(down2)
+        llf2 = self.llf2(down4)
+
+        up5 = self.layers["up5"](down5, indices_5, unpool_shape5, MCDO=mcdo)
+        up4 = self.layers["up4"](up5, indices_4, unpool_shape4, MCDO=mcdo)
+        up3 = self.layers["up3"](up4, indices_3, unpool_shape3, MCDO=mcdo)
+
+        if self.full_mcdo:
+            up2 = self.layers["up2"](up3, indices_2, unpool_shape2, MCDO=mcdo)
+            up1 = self.layers["up1"](up2, indices_1, unpool_shape1, MCDO=mcdo)
+        else:
+            up2 = self.layers["up2"](up3, indices_2, unpool_shape2)
+            up1 = self.layers["up1"](up2, indices_1, unpool_shape1)
+
+        return up1,llf1, llf2, down5
 
     def forwardMCDO_logits(self, inputs, mcdo=True):   
         with torch.no_grad():

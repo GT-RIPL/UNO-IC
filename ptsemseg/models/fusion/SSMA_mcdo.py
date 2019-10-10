@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from .sync_batchnorm.batchnorm import SynchronizedBatchNorm2d
 
+from ..segnet_mcdo import segnet_mcdo
 from ..segnet import segnet
 from .deeplab import DeepLab
 from .decoder import build_decoder
@@ -34,8 +35,8 @@ class SSMA(nn.Module):
                  sync_bn=True, freeze_bn=False):
         super(SSMA, self).__init__()
         if backbone == 'segnet':
-            self.expert_A = segnet(n_classes=n_classes, in_channels=3, is_unpooling=True)
-            self.expert_B = segnet(n_classes=n_classes, in_channels=3, is_unpooling=True)
+            self.expert_A = segnet_mcdo(n_classes=n_classes, in_channels=3, is_unpooling=True)
+            self.expert_B = segnet_mcdo(n_classes=n_classes, in_channels=3, is_unpooling=True)
             vgg16 = models.vgg16(pretrained=True)
             self.expert_A.init_vgg16_params(vgg16)
             self.expert_B.init_vgg16_params(vgg16)
@@ -95,7 +96,7 @@ class SSMA(nn.Module):
             "GlobalScaling" : GlobalScaling(modality=self.modality),
             "None": None
         }[name]
-
+ 
 
     def freeze_bn(self):
         for m in self.modules():
@@ -109,7 +110,7 @@ class _SSMABlock(nn.Module):
     def __init__(self, n_channels, compression_rate=6):
         super(_SSMABlock, self).__init__()
         self.bottleneck = nn.Conv2d(
-            2 * n_channels,
+            n_channels,
             n_channels // compression_rate,
             3,
             stride=1,
@@ -139,7 +140,8 @@ class _SSMABlock(nn.Module):
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, A, B):
-        AB = torch.cat([A, B], dim=1)
+        # AB = torch.cat([A, B], dim=1)
+        AB= A*0.5 + B * 0.5
         G = self.bottleneck(AB)
         G = F.relu(G)
         G = self.gate(G)

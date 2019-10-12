@@ -61,14 +61,14 @@ def get_loaders(name, cfg):
         img_size=(cfg['data']['img_rows'], cfg['data']['img_cols']),
         augmentations=data_aug)
 
-    r_loader = data_loader(
-        data_path,
-        is_transform=True,
-        split=cfg['data']['recal_split'],
-        subsplits=cfg['data']['recal_subsplit'],
-        scale_quantity=cfg['data']['recal_reduction'],
-        img_size=(cfg['data']['img_rows'], cfg['data']['img_cols']),
-        augmentations=data_aug)
+    # r_loader = data_loader(
+    #     data_path,
+    #     is_transform=True,
+    #     split=cfg['data']['recal_split'],
+    #     subsplits=cfg['data']['recal_subsplit'],
+    #     scale_quantity=cfg['data']['recal_reduction'],
+    #     img_size=(cfg['data']['img_rows'], cfg['data']['img_cols']),
+    #     augmentations=data_aug)
 
     tv_loader = data_loader(
         data_path,
@@ -101,10 +101,10 @@ def get_loaders(name, cfg):
                                   batch_size=cfg['training']['batch_size'],
                                   num_workers=cfg['training']['n_workers'],
                                   shuffle=True),
-            'recal': data.DataLoader(r_loader,
-                                  batch_size=cfg['training']['batch_size'],
-                                  num_workers=cfg['training']['n_workers'],
-                                  shuffle=True),
+            # 'recal': data.DataLoader(r_loader,
+            #                       batch_size=cfg['training']['batch_size'],
+            #                       num_workers=cfg['training']['n_workers'],
+            #                       shuffle=True),
             'val': valloaders
         }, n_classes
 

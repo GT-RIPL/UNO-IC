@@ -10,6 +10,7 @@ from ptsemseg.models.icnet import *
 from ptsemseg.models.linknet import *
 from ptsemseg.models.frrn import *
 from ptsemseg.models.fusion.SSMA import SSMA
+from ptsemseg.models.fusion.shared_SSMA import shared_SSMA
 from ptsemseg.models.fusion.deeplab import DeepLab
 from ptsemseg.models.fusion.CAFnet import CAFnet
 from ptsemseg.models.fusion.fusenet import FuseNet
@@ -92,11 +93,13 @@ def get_model(name,
     elif name == "pspnet":
         model = model(n_classes=n_classes,
                       input_size=input_size,
-                      mcdo_passes=mcdo_passes,
+                      mcdo_paSsses=mcdo_passes,
                       dropoutP=dropoutP,
                       in_channels=in_channels, )
 
     elif name == "SSMA":
+        model = model(backbone='segnet', output_stride=16, n_classes=n_classes, sync_bn=True, freeze_bn=False)
+    elif name == "shared_SSMA":
         model = model(backbone='segnet', output_stride=16, n_classes=n_classes, sync_bn=True, freeze_bn=False)
     elif name == "DeepLab":
         model = model(backbone='segnet', output_stride=16, n_classes=n_classes, sync_bn=True, freeze_bn=False)
@@ -124,6 +127,7 @@ def _get_model_instance(name):
             "CAFnet": CAFnet,
             "CAF_segnet": CAFnet,
             "SSMA": SSMA,
+            "shared_SSMA" : shared_SSMA,
             "DeepLab": DeepLab,
             "fusenet": FuseNet,
             "tempnet": CoTempNet#TempNet,

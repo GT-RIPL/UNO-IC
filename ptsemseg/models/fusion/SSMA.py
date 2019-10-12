@@ -79,7 +79,7 @@ class SSMA(nn.Module):
         #else:
           #DR = 0
 
-        return x, entropy, mutual_info,entropy.mean((1,2)),mutual_info.mean((1,2)),0
+        return x#, entropy, mutual_info,entropy.mean((1,2)),mutual_info.mean((1,2)),0
 
 
     def _get_scale_module(self, name, n_classes=11, bias_init=None):

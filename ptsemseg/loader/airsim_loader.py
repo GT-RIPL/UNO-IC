@@ -80,7 +80,7 @@ class airsimLoader(data.Dataset):
 
     #cam_pos = ['back_lower',  'back_upper']
 
-    cam_pos = ['back',]
+    cam_pos = ['back','front','left','overhead','right']
     # cam_pos = [ 'back_lower',  'back_upper',
     #             'front_lower', 'front_upper',
     #             'left_lower',  'left_upper',
@@ -326,7 +326,8 @@ class airsimLoader(data.Dataset):
                         condition = subsplit
                         degradation = None
 
-                    for file_path in sorted(glob.glob(os.path.join(root,'scene',condition,subdir,self.cam_pos[0],'*.png'),recursive=True)):
+                    for file_path in glob.glob(os.path.join(root,'scene',condition,subdir,self.cam_pos[0],'*.png'),recursive=True):
+                        #print(file_path)
 
                         ext = file_path.replace(root+"/scene/",'')
                         env = ext.split("/")[1]
@@ -347,6 +348,7 @@ class airsimLoader(data.Dataset):
 
                                     self.imgs[split][comb_cam][comb_modal].append(file_path)
                                     self.dgrd[split][comb_cam][comb_modal].append(degradation)
+
                     '''
                     if all([os.path.exists(os.path.join(root,image_mode,ext)) for image_mode in self.image_modes]):
                         if subsplit is None or (not subsplit is None and subsplit==env):
@@ -356,6 +358,11 @@ class airsimLoader(data.Dataset):
 
         print('scene_back_image num', n)
         print('valid sample pairs', k)
+
+        if not self.imgs[self.split][self.cam_pos[0]][self.image_modes[0]]:
+            raise Exception(
+                "No files for split=[%s] found in %s" % (self.split, self.root)
+            )
 
         print("{} {}: Found {} Images".format(self.split,self.subsplits,len(self.imgs[self.split][self.cam_pos[0]][self.image_modes[0]])))
         if scale_quantity != 1.0:
@@ -488,11 +495,12 @@ class airsimLoader(data.Dataset):
             for test_one_path in dataset_div['test'][region][1]:
                 test_path_list.append(self.tuple_to_folder_name(test_one_path))
 
+
         split_subdirs = {}
-        split_subdirs['train'] = ['-57_-194__20_-192']
-        split_subdirs['recal'] = ['-57_-194__20_-192']
-        split_subdirs['val'] = ['-57_-194__20_-192']
-        split_subdirs['test'] = ['-57_-194__20_-192']
+        split_subdirs['train'] = train_path_list
+        split_subdirs['recal'] = recal_path_list
+        split_subdirs['val'] = val_path_list
+        split_subdirs['test'] = test_path_list
         
         return split_subdirs
 
@@ -528,7 +536,31 @@ class airsimLoader(data.Dataset):
             path_list = distance_and_path_list[1] 
             tem_list = copy.deepcopy(path_list)
 
+            random.seed(0)
+            shuffle(tem_list)
+
             sum_distance = 0 
+
+            # Recal Set
+            while sum_distance < recal_distance*0.8:
+                path = tem_list.pop()
+                sum_distance += path[3]
+                dataset_div['recal'][region_type][0] = dataset_div['recal'][region_type][0] + path[3]
+                dataset_div['recal'][region_type][1].append(path)
+
+            # Test Set
+            while sum_distance < test_distance*0.8:
+                path = tem_list.pop()
+                sum_distance += path[3]
+                dataset_div['test'][region_type][0] = dataset_div['test'][region_type][0] + path[3]
+                dataset_div['test'][region_type][1].append(path)
+
+            # Val Set
+            while sum_distance < (test_distance + val_distance)*0.8:
+                path = tem_list.pop()
+                sum_distance += path[3]
+                dataset_div['val'][region_type][0] = dataset_div['val'][region_type][0] + path[3]
+                dataset_div['val'][region_type][1].append(path)
 
             # Train Set
             dataset_div['train'][region_type][0] = total_distance - sum_distance
@@ -637,7 +669,6 @@ class airsimLoader(data.Dataset):
         for camera in self.cam_pos:
 
             img_path, mask_path = self.imgs[self.split][camera]['scene'][index], self.imgs[self.split][camera]['segmentation'][index]
-            print(img_path)
             img, mask = np.array(cv2.imread(img_path),dtype=np.uint8)[:,:,:3], np.array(cv2.imread(mask_path),dtype=np.uint8)[:,:,:3]
 
             if any(['depth_encoded'==mode for mode in self.image_modes]):

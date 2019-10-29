@@ -1,10 +1,10 @@
 seed: 1337
-id: SSMA_T000+T050
+id: joint_SSMA
 models:
     rgbd:
         # model settings
-        arch: shared_SSMA
-
+        arch: joint_SSMA
+        resume: None
 # recalibration
 recalibration: None #{None, afterMCDO, beforeMCDO}
 recalibrator: None #{HistogramLinear, HistogramFlat, Polynomial_X, Isotonic, Platt}
@@ -52,8 +52,8 @@ training:
     weight: [32.93554, 575.20610, 4.87791, 1.0, 21.79751, 204.85757, 4.60879, 8.74993, 81.57046412795533, 41.01965, 7.37522]
     train_iters: 500000
     batch_size: 2
-    val_interval: 50000 #5000
-    n_workers: 8
+    val_interval: 20000 #5000
+    n_workers: 4
     print_interval: 50
     png_frames: 50 #5000
     optimizer:

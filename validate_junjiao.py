@@ -55,6 +55,7 @@ def validate(cfg, writer, logger, logdir):
     # Setup Metrics
     running_metrics_ssma = runningScore(n_classes)# {env: runningScore(n_classes) for env in loaders['val'].keys()}
     running_metrics_uno = runningScore(n_classes) #{env: runningScore(n_classes) for env in loaders['val'].keys()}
+    running_metrics_val = {env: runningScore(n_classes) for env in loaders['val'].keys()}
     # Setup Meters
     val_loss_meter = {m: {env: averageMeter() for env in loaders['val'].keys()} for m in cfg["models"].keys()}
     val_CE_loss_meter = {env: averageMeter() for env in loaders['val'].keys()}
@@ -118,66 +119,66 @@ def validate(cfg, writer, logger, logdir):
         if attr['resume_temp_rgb'] != "None":
             model_pkl_dict["temp_rgb"] = attr['resume_temp_rgb']
 
-        
+        # import ipdb;ipdb.set_trace()
 
             #import ipdb;ipdb.set_trace()
 
-            for model_key,model_pkl in model_pkl_dict.items():
-                if os.path.isfile(model_pkl):
-                    logger.info(
-                        "Loading model and optimizer from checkpoint '{}'".format(model_pkl)
-                    )
-                    checkpoint = torch.load(model_pkl)
+        for model_key,model_pkl in model_pkl_dict.items():
+            if os.path.isfile(model_pkl):
+                logger.info(
+                    "Loading model and optimizer from checkpoint '{}'".format(model_pkl)
+                )
+                checkpoint = torch.load(model_pkl)
 
-                    pretrained_dict_temp = torch.load(model_pkl)['model_state']
-                    pretrained_dict = {}
-                    #import ipdb;ipdb.set_trace()
-                    if model_key == "temp":
-                        for wieghts_key,weights in pretrained_dict_temp.items():
-                            if wieghts_key.split('.')[1]=='segnet':
-                                pretrained_dict[wieghts_key] = weights
-                            else:
-                                pretrained_dict['module.tempnet'+wieghts_key.split('module')[1]] = weights
-                    elif model_key == "comp":
-                        for wieghts_key,weights in pretrained_dict_temp.items():
-                            if wieghts_key.split('.')[1]=='segnet':
-                                pretrained_dict[wieghts_key] = weights
-                            else:
-                                pretrained_dict['module.compnet'+wieghts_key.split('module')[1]] = weights 
-                    elif model_key == "temp_d":
-                        for wieghts_key,weights in pretrained_dict_temp.items():
-                            if wieghts_key.split('.')[1]!='segnet':
-                                #pretrained_dict[wieghts_key] = weights
-                            #else:
-                                pretrained_dict['module.tempnet_d'+wieghts_key.split('module')[1]] = weights
+                pretrained_dict_temp = torch.load(model_pkl)['model_state']
+                pretrained_dict = {}
+                # import ipdb;ipdb.set_trace()
+                if model_key == "temp":
+                    for wieghts_key,weights in pretrained_dict_temp.items():
+                        if wieghts_key.split('.')[1]=='segnet':
+                            pretrained_dict[wieghts_key] = weights
+                        else:
+                            pretrained_dict['module.tempnet'+wieghts_key.split('module')[1]] = weights
+                elif model_key == "comp":
+                    for wieghts_key,weights in pretrained_dict_temp.items():
+                        if wieghts_key.split('.')[1]=='segnet':
+                            pretrained_dict[wieghts_key] = weights
+                        else:
+                            pretrained_dict['module.compnet'+wieghts_key.split('module')[1]] = weights 
+                elif model_key == "temp_d":
+                    for wieghts_key,weights in pretrained_dict_temp.items():
+                        if wieghts_key.split('.')[1]!='segnet':
+                            #pretrained_dict[wieghts_key] = weights
+                        #else:
+                            pretrained_dict['module.tempnet_d'+wieghts_key.split('module')[1]] = weights
 
-                    elif model_key == "temp_rgb":
-                        for wieghts_key,weights in pretrained_dict_temp.items():
-                            if wieghts_key.split('.')[1]!='segnet':
-                                #pretrained_dict[wieghts_key] = weights
-                            #else:
-                                pretrained_dict['module.tempnet_rgb'+wieghts_key.split('module')[1]] = weights
-                    else:
-                        pretrained_dict = pretrained_dict_temp
-                    #import ipdb;ipdb.set_trace()
-                    # 1. filter out unnecessary keys
-                    pretrained_dict = {k: v.resize_(model_dict[k].shape) for k, v in pretrained_dict.items() if (
-                            k in model_dict)}  # and ((model!="fuse") or (model=="fuse" and not start_layer in k))}
-                    print("Model {} parameters,Loaded {} parameters".format(len(model_dict),len(pretrained_dict)))
-                    #import ipdb;ipdb.set_trace()
-                    model_dict.update(pretrained_dict)
-                    models[model].load_state_dict(pretrained_dict, strict=False)
-                    if attr['resume'] == 'same_yaml':
-                        optimizers[model].load_state_dict(checkpoint["optimizer_state"])
-                        schedulers[model].load_state_dict(checkpoint["scheduler_state"])
-                        start_iter = checkpoint["epoch"]
-                    else:
-                        start_iter = checkpoint["epoch"]
-                    logger.info("Loaded checkpoint '{}' (iter {})".format(model_pkl, checkpoint["epoch"]))
-                    print("Loaded checkpoint '{}' (iter {})".format(model_pkl, checkpoint["epoch"]))
+                elif model_key == "temp_rgb":
+                    for wieghts_key,weights in pretrained_dict_temp.items():
+                        if wieghts_key.split('.')[1]!='segnet':
+                            #pretrained_dict[wieghts_key] = weights
+                        #else:
+                            pretrained_dict['module.tempnet_rgb'+wieghts_key.split('module')[1]] = weights
                 else:
-                    logger.info("No checkpoint found at '{}'".format(model_pkl))
-                    print("No checkpoint found at '{}'".format(model_pkl))
+                    pretrained_dict = pretrained_dict_temp
+                #import ipdb;ipdb.set_trace()
+                # 1. filter out unnecessary keys
+                pretrained_dict = {k: v.resize_(model_dict[k].shape) for k, v in pretrained_dict.items() if (
+                        k in model_dict)}  # and ((model!="fuse") or (model=="fuse" and not start_layer in k))}
+                print("Model {} parameters,Loaded {} parameters".format(len(model_dict),len(pretrained_dict)))
+                #import ipdb;ipdb.set_trace()
+                model_dict.update(pretrained_dict)
+                models[model].load_state_dict(pretrained_dict, strict=False)
+                if attr['resume'] == 'same_yaml':
+                    optimizers[model].load_state_dict(checkpoint["optimizer_state"])
+                    schedulers[model].load_state_dict(checkpoint["scheduler_state"])
+                    start_iter = checkpoint["epoch"]
+                else:
+                    start_iter = checkpoint["epoch"]
+                logger.info("Loaded checkpoint '{}' (iter {})".format(model_pkl, checkpoint["epoch"]))
+                print("Loaded checkpoint '{}' (iter {})".format(model_pkl, checkpoint["epoch"]))
+            else:
+                logger.info("No checkpoint found at '{}'".format(model_pkl))
+                print("No checkpoint found at '{}'".format(model_pkl))
 
     best_iou = -100.0
     i = start_iter
@@ -241,7 +242,8 @@ def validate(cfg, writer, logger, logdir):
                             m_temp = 'rgb'
                         mean[m], entropy[m], mutual_info[m], temp_map[m],temp_ave[m],entropy_ave[m],MI_ave[m],DR[m] = models[m](images_val[m],images_val[m_temp],scaling_metrics=cfg['scaling_metrics'])
                     elif cfg["models"][m]["arch"] == "SSMA":    
-                        mean[m], entropy[m], mutual_info[m],entropy_ave[m],MI_ave[m],DR[m] = models[m](images_val[m])
+                        #mean[m], entropy[m], mutual_info[m],entropy_ave[m],MI_ave[m],DR[m] = models[m](images_val[m],[DR['rgb'],DR['d']])
+                        mean[m], entropy[m], mutual_info[m],entropy_ave[m],MI_ave[m],DR[m] = models[m](images_val[m],0)
                     else:
                         mean[m] = models[m](images_val[m])
                         #variance[m] = torch.zeros(mean[m].shape)
@@ -251,7 +253,8 @@ def validate(cfg, writer, logger, logdir):
                 # Fusion Type
                 #import ipdb;ipdb.set_trace()
                 if cfg["fusion"] == "None":
-                    outputs = torch.nn.Softmax(dim=1)(mean[list(cfg["models"].keys())[0]])
+                    # outputs = torch.nn.Softmax(dim=1)(mean[list(cfg["models"].keys())[0]])
+                    outputs = torch.nn.Softmax(dim=1)(mean['rgbd'])
                 elif cfg["fusion"] == "SoftmaxMultiply":
                     outputs = torch.nn.Softmax(dim=1)(mean["rgb"]) * torch.nn.Softmax(dim=1)(mean["d"])
 
@@ -287,9 +290,8 @@ def validate(cfg, writer, logger, logdir):
                         temp_dict_per_loader[m].extend(temp_ave[m].cpu().numpy().tolist())
                 # plot ground truth vs mean/variance of outputs            
                 outputs = outputs/outputs.sum(1).unsqueeze(1)
-                #import ipdb;ipdb.set_trace()
                 prob, pred = outputs.max(1)
-                _,ssma = mean["rgbd"].max(1)
+                # _,ssma = mean["rgbd"].max(1)
 
                 gt = labels_val
                 e, _ = mutualinfo_entropy(outputs.unsqueeze(-1))
@@ -297,24 +299,35 @@ def validate(cfg, writer, logger, logdir):
                 # if i_val % cfg["training"]["png_frames"] == 0:
                 
                     # plotPrediction(logdir, cfg, n_classes, i, i_val, k, inputs_display, pred, gt)
-                #import ipdb;ipdb.set_trace()
-                running_metrics_ssma.update(gt.data.cpu().numpy(), ssma.cpu().numpy())
-                running_metrics_uno.update(gt.data.cpu().numpy(), pred.cpu().numpy())
-                score_ssma, _ = running_metrics_ssma.get_scores()
-                score_uno, _ = running_metrics_uno.get_scores()
-                running_metrics_ssma.reset()
-                running_metrics_uno.reset()
-                #import ipdb;ipdb.set_trace()
-                import matplotlib.pyplot as plt 
-                
-                stuff = [inputs_display['rgb'], inputs_display['d'], gt,ssma, pred,[miou_ssma,miou_uno]]
 
-                plotAll(logdir, i, i_val, k, stuff)
                 #import ipdb;ipdb.set_trace()
-                # labels = ['mutual info', 'entropy', 'probability', 'variance', 'temperature']
-                # values = [mi, e, prob, torch.zeros(mi.shape), torch.zeros(mi.shape)]
-                # plotEverything(logdir, i, i_val, k + "/fused", values, labels)
+                # running_metrics_ssma.update(gt.data.cpu().numpy(), ssma.cpu().numpy())
+                # running_metrics_uno.update(gt.data.cpu().numpy(), pred.cpu().numpy())
+                # score_ssma, _ = running_metrics_ssma.get_scores()
+                # score_uno, _ = running_metrics_uno.get_scores()
+                # running_metrics_ssma.reset()
+                # running_metrics_uno.reset()                
+                # stuff = [inputs_display['rgb'], inputs_display['d'], gt,ssma, pred,[miou_ssma,miou_uno]]
+                # plotAll(logdir, i, i_val, k, stuff)
+                #import ipdb;ipdb.set_trace()
+                if i_val % cfg["training"]["png_frames"] == 0:
+                    plotPrediction(logdir, cfg, n_classes, i, i_val, k, inputs_display, pred, gt)
+                    labels = ['entropy', 'probability']
+                    values = [e, prob]
+                    plotEverything(logdir, i, i_val, k + "/fused", values, labels)
 
+                    for m in cfg["models"].keys():
+                        prob,pred_m = torch.nn.Softmax(dim=1)(mean[m]).max(1)
+                        if cfg["models"][m]["arch"] == "tempnet":
+                            labels = ['mutual info', 'entropy', 'probability','temperature']
+                            values = [mutual_info[m], entropy[m], prob, temp_map[m]]
+                        else:
+                            labels = ['mutual info', 'entropy', 'probability']
+                            values = [mutual_info[m], entropy[m], prob]
+                        plotPrediction(logdir, cfg, n_classes, i, i_val, k + "/" + m, inputs_display, pred_m, gt)
+                        plotEverything(logdir, i, i_val, k + "/" + m, values, labels)
+
+                running_metrics_val[k].update(gt.data.cpu().numpy(), pred.cpu().numpy())
                 #import ipdb;ipdb.set_trace()
                
 
@@ -328,19 +341,19 @@ def validate(cfg, writer, logger, logdir):
                 writer.add_scalar('loss/val_loss/{}/{}'.format(m, k), val_loss_meter[m][k].avg, i + 1)
                 logger.info("%s %s Iter %d Loss: %.4f" % (m, k, i + 1, val_loss_meter[m][k].avg))
 
-    # for env, valloader in loaders['val'].items():
-    #     score, class_iou = running_metrics_val[env].get_scores()
-    #     for k, v in score.items():
-    #         logger.info('{}: {}'.format(k, v))
-    #         writer.add_scalar('val_metrics/{}/{}'.format(env, k), v, i + 1)
+    for env, valloader in loaders['val'].items():
+        score, class_iou = running_metrics_val[env].get_scores()
+        for k, v in score.items():
+            logger.info('{}: {}'.format(k, v))
+            writer.add_scalar('val_metrics/{}/{}'.format(env, k), v, i + 1)
 
-    #     for k, v in class_iou.items():
-    #         logger.info('{}: {}'.format(k, v))
-    #         writer.add_scalar('val_metrics/{}/cls_{}'.format(env, k), v, i + 1)
+        for k, v in class_iou.items():
+            logger.info('{}: {}'.format(k, v))
+            writer.add_scalar('val_metrics/{}/cls_{}'.format(env, k), v, i + 1)
 
-    #     for m in cfg["models"].keys():
-    #         val_loss_meter[m][env].reset()
-    #     running_metrics_val[env].reset()
+        for m in cfg["models"].keys():
+            val_loss_meter[m][env].reset()
+        running_metrics_val[env].reset()
 
 
 if __name__ == "__main__":

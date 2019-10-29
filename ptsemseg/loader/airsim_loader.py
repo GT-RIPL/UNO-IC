@@ -19,6 +19,42 @@ import pickle
 from ptsemseg.degredations import *
 random.seed(42) 
 
+def save_transformed(img_path, mask_path, depth_path, img, lbl, depth, img_display, depth_display):
+    def check_save(path,file_name,data):
+        if not os.path.exists(path):
+            os.makedirs(path)
+        # import ipdb;ipdb.set_trace()
+        #cv2.imwrite(os.path.join(path,file_name+'.npy'),data)
+        # np.save(os.path.join(path,file_name+'.npy'),data)
+        pickle.dump(data,open(os.path.join(path,file_name+'.pkl'),'wb'),pickle.HIGHEST_PROTOCOL)
+    img_path = img_path.split('/')
+    file_name = img_path[-1].split('.')[0]
+    img_path = img_path[:-1]
+    img_path[4] = 'transformed_data'
+    img_path = '/'.join(img_path)
+
+    mask_path = mask_path.split('/')
+    mask_path = mask_path[:-1]
+    mask_path[4] = 'transformed_data'
+    mask_path = '/'.join(mask_path)
+
+    depth_path = depth_path.split('/')
+    depth_path = depth_path[:-1]
+    depth_path[4] = 'transformed_data'
+    depth_path = '/'.join(depth_path)
+
+    # img_display_path = img_path.split('/')
+    # img_display_path[6] = 'img_display'
+    # img_display_path = '/'.join(img_display_path)
+
+    # depth_display_path = depth_path.split('/')
+    # depth_display_path[6] = 'depth_display'
+    # depth_display_path = '/'.join(depth_display_path)
+
+    check_save(img_path,file_name, img.numpy())
+    check_save(mask_path,file_name, lbl.numpy())
+    check_save(depth_path,file_name,depth.numpy())
+
 
 def label_region_n_compute_distance(i,path_tuple):
     begin = path_tuple[0]
@@ -310,7 +346,6 @@ class airsimLoader(data.Dataset):
         self.dgrd = {s:{c:{image_mode:[] for image_mode in self.image_modes} for c in self.cam_pos} for s in self.splits}
 
         # print(self.splits,self.subsplits,self.split_subdirs[split])
-
         k = 0
         n = 0
         for split in self.splits: # [train, val]
@@ -667,42 +702,49 @@ class airsimLoader(data.Dataset):
         start_ts = time.time()
 
         for camera in self.cam_pos:
-
-            img_path, mask_path = self.imgs[self.split][camera]['scene'][index], self.imgs[self.split][camera]['segmentation'][index]
-            img, mask = np.array(cv2.imread(img_path),dtype=np.uint8)[:,:,:3], np.array(cv2.imread(mask_path),dtype=np.uint8)[:,:,:3]
-
-            if any(['depth_encoded'==mode for mode in self.image_modes]):
-                depth_path = self.imgs[self.split][camera]['depth_encoded'][index]
-                depth_raw = np.array(cv2.imread(depth_path),dtype=np.uint8)
-                depth = np.array((256**3)*depth_raw[:,:,0]+
-                                 (256**2)*depth_raw[:,:,1]+
-                                 (256**1)*depth_raw[:,:,2],dtype=np.uint32).view(np.float32)
-            else:
-                depth_path = self.imgs[self.split][camera]['depth'][index]
-                depth = np.array(cv2.imread(depth_path),dtype=np.uint8)
+            if self.split != 'train':
+                img_path, mask_path = self.imgs[self.split][camera]['scene'][index], self.imgs[self.split][camera]['segmentation'][index]
+                img, mask = np.array(cv2.imread(img_path),dtype=np.uint8)[:,:,:3], np.array(cv2.imread(mask_path),dtype=np.uint8)[:,:,:3]
+                if any(['depth_encoded'==mode for mode in self.image_modes]):
+                    depth_path = self.imgs[self.split][camera]['depth_encoded'][index]
+                    depth_raw = np.array(cv2.imread(depth_path),dtype=np.uint8)
+                    depth = np.array((256**3)*depth_raw[:,:,0]+
+                                     (256**2)*depth_raw[:,:,1]+
+                                     (256**1)*depth_raw[:,:,2],dtype=np.uint32).view(np.float32)
+                else:
+                    depth_path = self.imgs[self.split][camera]['depth'][index]
+                    depth = np.array(cv2.imread(depth_path),dtype=np.uint8)
+                    
+                degradation = self.dgrd[self.split][camera]['scene'][index]
+                if not degradation is None:
+                    img, depth = self.degradation(degradation, img, depth)
                 
-            degradation = self.dgrd[self.split][camera]['scene'][index]
-            if not degradation is None:
-                img, depth = self.degradation(degradation, img, depth)
-            
-            
-            lbl = self.ignore_index*np.ones((img.shape[0],img.shape[1]),dtype=np.uint8)
-            for i,name in self.id2name.items():
-                for color in self.name2color[name]:
-                    lbl[(mask==color[::-1]).all(-1)] = i
+                
+                lbl = self.ignore_index*np.ones((img.shape[0],img.shape[1]),dtype=np.uint8)
+                for i,name in self.id2name.items():
+                    for color in self.name2color[name]:
+                        lbl[(mask==color[::-1]).all(-1)] = i
 
-            if self.augmentations is not None:
-                img, lbl, depth = self.augmentations(img, lbl, depth)
+                if self.augmentations is not None:
+                    img, lbl, depth = self.augmentations(img, lbl, depth)
 
-            if self.is_transform:
-                img, lbl, depth, img_display, depth_display = self.transform(img, lbl, depth)
-            input_list['rgb'].append(img)
-            input_list['d'].append(depth)
-            input_list['rgb_display'].append(img_display)
-            input_list['d_display'].append(depth_display)
-            
-            lbl_list.append(lbl)
+                if self.is_transform:
+                    img, lbl, depth, img_display, depth_display = self.transform(img, lbl, depth)
+                input_list['rgb'].append(img)
+                input_list['d'].append(depth)
+                input_list['rgb_display'].append(img_display)
+                input_list['d_display'].append(depth_display)
+                lbl_list.append(lbl)
+            else:
+                img_path, lbl_path, depth_path  = self.imgs[self.split][camera]['scene'][index], self.imgs[self.split][camera]['segmentation'][index],self.imgs[self.split][camera]['depth'][index]
+                input_list['rgb'].append(pickle.load(open(img_path.replace('airsim_03-30-2019','transformed_data').replace('png','pkl'),'rb')))
+                input_list['d'].append(pickle.load(open(depth_path.replace('airsim_03-30-2019','transformed_data').replace('png','pkl'),'rb')))
+                # input_list['rgb_display'].append(img_display)
+                # input_list['d_display'].append(depth_display)
+                lbl_list.append(pickle.load(open(lbl_path.replace('airsim_03-30-2019','transformed_data').replace('png','pkl'),'rb')))
 
+            # save_transformed(img_path, mask_path, depth_path, img, lbl, depth, img_display, depth_display)
+        # import ipdb;ipdb.set_trace()
         return input_list, lbl_list
 
 

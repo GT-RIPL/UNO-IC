@@ -318,6 +318,8 @@ def train(cfg, writer, logger, logdir):
 
                             # Run Models
                             mean = {}
+                            mean_A = {}
+                            mean_B = {}
                             variance = {}
                             entropy = {}
                             mutual_info = {}
@@ -342,7 +344,8 @@ def train(cfg, writer, logger, logdir):
                                             m_temp = 'rgb' 
                                         mean[m], variance[m], entropy[m], mutual_info[m], temp_map[m],_,_,_ = models[m](images_val[m],images_val[m_temp])
                                 else:
-                                    _,_,mean[m],_,_,_,_,_ = models[m](images_val[m])
+                                    # _,_,mean[m],_,_,_,_,_ = models[m](images_val[m])
+                                    mean_A[m],mean_B[m],mean[m],_,_,_,_,_ = models[m](images_val[m])
                                     variance[m] = torch.zeros(mean[m].shape)
 
                                 val_loss[m] = loss_fn(input=mean[m], target=labels_val, weight=weight)
@@ -350,6 +353,8 @@ def train(cfg, writer, logger, logdir):
                             # Fusion Type
                             if cfg["fusion"] == "None":
                                 outputs = torch.nn.Softmax(dim=1)(mean[list(cfg["models"].keys())[0]])
+                                outputs_A = torch.nn.Softmax(dim=1)(mean_A[list(cfg["models"].keys())[0]])
+                                outputs_B = torch.nn.Softmax(dim=1)(mean_B[list(cfg["models"].keys())[0]])
                             elif cfg["fusion"] == "SoftmaxMultiply":
                                 outputs = torch.nn.Softmax(dim=1)(mean["rgb"]) * torch.nn.Softmax(dim=1)(mean["d"])
                             elif cfg["fusion"] == "SoftmaxAverage":
@@ -374,24 +379,30 @@ def train(cfg, writer, logger, logdir):
                             outputs = outputs/outputs.sum(1).unsqueeze(1)
                             prob, pred = outputs.max(1)
                             gt = labels_val
-                            e, _ = mutualinfo_entropy(outputs.unsqueeze(-1))
+                            outputs_A = outputs_A/outputs_A.sum(1).unsqueeze(1)
+                            outputs_B = outputs_B/outputs_B.sum(1).unsqueeze(1)
+                            _,pred_A = outputs_A.max(1)
+                            _,pred_B = outputs_B.max(1)
+                            # e, _ = mutualinfo_entropy(outputs.unsqueeze(-1))
 
                             if i_val % cfg["training"]["png_frames"] == 0:
                                 plotPrediction(logdir, cfg, n_classes, i, i_val, k, inputs_display, pred, gt)
-                                labels = ['entropy', 'probability']
-                                values = [e, prob]
-                                plotEverything(logdir, i, i_val, k + "/fused", values, labels)
+                                plotPrediction(logdir, cfg, n_classes, i, i_val, k + '/rgb', inputs_display, pred_A, gt)
+                                plotPrediction(logdir, cfg, n_classes, i, i_val, k + '/depth', inputs_display, pred_B, gt)
+                                # labels = ['entropy', 'probability']
+                                # values = [e, prob]
+                                # plotEverything(logdir, i, i_val, k + "/fused", values, labels)
 
-                                for m in cfg["models"].keys():
-                                    prob,pred_m = torch.nn.Softmax(dim=1)(mean[m]).max(1)
-                                    if cfg["models"][m]["arch"] == "tempnet":
-                                        labels = ['mutual info', 'entropy', 'probability','temperature']
-                                        values = [mutual_info[m], entropy[m], prob, temp_map[m]]
-                                    else:
-                                        labels = ['mutual info', 'entropy', 'probability']
-                                        values = [mutual_info[m], entropy[m], prob]
-                                    plotPrediction(logdir, cfg, n_classes, i, i_val, k + "/" + m, inputs_display, pred_m, gt)
-                                    plotEverything(logdir, i, i_val, k + "/" + m, values, labels)
+                                # for m in cfg["models"].keys():
+                                #     prob,pred_m = torch.nn.Softmax(dim=1)(mean[m]).max(1)
+                                #     if cfg["models"][m]["arch"] == "tempnet":
+                                #         labels = ['mutual info', 'entropy', 'probability','temperature']
+                                #         values = [mutual_info[m], entropy[m], prob, temp_map[m]]
+                                #     else:
+                                #         labels = ['mutual info', 'entropy', 'probability']
+                                #         values = [mutual_info[m], entropy[m], prob]
+                                #     plotPrediction(logdir, cfg, n_classes, i, i_val, k + "/" + m, inputs_display, pred_m, gt)
+                                #     plotEverything(logdir, i, i_val, k + "/" + m, values, labels)
 
                             running_metrics_val[k].update(gt.cpu().numpy(), pred.cpu().numpy())
 

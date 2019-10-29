@@ -16,6 +16,8 @@ from ptsemseg.models.fusion.CAFnet import CAFnet
 from ptsemseg.models.fusion.fusenet import FuseNet
 from ptsemseg.models.tempnet import TempNet
 from ptsemseg.models.cotempnet import CoTempNet
+from ptsemseg.models.fusion.separate_SSMA import separate_SSMA
+from ptsemseg.models.fusion.joint_SSMA import joint_SSMA 
 
 def get_model(name,
               modality = 'rgb',
@@ -101,6 +103,10 @@ def get_model(name,
         model = model(backbone='segnet', output_stride=16, n_classes=n_classes, sync_bn=True, freeze_bn=False)
     elif name == "shared_SSMA":
         model = model(backbone='segnet', output_stride=16, n_classes=n_classes, sync_bn=True, freeze_bn=False)
+    elif name == "joint_SSMA":
+        model = model(backbone='segnet', output_stride=16, n_classes=n_classes, sync_bn=True, freeze_bn=False)
+    elif name == "separate_SSMA":
+        model = model(backbone='segnet', output_stride=16, n_classes=n_classes, sync_bn=True, freeze_bn=False)
     elif name == "DeepLab":
         model = model(backbone='segnet', output_stride=16, n_classes=n_classes, sync_bn=True, freeze_bn=False)
     else:
@@ -128,6 +134,8 @@ def _get_model_instance(name):
             "CAF_segnet": CAFnet,
             "SSMA": SSMA,
             "shared_SSMA" : shared_SSMA,
+            "joint_SSMA" : joint_SSMA,
+            "separate_SSMA" : separate_SSMA,
             "DeepLab": DeepLab,
             "fusenet": FuseNet,
             "tempnet": CoTempNet#TempNet,

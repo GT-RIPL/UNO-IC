@@ -29,10 +29,10 @@ class _tempnet(nn.Module):
         tup1 = tup1.masked_fill(tup1 < 0.3, 0.3)
         return  tup1.squeeze(1),temp.view(-1)
 
-class SSMA(nn.Module):
+class separate_SSMA(nn.Module):
     def __init__(self, backbone='segnet', output_stride=16, n_classes=11,scaling_module='None',
                  sync_bn=True, freeze_bn=False):
-        super(SSMA, self).__init__()
+        super(separate_SSMA, self).__init__()
         if backbone == 'segnet':
             self.expert_A = segnet(n_classes=n_classes, in_channels=3, is_unpooling=True)
             self.expert_B = segnet(n_classes=n_classes, in_channels=3, is_unpooling=True)
@@ -48,6 +48,9 @@ class SSMA(nn.Module):
             self.SSMA_skip1 = _SSMABlock(64, 4)
             self.SSMA_skip2 = _SSMABlock(512, 4)
             self.SSMA_ASPP = _SSMABlock(512, 4)
+        # self.linear = torch.nn.Conv2d(n_classes,
+                             # n_classes,
+                             # kernel_size=1)
         self.modality = 'rgbd'
         self.decoder = _Decoder(n_classes, in_channels=512)
         self.softmaxMCDO = torch.nn.Softmax(dim=1)
@@ -55,17 +58,19 @@ class SSMA(nn.Module):
         self.tempnet_rgb = _tempnet()
         self.tempnet_d = _tempnet()
 
-    def forward(self, input,DR=0):
-        # print(input.shape)
-        # import pdb;pdb.set_trace()
+    def forward(self, input):
         A, A_llf1, A_llf2, A_aspp = self.expert_A.forward_SSMA(input[:, :3, :, :])
         B, B_llf1, B_llf2, B_aspp = self.expert_B.forward_SSMA(input[:, 3:, :, :])
-        # import pdb;pdb.set_trace()
-        fused_ASPP = self.SSMA_ASPP(A_aspp, B_aspp,DR)
-        fused_skip1 = self.SSMA_skip1(A_llf1, B_llf1,DR)
-        fused_skip2 = self.SSMA_skip2(A_llf2, B_llf2,DR)
-        x = self.decoder(fused_ASPP, fused_skip1, fused_skip2)
-        
+        fused_ASPP = self.SSMA_ASPP(A_aspp.detach(), B_aspp.detach())
+        fused_skip1 = self.SSMA_skip1(A_llf1.detach(), B_llf1.detach())
+        fused_skip2 = self.SSMA_skip2(A_llf2.detach(), B_llf2.detach())
+        # A = self.linear(A)
+        # B = self.linear(B)
+
+
+        x = self.decoder(fused_ASPP, fused_skip1, fused_skip2) # [batch,classes,512,512]
+        # x = self.linear(x)
+        #import ipdb;ipdb.set_trace()
         prob = self.softmaxMCDO(x.unsqueeze(-1)) #[batch,classes,512,512]
         prob = prob.masked_fill(prob < 1e-9, 1e-9)
         entropy,mutual_info = mutualinfo_entropy(prob)#(batch,512,512)
@@ -82,7 +87,7 @@ class SSMA(nn.Module):
         #else:
           #DR = 0
 
-        return x, entropy, mutual_info,entropy.mean((1,2)),mutual_info.mean((1,2)),0
+        return A,B,x, entropy, mutual_info,entropy.mean((1,2)),mutual_info.mean((1,2)),0
 
 
     def _get_scale_module(self, name, n_classes=11, bias_init=None):
@@ -141,22 +146,12 @@ class _SSMABlock(nn.Module):
         self.fuser = nn.Sequential(conv_mod, nn.BatchNorm2d(int(n_channels)))
         self.sigmoid = nn.Sigmoid()
 
-    def forward(self, A, B, DR = 0):
-        #DR (batch,1,1,1)
-        if DR != 0:
-            AB = torch.cat([A*DR[0], B*DR[1]], dim=1)
-        else:
-            AB = torch.cat([A, B], dim=1)
+    def forward(self, A, B):
+        AB = torch.cat([A, B], dim=1)
         G = self.bottleneck(AB)
         G = F.relu(G)
         G = self.gate(G)
         G = self.sigmoid(G)
-        #if DR != 0:
-            #if DR[0] == 1 and DR[1] == 1:
-            #    AB = AB * G
-            #else:
-        #    AB = torch.cat([A*DR[0], B*DR[1]], dim=1) * G
-        #else:
         AB = AB * G
         fused = self.fuser(AB)
         return fused
@@ -170,6 +165,7 @@ class _Decoder(nn.Module):
                                   
         self.compress1 = nn.Sequential(nn.AdaptiveAvgPool2d(1),
                                        conv2DBatchNormRelu(in_channels,compress_size,1,1,0))
+                                       
                                        
         self.leg2 = nn.Sequential(conv2DBatchNormRelu(in_channels + compress_size, in_channels, 3, 1, 1),
                                   conv2DBatchNormRelu(in_channels, in_channels, 3, 1, 1),
@@ -188,6 +184,7 @@ class _Decoder(nn.Module):
                                   nn.BatchNorm2d(n_classes))
         
     def forward(self, ASSP, skip1, skip2):
+        
         x = self.leg1(ASSP)
         features1 = self.compress1(x) * skip2
         x = torch.cat([x, features1], dim=1)

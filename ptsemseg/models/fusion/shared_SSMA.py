@@ -155,7 +155,7 @@ class _Decoder(nn.Module):
         self.leg1 = nn.Sequential(nn.ConvTranspose2d(in_channels, in_channels, 4, stride=2, padding=1),
                                   nn.BatchNorm2d(in_channels))
                                   
-        self.compress1 = nn.Sequential(nn.AvgPool2d(1),
+        self.compress1 = nn.Sequential(nn.AdaptiveAvgPool2d(1),
                                        conv2DBatchNormRelu(in_channels,compress_size,1,1,0))
                                        
                                        
@@ -165,7 +165,7 @@ class _Decoder(nn.Module):
                                   nn.BatchNorm2d(in_channels))
                                   
       
-        self.compress2 = nn.Sequential(nn.AvgPool2d(1),
+        self.compress2 = nn.Sequential(nn.AdaptiveAvgPool2d(1),
                                        conv2DBatchNormRelu(in_channels,compress_size,1,1,0))
 
 

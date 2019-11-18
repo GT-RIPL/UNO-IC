@@ -127,7 +127,7 @@ class CoTempNet(nn.Module):
           mean = mean * DR
           #import ipdb;ipdb.set_trace() 
         else:
-          DR = 0
+          DR = torch.ones_like(mean)
         return mean, entropy, mutual_info,temp_map,temp,entropy.mean((1,2)),mutual_info.mean((1,2)),DR
 
     def loadModel(self, model, path):

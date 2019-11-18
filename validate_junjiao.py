@@ -256,7 +256,7 @@ def validate(cfg, writer, logger, logdir):
                     # outputs = torch.nn.Softmax(dim=1)(mean[list(cfg["models"].keys())[0]])
                     outputs = torch.nn.Softmax(dim=1)(mean['rgbd'])
                 elif cfg["fusion"] == "SoftmaxMultiply":
-                    outputs = torch.nn.Softmax(dim=1)(mean["rgb"]) * torch.nn.Softmax(dim=1)(mean["d"])
+                    outputs = torch.nn.Softmax(dim=1)(mean["rgb"]) * torch.nn.Softmax(dim=1)(mean["d"]) * torch.nn.Softmax(dim=1)(mean["rgbd"]*torch.min(DR['rgb'],DR['d']))
 
                 elif cfg["fusion"] == "SoftmaxAverage":
                     outputs = torch.nn.Softmax(dim=1)(mean["rgb"]) + torch.nn.Softmax(dim=1)(mean["d"])
@@ -280,6 +280,16 @@ def validate(cfg, writer, logger, logdir):
                         outputs = 1 - (1 - torch.nn.Softmax(dim=1)(mean["rgb"])) * (1 - torch.nn.Softmax(dim=1)(mean["d"])) * (1 - torch.nn.Softmax(dim=1)(mean["rgbd"]*torch.min(DR['rgb'],DR['d']))) #[batch,11,512,512,1]
                     else:
                         outputs = 1 - (1 - torch.nn.Softmax(dim=1)(mean["rgb"])) * (1 - torch.nn.Softmax(dim=1)(mean["d"])) #[batch,11,512,512,1]
+                elif cfg["fusion"] == "Stacked-Noisy-Or":
+                    soft = torch.nn.Softmax(dim=1)(mean["rgb"]) * torch.nn.Softmax(dim=1)(mean["d"]) * torch.nn.Softmax(dim=1)(mean["rgbd"]*torch.min(DR['rgb'],DR['d']))#[batch,11,512,512,1]
+                    soft = soft/soft.sum(1).unsqueeze(1)
+                    if 'rgbd' in mean:
+                        outputs = 1 - (1-soft)*(1 - torch.nn.Softmax(dim=1)(mean["rgb"])) * (1 - torch.nn.Softmax(dim=1)(mean["d"])) * (1 - torch.nn.Softmax(dim=1)(mean["rgbd"]*torch.min(DR['rgb'],DR['d']))) #[batch,11,512,512,1]
+                    else:
+                        outputs = 1 - (1-soft)*(1 - torch.nn.Softmax(dim=1)(mean["rgb"])) * (1 - torch.nn.Softmax(dim=1)(mean["d"])) #[batch,11,512,512,1]
+                elif cfg["fusion"] == "Bayesian":      
+                    outputs = torch.nn.Softmax(dim=1)(mean["rgb"]) * torch.nn.Softmax(dim=1)(mean["d"])
+                    outputs = outputs/outputs/sum(0).unsqueeze(0)
                 else:
                     print("Fusion Type Not Supported")
                 # aggregate training stats

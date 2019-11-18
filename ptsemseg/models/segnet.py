@@ -68,11 +68,11 @@ class segnet(nn.Module):
         llf1 = self.llf1(down2)
         llf2 = self.llf2(down4)
 
-        up5 = self.up5(down5.detach(), indices_5, unpool_shape5)
-        up4 = self.up4(up5, indices_4, unpool_shape4)
-        up3 = self.up3(up4, indices_3, unpool_shape3)
-        up2 = self.up2(up3, indices_2, unpool_shape2)
-        up1 = self.up1(up2, indices_1, unpool_shape1)
+        up5 = self.up5(down5.detach(), indices_5.detach(), unpool_shape5.detach())
+        up4 = self.up4(up5, indices_4.detach(), unpool_shape4.detach())
+        up3 = self.up3(up4, indices_3.detach(), unpool_shape3.detach())
+        up2 = self.up2(up3, indices_2.detach(), unpool_shape2.detach())
+        up1 = self.up1(up2, indices_1.detach(), unpool_shape1.detach())
         return up1, llf1, llf2, down5
 
     def init_vgg16_params(self, vgg16):

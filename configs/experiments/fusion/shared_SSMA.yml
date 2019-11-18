@@ -44,7 +44,7 @@ data:
     val_reduction: 0.5
     img_rows: 512
     img_cols: 512
-    path: /home/jtian73/airsim_03-30-2019/airsim_data_async #../../ros/data/airsim_03-30-2019/airsim_data_async
+    path: /home/jtian73/datasets/airsim_03-30-2019/airsim_data_async #../../ros/data/airsim_03-30-2019/airsim_data_async
     noisy_type: None
 
 
@@ -53,7 +53,7 @@ training:
     train_iters: 500000
     batch_size: 2
     val_interval: 20000 #5000
-    n_workers: 8
+    n_workers: 4
     print_interval: 50
     png_frames: 50 #5000
     optimizer:

@@ -14,6 +14,8 @@ from ptsemseg.loader.cityscapes_loader import cityscapesLoader
 from ptsemseg.loader.nyuv2_loader import NYUv2Loader
 from ptsemseg.loader.sunrgbd_loader import SUNRGBDLoader
 from ptsemseg.loader.mapillary_vistas_loader import mapillaryVistasLoader
+from ptsemseg.loader.synthia_loader import synthiaLoader
+
 
 
 def get_loader(name):
@@ -31,6 +33,7 @@ def get_loader(name):
         "nyuv2": NYUv2Loader,
         "sunrgbd": SUNRGBDLoader,
         "vistas": mapillaryVistasLoader,
+        "synthia": synthiaLoader
     }[name]
 
 def get_loaders(name, cfg):
@@ -49,6 +52,7 @@ def get_loaders(name, cfg):
         "nyuv2": NYUv2Loader,
         "sunrgbd": SUNRGBDLoader,
         "vistas": mapillaryVistasLoader,
+        "synthia": synthiaLoader
     }[name]
     data_path = cfg["data"]["path"]
 

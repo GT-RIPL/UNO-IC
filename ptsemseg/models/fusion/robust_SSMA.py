@@ -56,14 +56,13 @@ class robust_SSMA(nn.Module):
         self.tempnet_d = _tempnet()
 
     def forward(self, input):
-        _, A_llf1, A_llf2, A_aspp = self.expert_A.forward(input[:, :3, :, :])
-        _, B_llf1, B_llf2, B_aspp = self.expert_B.forward(input[:, 3:, :, :])
+        _, A_llf1, A_llf2, A_aspp = self.expert_A.forward_SSMA(input[:, :3, :, :])
+        _, B_llf1, B_llf2, B_aspp = self.expert_B.forward_SSMA(input[:, 3:, :, :])
 
         fused_ASPP = self.SSMA_ASPP(A_aspp, B_aspp)
         fused_skip1 = self.SSMA_skip1(A_llf1, B_llf1)
         fused_skip2 = self.SSMA_skip2(A_llf2, B_llf2)
-        for param in self.decoder.parameters():
-            param.require_grads = True
+
         x = self.decoder(fused_ASPP, fused_skip1, fused_skip2) # [batch,classes,512,512]
         
         A_ASPP = self.SSMA_ASPP(A_aspp, torch.zeros_like(B_aspp))
@@ -74,8 +73,7 @@ class robust_SSMA(nn.Module):
         B_skip1 = self.SSMA_skip1(torch.zeros_like(A_llf1), B_llf1)
         B_skip2 = self.SSMA_skip2(torch.zeros_like(A_llf2), B_llf2)
 
-        for param in self.decoder.parameters():
-            param.require_grads = False
+        
         A = self.decoder(A_ASPP, A_skip1, A_skip2)
         B = self.decoder(B_ASPP, B_skip1, B_skip2)
         #import ipdb;ipdb.set_trace()

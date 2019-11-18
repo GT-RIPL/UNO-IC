@@ -1,9 +1,9 @@
 seed: 1337
-id: separate_SSMA
+id: robust_SSMA
 models:
     rgbd:
         # model settings
-        arch: separate_SSMA
+        arch: robust_SSMA
         resume: None
 # recalibration
 recalibration: None #{None, afterMCDO, beforeMCDO}

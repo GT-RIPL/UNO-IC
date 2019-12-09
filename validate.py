@@ -15,12 +15,10 @@ import cv2
 from ptsemseg.models import get_model
 from ptsemseg.loss import get_loss_function
 from ptsemseg.loader import get_loaders
-from ptsemseg.utils import get_logger, parseEightCameras, plotPrediction, plotMeansVariances, plotEntropy, plotMutualInfo, plotSpatial, save_pred, plotEverything,mutualinfo_entropy
+from ptsemseg.utils import get_logger, parseEightCameras, plotPrediction, plotMeansVariances, plotEntropy, plotMutualInfo, plotSpatial, save_pred, plotEverything,mutualinfo_entropy,save_stats,plotAll
 from ptsemseg.metrics import runningScore, averageMeter
-from ptsemseg.schedulers import get_scheduler
-from ptsemseg.optimizers import get_optimizer
 from ptsemseg.degredations import *
-
+from ptsemseg.models.fusion.fusion import *
 from tensorboardX import SummaryWriter
 from functools import partial
 from collections import defaultdict
@@ -54,142 +52,100 @@ def validate(cfg, writer, logger, logdir):
 
     # Setup Metrics
     running_metrics_val = {env: runningScore(n_classes) for env in loaders['val'].keys()}
-
     # Setup Meters
     val_loss_meter = {m: {env: averageMeter() for env in loaders['val'].keys()} for m in cfg["models"].keys()}
-    val_CE_loss_meter = {env: averageMeter() for env in loaders['val'].keys()}
-    val_REG_loss_meter = {env: averageMeter() for env in loaders['val'].keys()}
-    variance_meter = {m: {env: averageMeter() for env in loaders['val'].keys()} for m in cfg["models"].keys()}
-    entropy_meter = {m: {env: averageMeter() for env in loaders['val'].keys()} for m in cfg["models"].keys()}
-    mutual_info_meter = {m: {env: averageMeter() for env in loaders['val'].keys()} for m in cfg["models"].keys()}
-    time_meter = averageMeter()
+
+    scale_logits = GlobalScaling(cfg['scaling_module'],cfg['training_stats'])
 
     # set seeds for training
-    random_seed(cfg['seed'], True)
-
-    start_iter = 0
     models = {}
-    swag_models = {}
-    optimizers = {}
-    schedulers = {}
-
     # Setup Model
     for model, attr in cfg["models"].items():
 
         attr = defaultdict(lambda: None, attr)
 
         models[model] = get_model(name=attr['arch'],
-                                  modality = model,
                                   n_classes=n_classes,
                                   input_size=(cfg['data']['img_rows'], cfg['data']['img_cols']),
                                   in_channels=attr['in_channels'],
                                   mcdo_passes=attr['mcdo_passes'],
                                   dropoutP=attr['dropoutP'],
                                   full_mcdo=attr['full_mcdo'],
-                                  device=device,
-                                  temperatureScaling=cfg['temperatureScaling'],
-                                  freeze_seg=cfg['freeze_seg'],
-                                  freeze_temp=cfg['freeze_temp'],
-                                  pretrained_rgb=cfg['pretrained_rgb'],
-                                  pretrained_d=cfg['pretrained_d'],
-                                  fusion_module=cfg['fusion_module'],
-                                  scaling_module=cfg['scaling_module']).to(device)
-
+                                  device=device).to(device)
 
         models[model] = torch.nn.DataParallel(models[model], device_ids=range(torch.cuda.device_count()))
 
-        # Setup optimizer, lr_scheduler and loss function
-        optimizer_cls = get_optimizer(cfg)
-        optimizer_params = {k: v for k, v in cfg['training']['optimizer'].items()
-                            if k != 'name'}
-
-        optimizers[model] = optimizer_cls(models[model].parameters(), **optimizer_params)
-        logger.info("Using optimizer {}".format(optimizers[model]))
-
-        schedulers[model] = get_scheduler(optimizers[model], cfg['training']['lr_schedule'])
-
-        loss_fn = get_loss_function(cfg)
-        logger.info("Using loss {}".format(loss_fn))
-
-
         # Load pretrained weights
-        if str(attr['resume']) is not "None":
+        # if str(attr['resume']) != "None" or str(attr['resume_temp']) != "None" :
+        model_dict = models[model].state_dict()
+        
+        # model_pkl_dict = {}
 
-            model_pkl = attr['resume']
-            if attr['resume'] == 'same_yaml':
-                model_pkl = "{}/{}_pspnet_airsim_best_model.pkl".format(logdir, model)
+        # if attr['resume'] != "None":
+        #     model_pkl_dict["single"]= attr['resume']
+        #     #if attr['resume'] == 'same_yaml':
+        #     #    model_pkl = "{}/{}_pspnet_airsim_best_model.pkl".format(logdir, model)
 
-            if os.path.isfile(model_pkl):
-                logger.info(
-                    "Loading model and optimizer from checkpoint '{}'".format(model_pkl)
-                )
-                checkpoint = torch.load(model_pkl)
+        # if attr['resume_temp'] != "None":
+        #     model_pkl_dict["temp"] = attr['resume_temp']
 
-                pretrained_dict = torch.load(model_pkl)['model_state']
-                model_dict = models[model].state_dict()
-                #import ipdb;ipdb.set_trace()
-                # 1. filter out unnecessary keys
-                pretrained_dict = {k: v.resize_(model_dict[k].shape) for k, v in pretrained_dict.items() if (
-                        k in model_dict)}  # and ((model!="fuse") or (model=="fuse" and not start_layer in k))}
+        # if attr['resume_temp_d'] != "None":
+        #     model_pkl_dict["temp_d"] = attr['resume_temp_d']
 
-                # 2. overwrite entries in the existing state dict
-                model_dict.update(pretrained_dict)
-                #import ipdb;ipdb.set_trace()
-                # 3. load the new state dict
-                models[model].load_state_dict(pretrained_dict, strict=False)
-                #import ipdb;ipdb.set_trace()
-                if attr['resume'] == 'same_yaml':
-                    optimizers[model].load_state_dict(checkpoint["optimizer_state"])
-                    schedulers[model].load_state_dict(checkpoint["scheduler_state"])
-                    start_iter = checkpoint["epoch"]
-                else:
-                    start_iter = checkpoint["epoch"]
+        # if attr['resume_temp_rgb'] != "None":
+        #     model_pkl_dict["temp_rgb"] = attr['resume_temp_rgb']
+        model_pkl = attr['resume']
+        # for model_key,model_pkl in model_pkl_dict.items():
+        if os.path.isfile(model_pkl):
+            logger.info(
+                "Loading model and optimizer from checkpoint '{}'".format(model_pkl)
+            )
+            checkpoint = torch.load(model_pkl)
+            pretrained_dict = torch.load(model_pkl)['model_state']
+            # pretrained_dict = {}
 
-                # start_iter = 0
-                logger.info("Loaded checkpoint '{}' (iter {})".format(model_pkl, checkpoint["epoch"]))
-            else:
-                logger.info("No checkpoint found at '{}'".format(model_pkl))
+            # if model_key == "temp":
+            #     for wieghts_key,weights in pretrained_dict_temp.items():
+            #         if wieghts_key.split('.')[1]=='segnet':
+            #             pretrained_dict[wieghts_key] = weights
+            #         else:
+            #             pretrained_dict['module.tempnet'+wieghts_key.split('module')[1]] = weights
+            # elif model_key == "comp":
+            #     for wieghts_key,weights in pretrained_dict_temp.items():
+            #         if wieghts_key.split('.')[1]=='segnet':
+            #             pretrained_dict[wieghts_key] = weights
+            #         else:
+            #             pretrained_dict['module.compnet'+wieghts_key.split('module')[1]] = weights 
+            # elif model_key == "temp_d":
+            #     for wieghts_key,weights in pretrained_dict_temp.items():
+            #         if wieghts_key.split('.')[1]!='segnet':
+            #             #pretrained_dict[wieghts_key] = weights
+            #         #else:
+            #             pretrained_dict['module.tempnet_d'+wieghts_key.split('module')[1]] = weights
 
-    best_iou = -100.0
-    i = start_iter
-    print(i)
+            # elif model_key == "temp_rgb":
+            #     for wieghts_key,weights in pretrained_dict_temp.items():
+            #         if wieghts_key.split('.')[1]!='segnet':
+            #             #pretrained_dict[wieghts_key] = weights
+            #         #else:
+            #             pretrained_dict['module.tempnet_rgb'+wieghts_key.split('module')[1]] = weights
+            # else:
+            # pretrained_dict = pretrained_dict_temp
+            # 1. filter out unnecessary keys
+            pretrained_dict = {k: v.resize_(model_dict[k].shape) for k, v in pretrained_dict.items() if (
+                    k in model_dict)}  # and ((model!="fuse") or (model=="fuse" and not start_layer in k))}
+            print("Model {} parameters,Loaded {} parameters".format(len(model_dict),len(pretrained_dict)))
+            #import ipdb;ipdb.set_trace()
+            model_dict.update(pretrained_dict)
+            models[model].load_state_dict(pretrained_dict, strict=False)
+            logger.info("Loaded checkpoint '{}' (iter {})".format(model_pkl, checkpoint["epoch"]))
+            print("Loaded checkpoint '{}' (iter {})".format(model_pkl, checkpoint["epoch"]))
+        else:
+            logger.info("No checkpoint found at '{}'".format(model_pkl))
+            print("No checkpoint found at '{}'".format(model_pkl))
+
 
     [models[m].eval() for m in models.keys()]
-
-    #################################################################################
-    # Recalibration
-    #################################################################################
-    if str(cfg["recalibrator"]) != "None":
-        print("=" * 10, "RECALIBRATING", "=" * 10)
-
-        for m in cfg["models"].keys():
-
-            bs = cfg['training']['batch_size']
-            output_all = torch.zeros(
-                (len(loaders['recal']) * bs, n_classes, cfg['data']['img_rows'], cfg['data']['img_cols']))
-            labels_all = torch.zeros(
-                (len(loaders['recal']) * bs, cfg['data']['img_rows'], cfg['data']['img_cols']), dtype=torch.long)
-
-            with torch.no_grad():
-                for i_recal, (images_list, labels_list, aux_list) in tqdm(enumerate(loaders['recal'])):
-                    inputs, labels = parseEightCameras(images_list, labels_list, aux_list, device)
-
-                    # Read batch from only one camera
-                    images_recal = inputs[m][:bs, :, :, :]
-                    labels_recal = labels[:bs, :, :]
-
-                    # Run Models
-                    mean, variance = models[m].module.forwardMCDO(images_recal)
-
-                    # concat results
-                    output_all[bs * i_recal:bs * (i_recal + 1), :, :, :] = torch.nn.Softmax(dim=1)(mean)
-                    labels_all[bs * i_recal:bs * (i_recal + 1), :, :] = labels_recal
-
-            # fit calibration models
-            for c in range(n_classes):
-                models[m].module.calibrationPerClass[c].fit(output_all, labels_all)
-            models[m].module.showCalibration(output_all, labels_all, logdir, m, i)
-
     #################################################################################
     # Validation
     #################################################################################
@@ -197,15 +153,16 @@ def validate(cfg, writer, logger, logdir):
 
     with torch.no_grad():
         for k, valloader in loaders['val'].items():
-            temp_dict_per_loader = {}
-            entropy_dict_per_loader = {}
-            MI_dict_per_loader = {}
-            for m in cfg["models"].keys():
-                temp_dict_per_loader[m] = []
-                entropy_dict_per_loader[m] = []
-                MI_dict_per_loader[m]=[]
+            if cfg["save_stats"]:
+                temp_dict_per_loader = {}
+                entropy_dict_per_loader = {}
+                MI_dict_per_loader = {}
+                for m in cfg["models"].keys():
+                    temp_dict_per_loader[m] = []
+                    entropy_dict_per_loader[m] = []
+                    MI_dict_per_loader[m]=[]
             for i_val, (input_list, labels_list) in tqdm(enumerate(valloader)):
-
+                #import ipdb;ipdb.set_trace()
                 inputs, labels = parseEightCameras(input_list['rgb'], labels_list, input_list['d'], device)
                 inputs_display, _ = parseEightCameras(input_list['rgb_display'], labels_list, input_list['d_display'],
                                                       device)
@@ -220,90 +177,71 @@ def validate(cfg, writer, logger, logdir):
 
                 # Run Models
                 mean = {}
-                variance = {}
                 entropy = {}
                 mutual_info = {}
                 val_loss = {}
-                temp_map = {}
                 entropy_ave = {}
                 MI_ave = {}
                 temp_ave = {}
-
+                DR = {}
+                # Inference
                 for m in cfg["models"].keys():
-
-                    if cfg['swa']:
-                        mean[m] = swag_models[m](images_val[m])
-                        variance[m] = torch.zeros(mean[m].shape)
-                        entropy[m] = torch.zeros(labels_val.shape)
-                        mutual_info[m] = torch.zeros(labels_val.shape)
-                    elif hasattr(models[m].module, 'forwardMCDO'):
-                        mean[m], variance[m], entropy[m], mutual_info[m] = models[m].module.forwardMCDO(images_val[m])
-                    elif cfg["models"][m]["arch"] == "tempnet":
-                        mean[m], variance[m], entropy[m], mutual_info[m], temp_map[m],temp_ave[m],entropy_ave[m],MI_ave[m] = models[m](images_val[m])
+                    mean[m], entropy[m], mutual_info[m] = models[m](images_val[m])
+                    if cfg["models"][m]["arch"] == "DeepLab" or "Segnet":
+                        DR[m] = scale_logits(entropy[m],mutual_info[m],modality = m,mode=cfg['scaling_metrics'])
+                        mean[m] = mean[m] * DR[m]
                     else:
-                        mean[m] = models[m](images_val[m])
-                        variance[m] = torch.zeros(mean[m].shape)
-                        entropy[m] = torch.zeros(labels_val.shape)
-                        mutual_info[m] = torch.zeros(labels_val.shape)
+                        if 'rgb' not in DR:
+                            DR['rgb'] = 1
+                        if 'd' not in DR:
+                            DR['d'] = 1
+                        mean[m] = mean["rgbd"]*torch.min(DR['rgb'],DR['d'])
+                   
+                    entropy_ave[m] = entropy[m].mean((1,2))
+                    MI_ave[m] = mutual_info[m].mean((1,2))
 
                 # Fusion Type
-                if cfg["fusion"] == "None":
-                    outputs = torch.nn.Softmax(dim=1)(mean[list(cfg["models"].keys())[0]])
-                elif cfg["fusion"] == "SoftmaxMultiply":
-                    outputs = torch.nn.Softmax(dim=1)(mean["rgb"]) * torch.nn.Softmax(dim=1)(mean["d"])
-
-                elif cfg["fusion"] == "SoftmaxAverage":
-                    outputs = torch.nn.Softmax(dim=1)(mean["rgb"]) + torch.nn.Softmax(dim=1)(mean["d"])
-                elif cfg["fusion"] == "WeightedVariance":
-                    rgb_var = 1 / (torch.mean(variance["rgb"], 1) + 1e-5)
-                    d_var = 1 / (torch.mean(variance["d"], 1) + 1e-5)
-
-                    rgb = torch.nn.Softmax(dim=1)(mean["rgb"])
-                    d = torch.nn.Softmax(dim=1)(mean["d"])
-                    for n in range(n_classes):
-                        rgb[:, n, :, :] = rgb[:, n, :, :] * rgb_var
-                        d[:, n, :, :] = d[:, n, :, :] * d_var
-                    outputs = rgb + d
-                elif cfg["fusion"] == "Noisy-Or":
-                    outputs = 1 - (1 - torch.nn.Softmax(dim=1)(mean["rgb"])) * (1 - torch.nn.Softmax(dim=1)(mean["d"])) #[batch,11,512,512,1]
-                else:
-                    print("Fusion Type Not Supported")
+                outputs = fusion(cfg["fusion"],mean)
 
                 # aggregate training stats
-                for m in cfg["models"].keys():
-                    entropy_dict_per_loader[m].extend(entropy_ave[m].cpu().numpy().tolist())
-                    MI_dict_per_loader[m].extend(MI_ave[m].cpu().numpy().tolist())
-                    if cfg["models"][m]["arch"] == "tempnet":
-                        temp_dict_per_loader[m].extend(temp_ave[m].cpu().numpy().tolist())
-                # plot ground truth vs mean/variance of outputs
+                if cfg["save_stats"]:
+                    for m in cfg["models"].keys():
+                        entropy_dict_per_loader[m].extend(entropy_ave[m].cpu().numpy().tolist())
+                        MI_dict_per_loader[m].extend(MI_ave[m].cpu().numpy().tolist())
+                        # if cfg["models"][m]["arch"] == "tempnet":
+                            # temp_dict_per_loader[m].extend(temp_ave[m].cpu().numpy().tolist())
+                
+                # plot ground truth vs mean/variance of outputs            
                 outputs = outputs/outputs.sum(1).unsqueeze(1)
                 prob, pred = outputs.max(1)
+
                 gt = labels_val
                 e, _ = mutualinfo_entropy(outputs.unsqueeze(-1))
-                # import ipdb;ipdb.set_trace()
                 if i_val % cfg["training"]["png_frames"] == 0:
                     plotPrediction(logdir, cfg, n_classes, i, i_val, k, inputs_display, pred, gt)
-                    labels = ['mutual info', 'probability']
+                    labels = ['entropy', 'probability']
                     values = [e, prob]
                     plotEverything(logdir, i, i_val, k + "/fused", values, labels)
 
                     for m in cfg["models"].keys():
                         prob,pred_m = torch.nn.Softmax(dim=1)(mean[m]).max(1)
-                        if cfg["models"][m]["arch"] == "tempnet":
-                            labels = ['mutual info', 'entropy', 'probability','temperature']
-                            values = [mutual_info[m], entropy[m], prob, temp_map[m]]
-                        else:
-                            labels = ['mutual info', 'entropy', 'probability']
-                            values = [mutual_info[m], entropy[m], prob]
+                        # if cfg["models"][m]["arch"] == "tempnet":
+                        #     labels = ['mutual info', 'entropy', 'probability','temperature']
+                        #     values = [mutual_info[m], entropy[m], prob, temp_map[m]]
+                        # else:
+                        labels = ['mutual info', 'entropy', 'probability']
+                        values = [mutual_info[m], entropy[m], prob]
                         plotPrediction(logdir, cfg, n_classes, i, i_val, k + "/" + m, inputs_display, pred_m, gt)
                         plotEverything(logdir, i, i_val, k + "/" + m, values, labels)
 
                 running_metrics_val[k].update(gt.data.cpu().numpy(), pred.cpu().numpy())
-
-            if cfg["models"][m]["arch"] == "tempnet":
-                save_stats(logdir,temp_dict_per_loader,k,cfg,"_temp_")
-            save_stats(logdir,entropy_dict_per_loader,k,cfg,"_entropy_")
-            save_stats(logdir,MI_dict_per_loader,k,cfg,"_MutualInfo_")
+                #import ipdb;ipdb.set_trace()
+               
+            if cfg["save_stats"]:
+                # if cfg["models"][m]["arch"] == "tempnet":
+                    # save_stats(logdir,temp_dict_per_loader,k,cfg,"_temp_")
+                save_stats(logdir,entropy_dict_per_loader,k,cfg,"_entropy_")
+                save_stats(logdir,MI_dict_per_loader,k,cfg,"_MutualInfo_")
 
         for m in cfg["models"].keys():
             for k in loaders['val'].keys():

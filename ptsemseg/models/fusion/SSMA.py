@@ -30,7 +30,7 @@ class _tempnet(nn.Module):
         return  tup1.squeeze(1),temp.view(-1)
 
 class SSMA(nn.Module):
-    def __init__(self, backbone='segnet', output_stride=16, n_classes=11,scaling_module='None',
+    def __init__(self, backbone='segnet', output_stride=16, n_classes=11,
                  sync_bn=True, freeze_bn=False):
         super(SSMA, self).__init__()
         if backbone == 'segnet':
@@ -51,11 +51,10 @@ class SSMA(nn.Module):
         self.modality = 'rgbd'
         self.decoder = _Decoder(n_classes, in_channels=512)
         self.softmaxMCDO = torch.nn.Softmax(dim=1)
-        self.scale_logits = self._get_scale_module(scaling_module)
         # self.tempnet_rgb = _tempnet()
         # self.tempnet_d = _tempnet()
 
-    def forward(self, input,DR=0):
+    def forward(self, input):
         # print(input.shape)
         # import pdb;pdb.set_trace()
         A, A_llf1, A_llf2, A_aspp = self.expert_A.forward_SSMA(input[:, :3, :, :])
@@ -82,22 +81,8 @@ class SSMA(nn.Module):
         #else:
           #DR = 0
 
-        return x, entropy, mutual_info,entropy.mean((1,2)),mutual_info.mean((1,2)),0
+        return x, entropy, mutual_info
 
-
-    def _get_scale_module(self, name, n_classes=11, bias_init=None):
-
-        name = str(name)
-
-        return {
-            "temperature": TemperatureScaling(n_classes, bias_init),
-            "uncertainty": UncertaintyScaling(n_classes, bias_init),
-            "LocalUncertaintyScaling": LocalUncertaintyScaling(n_classes, bias_init),
-            "GlobalUncertainty": GlobalUncertaintyScaling(n_classes, bias_init),
-            "GlobalLocalUncertainty": GlobalLocalUncertaintyScaling(n_classes, bias_init),
-            "GlobalScaling" : GlobalScaling(modality=self.modality),
-            "None": None
-        }[name]
 
 
     def freeze_bn(self):

@@ -1,19 +1,11 @@
 id: rgbd_SSMA_synthia_uno #rgbd_NoisyOr_SSMA_RGB_D #rgbd_NoisyOr_T000+T050_pretrain_1_val #rgbd_NoisyOr_T000+T050_val # rgbd_Compnet_T000+T050_val
-model:
-    arch: tempnet
 models:
     rgb:
         arch: DeepLab
         resume: /home/wcheung8/pytorch-semseg/runs/synthia-seq/rgb/best_model/rgb_DeepLab_synthia_best_model.pkl #/home/jtian73/fusion_backup/runs/configs/experiments/icra_configs/rgbd_TempNet_T000+T050_pretrain_1/rgb_tempnet_airsim_100000_model.pkl
-        resume_temp: None
-        resume_temp_d: None #/home/jtian73/fusion_backup/runs/configs/experiments/icra_configs/rgbd_TempNet_T000+T050_pretrain_1/d_tempnet_airsim_100000_model.pkl
-        resume_temp_rgb: None 
     d:
         arch: DeepLab
         resume: /home/wcheung8/pytorch-semseg/runs/synthia-seq/d/best_model/d_DeepLab_synthia_best_model.pkl #/home/jtian73/fusion_backup/runs/configs/experiments/icra_configs/rgbd_TempNet_T000+T050_pretrain_1/d_tempnet_airsim_100000_model.pkl
-        resume_temp: None
-        resume_temp_d: None #/home/jtian73/fusion_backup/runs/configs/experiments/icra_configs/rgbd_TempNet_T000+T050_pretrain_1/d_tempnet_airsim_100000_model.pkl
-        resume_temp_rgb: None 
     # rgbd:
     #     arch: SSMA
     #     resume: /home/wcheung8/pytorch-semseg/runs/synthia-seq/segnet/SSMA/best_model/rgbd_SSMA_synthia_best_model.pkl #/home/jtian73/fusion_backup/runs/configs/experiments/fusion/SSMA/SSMA_T000+T050/best_model/rgbd_SSMA_airsim_best_model.pkl
@@ -22,18 +14,9 @@ models:
     #     resume_temp_rgb: None #/home/jtian73/fusion_backup/runs/configs/experiments/icra_configs/rgbd_TempNet_T000+T050_pretrain_1/rgb_tempnet_airsim_100000_model.pkl
 
 fusion: SoftmaxAverage #Noisy-Or   #Stacked-Noisy-Or  #Noisy-Or # #{None,SoftmaxMultiply}
-temperatureScaling: False
-
-pretrained_rgb: None #/home/wcheung8/pytorch-semseg/runs/train/rgb_segnet_T000+T050/1/best_model/rgb_segnet_mcdo_airsim_best_model.pkl  #/home/jtian73/pytorch-semseg/runs/configs/rgb_segnet_T100+T050/rgb_segnet_mcdo_airsim_500000_model.pkl #/home/wcheung8/pytorch-semseg/models/Segnet/rgb_Segnet/rgb_segnet_mcdo_airsim_T000+T050.pkl
-pretrained_d: None #/home/wcheung8/pytorch-semseg/runs/train/d_segnet_T000+T050/1/best_model/d_segnet_mcdo_airsim_best_model.pkl #/home/jtian73/pytorch-semseg/runs/configs/d_segnet_T100+T050/d_segnet_mcdo_airsim_500000_model.pkl ##/home/wcheung8/pytorch-semseg/models/Segnet/d_Segnet/d_segnet_mcdo_airsim_T000+T050.pkl
-fusion_module: None
 scaling_module: None #GlobalScaling #GlobalScaling
 scaling_metrics: Mixed #Mixed #AveTemp  #SoftEn #MI 
-
-# training
-freeze_seg: True
-freeze_temp: False
-
+save_stats: False
 data:
     dataset: synthia
     train_split: train
@@ -81,3 +64,20 @@ training:
         size_average: True
     lr_schedule:
     resume: None
+
+training_stats: 
+    MI_MEAN_rgb: 0.01635716
+    MI_STD_rgb: 0.00688986
+    PreEn_MEAN_rgb: 0.16158119
+    PreEn_STD_rgb: 0.03454985
+    SoftEn_MEAN_rgb: 0.10871122
+
+    MI_MEAN_d: 0.02271291
+    MI_STD_d: 0.01019019
+    PreEn_MEAN_d: 0.20687151
+    PreEn_STD_d: 0.04621102
+    SoftEn_MEAN_d: 0.13952574
+    SoftEn_STD_d: 0.03168533
+
+    SoftEn_MEAN_rgbd: 0.05217332
+    SoftEn_STD_rgbd: 0.01356846

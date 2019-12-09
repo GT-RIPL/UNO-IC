@@ -125,7 +125,8 @@ class synthiaLoader(data.Dataset):
         img_size=(512, 512),
         scale_quantity=1.0,      
         img_norm=True,
-        version='synthia-seq'   
+        version='synthia-seq',   
+        augmentations=None,
     ):
         """__init__
 

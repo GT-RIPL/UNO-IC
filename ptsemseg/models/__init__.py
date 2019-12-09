@@ -112,7 +112,7 @@ def get_model(name,
     elif name == "robust_SSMA":
         model = model(backbone='segnet', output_stride=16, n_classes=n_classes, sync_bn=True, freeze_bn=False)
     elif name == "DeepLab":
-        model = model(backbone='segnet', output_stride=16, n_classes=n_classes, sync_bn=True, freeze_bn=False)
+        model = model(backbone='resnet', output_stride=16, n_classes=n_classes, sync_bn=True, freeze_bn=False,modality = modality)
     else:
         model = model(n_classes=n_classes)
 

@@ -5,10 +5,12 @@ from .sync_batchnorm.batchnorm import SynchronizedBatchNorm2d
 from .aspp import build_aspp
 from .decoder import build_decoder
 from .backbone import build_backbone
+from .fusion import *
+from ptsemseg.utils import mutualinfo_entropy, plotEverything, plotPrediction
 
 class DeepLab(nn.Module):
-    def __init__(self, backbone='resnet', output_stride=16, num_classes=21,
-                 sync_bn=True, freeze_bn=False):
+    def __init__(self, backbone='resnet', output_stride=16, n_classes=21,
+                 sync_bn=True, freeze_bn=False,modality = 'rgb'):
         super(DeepLab, self).__init__()
         if backbone == 'drn':
             output_stride = 8
@@ -20,19 +22,45 @@ class DeepLab(nn.Module):
 
         self.backbone = build_backbone(backbone, output_stride, BatchNorm)
         self.aspp = build_aspp(backbone, output_stride, BatchNorm)
-        self.decoder = build_decoder(num_classes, backbone, BatchNorm)
+        self.decoder = build_decoder(n_classes, backbone, BatchNorm)
+        self.modality = modality
+        self.scale_logits = self._get_scale_module("GlobalScaling")
 
         if freeze_bn:
             self.freeze_bn()
 
-    def forward(self, input):
+    # def forward(self, input):
+    #     x, low_level_feat = self.backbone(input)
+    #     x = self.aspp(x)
+    #     x = self.decoder(x, low_level_feat)
+    #     x = F.interpolate(x, size=input.size()[2:], mode='bilinear', align_corners=True)
+
+    #     return x
+        
+    def forward(self, input,scaling_metrics="SoftEn"):
         x, low_level_feat = self.backbone(input)
         x = self.aspp(x)
         x = self.decoder(x, low_level_feat)
         x = F.interpolate(x, size=input.size()[2:], mode='bilinear', align_corners=True)
+        x = x.unsqueeze(-1) #[batch,classes,760,1280,1]
 
-        return x
-        
+        mean = x.mean(-1) #[batch,classes,760,1280]
+    
+        prob = torch.nn.Softmax(dim=1)(x) #[batch,classes,760,1280]
+        prob = prob.masked_fill(prob < 1e-9, 1e-9)
+        entropy,mutual_info = mutualinfo_entropy(prob)#(batch,760,1280)
+        # import ipdb;ipdb.set_trace()
+        if self.scale_logits != None:
+          DR = self.scale_logits(entropy,mutual_info, temp1=torch.zeros_like(mutual_info),mode=scaling_metrics) #(batch,1,1,1)
+          #mean_comp = mean * torch.min(DR,comp_map.unsqueeze(1))
+          mean = mean * DR
+          #import ipdb;ipdb.set_trace() 
+        else:
+          DR = torch.ones_like(mean)
+        return mean, entropy, mutual_info,entropy.mean((1,2)),mutual_info.mean((1,2)),DR
+
+
+
     def forward_SSMA(self, input):
         x, low_level_feat = self.backbone(input)
         aspp_out = self.aspp(x)
@@ -67,6 +95,20 @@ class DeepLab(nn.Module):
                     for p in m[1].parameters():
                         if p.requires_grad:
                             yield p
+
+    def _get_scale_module(self, name, n_classes=11, bias_init=None):
+
+        name = str(name)
+
+        return {
+            "temperature": TemperatureScaling(n_classes, bias_init),
+            "uncertainty": UncertaintyScaling(n_classes, bias_init),
+            "LocalUncertaintyScaling": LocalUncertaintyScaling(n_classes, bias_init),
+            "GlobalUncertainty": GlobalUncertaintyScaling(n_classes, bias_init),
+            "GlobalLocalUncertainty": GlobalLocalUncertaintyScaling(n_classes, bias_init),
+            "GlobalScaling" : GlobalScaling(modality=self.modality),
+            "None": None
+        }[name]
 
 
 if __name__ == "__main__":

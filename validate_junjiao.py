@@ -132,7 +132,7 @@ def validate(cfg, writer, logger, logdir):
 
                 pretrained_dict_temp = torch.load(model_pkl)['model_state']
                 pretrained_dict = {}
-                # import ipdb;ipdb.set_trace()
+
                 if model_key == "temp":
                     for wieghts_key,weights in pretrained_dict_temp.items():
                         if wieghts_key.split('.')[1]=='segnet':
@@ -241,6 +241,8 @@ def validate(cfg, writer, logger, logdir):
                         else:
                             m_temp = 'rgb'
                         mean[m], entropy[m], mutual_info[m], temp_map[m],temp_ave[m],entropy_ave[m],MI_ave[m],DR[m] = models[m](images_val[m],images_val[m_temp],scaling_metrics=cfg['scaling_metrics'])
+                    elif cfg["models"][m]["arch"] == "DeepLab":
+                        mean[m], entropy[m], mutual_info[m],entropy_ave[m],MI_ave[m],DR[m] = models[m](images_val[m],scaling_metrics=cfg['scaling_metrics'])
                     elif cfg["models"][m]["arch"] == "SSMA":    
                         #mean[m], entropy[m], mutual_info[m],entropy_ave[m],MI_ave[m],DR[m] = models[m](images_val[m],[DR['rgb'],DR['d']])
                         mean[m], entropy[m], mutual_info[m],entropy_ave[m],MI_ave[m],DR[m] = models[m](images_val[m],0)
@@ -341,10 +343,10 @@ def validate(cfg, writer, logger, logdir):
                 #import ipdb;ipdb.set_trace()
                
 
-            # if cfg["models"][m]["arch"] == "tempnet":
-            #     save_stats(logdir,temp_dict_per_loader,k,cfg,"_temp_")
-            # save_stats(logdir,entropy_dict_per_loader,k,cfg,"_entropy_")
-            # save_stats(logdir,MI_dict_per_loader,k,cfg,"_MutualInfo_")
+            if cfg["models"][m]["arch"] == "tempnet":
+                save_stats(logdir,temp_dict_per_loader,k,cfg,"_temp_")
+            save_stats(logdir,entropy_dict_per_loader,k,cfg,"_entropy_")
+            save_stats(logdir,MI_dict_per_loader,k,cfg,"_MutualInfo_")
 
         for m in cfg["models"].keys():
             for k in loaders['val'].keys():

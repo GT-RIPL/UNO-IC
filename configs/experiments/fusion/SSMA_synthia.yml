@@ -1,0 +1,69 @@
+seed: 1337
+id: SSMA_T000+T050
+models:
+    rgbd:
+        # model settings
+        arch: SSMA
+        resume: /home/jtian73/fusion_backup/runs/configs/experiments/fusion/SSMA/SSMA_T000+T050/best_model/rgbd_SSMA_airsim_best_model.pkl
+
+# recalibration
+recalibration: None #{None, afterMCDO, beforeMCDO}
+recalibrator: None #{HistogramLinear, HistogramFlat, Polynomial_X, Isotonic, Platt}
+bins: 20
+temperatureScaling: False
+
+# training
+freeze_seg: False
+freeze_temp: False
+
+# learned fusion specific settings
+pretrained_rgb: None
+pretrained_d: None
+fusion_module: None
+
+# basic fusion method
+fusion: None #{None, SoftmaxMultiply, SoftmaxAverage, WeightedVariance, Noisy-Or}
+
+data:
+    dataset: airsim
+    train_split: train
+    train_subsplit: ['async_fog_000_clear',
+                     'async_fog_050_clear',
+                     # 'async_fog_100_clear',
+                 ]
+    train_reduction: 1.0
+    # recal_split: recal
+    # recal_subsplit: ['async_fog_000_clear',
+    #                  'async_fog_050_clear',]
+    # recal_reduction: 0.5
+    val_split: val
+    val_subsplit: [
+                   'async_fog_000_clear',
+                   'async_fog_050_clear',
+                   'async_fog_100_clear',
+                   # "async_fog_100_clear__{'channel':'rgb','type':'blackoutNoise','value':'20'}",
+                   # "async_fog_100_clear__{'channel':'d','type':'blackoutNoise','value':'20'}",
+                  ]
+    val_reduction: 0.5
+    img_rows: 512
+    img_cols: 512
+    path: /home/jtian73/datasets/airsim_03-30-2019/airsim_data_async #../../ros/data/airsim_03-30-2019/airsim_data_async
+    noisy_type: None
+
+
+training:
+    weight: [32.93554, 575.20610, 4.87791, 1.0, 21.79751, 204.85757, 4.60879, 8.74993, 81.57046412795533, 41.01965, 7.37522]
+    train_iters: 500000
+    batch_size: 2
+    val_interval: 50000 #5000
+    n_workers: 4
+    print_interval: 50
+    png_frames: 50 #5000
+    optimizer:
+        name: 'adam'
+        lr: 1.0e-5
+    loss:
+        name: 'cross_entropy'
+        size_average: True
+    lr_schedule:
+    resume_iteration: None

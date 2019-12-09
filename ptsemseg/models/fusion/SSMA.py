@@ -52,8 +52,8 @@ class SSMA(nn.Module):
         self.decoder = _Decoder(n_classes, in_channels=512)
         self.softmaxMCDO = torch.nn.Softmax(dim=1)
         self.scale_logits = self._get_scale_module(scaling_module)
-        self.tempnet_rgb = _tempnet()
-        self.tempnet_d = _tempnet()
+        # self.tempnet_rgb = _tempnet()
+        # self.tempnet_d = _tempnet()
 
     def forward(self, input,DR=0):
         # print(input.shape)

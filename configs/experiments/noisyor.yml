@@ -1,0 +1,86 @@
+seed: 1
+id: segnet_synthia
+models:
+    rgb:
+        # model settings
+        arch: DeepLab
+        resume: /home/wcheung8/pytorch-semseg/runs/synthia-seq/rgb/best_model/rgb_DeepLab_synthia_best_model.pkl
+
+# recalibration
+recalibration: None #{None, afterMCDO, beforeMCDO}
+recalibrator: None #{HistogramLinear, HistogramFlat, Polynomial_X, Isotonic, Platt}
+bins: 20
+temperatureScaling: False
+
+# training
+freeze_seg: False
+freeze_temp: False
+
+# learned fusion specific settings
+pretrained_rgb: None
+pretrained_d: None
+fusion_module: None
+
+# basic fusion method
+fusion: None #{None, SoftmaxMultiply, SoftmaxAverage, WeightedVariance, Noisy-Or}
+
+data:
+    dataset: synthia
+    train_split: train
+    train_subsplit: [
+                    'SYNTHIA-SEQS-05-FALL',
+                    'SYNTHIA-SEQS-05-FOG',
+                    'SYNTHIA-SEQS-05-RAIN',
+                    'SYNTHIA-SEQS-05-RAINNIGHT',
+                    'SYNTHIA-SEQS-05-SOFTRAIN',
+                    'SYNTHIA-SEQS-05-SPRING',
+                    'SYNTHIA-SEQS-05-WINTER',
+                    'SYNTHIA-SEQS-05-WINTERNIGHT',
+                    ]
+    train_reduction: 1.0
+    recal_split: recal
+    recal_subsplit: [
+                    'SYNTHIA-SEQS-05-FALL',
+                    'SYNTHIA-SEQS-05-FOG',
+                    'SYNTHIA-SEQS-05-RAIN',
+                    'SYNTHIA-SEQS-05-RAINNIGHT',
+                    'SYNTHIA-SEQS-05-SOFTRAIN',
+                    'SYNTHIA-SEQS-05-SPRING',
+                    'SYNTHIA-SEQS-05-WINTER',
+                    'SYNTHIA-SEQS-05-WINTERNIGHT',
+                    ]
+    recal_reduction: 1.0
+    val_split: val
+    val_subsplit: [
+                    'SYNTHIA-SEQS-05-FALL',
+                    'SYNTHIA-SEQS-05-FOG',
+                    'SYNTHIA-SEQS-05-RAIN',
+                    'SYNTHIA-SEQS-05-RAINNIGHT',
+                    'SYNTHIA-SEQS-05-SOFTRAIN',
+                    'SYNTHIA-SEQS-05-SPRING',
+                    'SYNTHIA-SEQS-05-WINTER',
+                    'SYNTHIA-SEQS-05-WINTERNIGHT',
+                  ]
+    val_reduction: 0.1
+    img_rows: 1280
+    img_cols: 760
+    path: /home/datasets/synthia-seq #../../ros/data/airsim_03-30-2019/airsim_data_async
+    noisy_type: None
+
+
+training:
+    train_iters: 500000
+    batch_size: 2
+    val_interval: 50000 #5000
+    n_workers: 8
+    print_interval: 50
+    png_frames: 50 #5000
+    optimizer:
+        name: 'adam'
+        lr: 1.0e-5
+    loss:
+        name: 'cross_entropy'
+        size_average: True
+    lr_schedule:
+    resume_iteration: None
+use_amp: True		

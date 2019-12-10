@@ -1,11 +1,11 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from .sync_batchnorm.batchnorm import SynchronizedBatchNorm2d
-from .aspp import build_aspp
-from .decoder import build_decoder
-from .backbone import build_backbone
-from .fusion import *
+from .fusion.sync_batchnorm.batchnorm import SynchronizedBatchNorm2d
+from .fusion.aspp import build_aspp
+from .fusion.decoder import build_decoder
+from .fusion.backbone import build_backbone
+from .fusion.fusion import *
 from ptsemseg.utils import mutualinfo_entropy, plotEverything, plotPrediction
 
 class DeepLab(nn.Module):
@@ -23,7 +23,6 @@ class DeepLab(nn.Module):
         self.backbone = build_backbone(backbone, output_stride, BatchNorm)
         self.aspp = build_aspp(backbone, output_stride, BatchNorm)
         self.decoder = build_decoder(n_classes, backbone, BatchNorm)
-        self.scale_logits = self._get_scale_module(scaling_module)
 
         if freeze_bn:
             self.freeze_bn()

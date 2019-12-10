@@ -286,37 +286,34 @@ class UncertaintyScaling(nn.Module):
 
 
 class GlobalScaling(nn.Module):
-    def __init__(self,modality='rgb'):
-        super(GlobalScaling,train_stats, self).__init__()
-        self.modality = modality
-            self.MI_MEAN_rgb = train_stats['MI_MEAN_rgb']# 0.01635716 #0.010646423
-            self.MI_STD_rgb = train_stats['MI_STD_rgb']#0.00688986 #0.004948631
-            self.PreEn_MEAN_rgb = train_stats['PreEn_MEAN_rgb']#0.16158119 #0.098073044 
-            self.PreEn_STD_rgb = train_stats['PreEn_STD_rgb']#0.03454985 #0.031052864
-            self.SoftEn_MEAN_rgb = train_stats['SoftEn_MEAN_rgb']#0.10871122 #0.072535
-            self.SoftEn_STD_rgb = train_stats['SoftEn_STD_rgb']#0.02284632 #0.024109
-            # self.Temp_MEAN_rgb = 0.80496331 #0.789093009
-            # self.Temp_STD_rgb = 0.02468624 #0.016560384
-            self.MI_MEAN_d = train_stats['MI_MEAN_d']#0.02271291 #0.015116896
-            self.MI_STD_d = train_stats['MI_STD_d']#0.01019019 #0.00831911
-            self.PreEn_MEAN_d = train_stats['PreEn_MEAN_d']#0.20687151 #0.119714723 
-            self.PreEn_STD_d = train_stats['PreEn_STD_d']#0.04621102 #0.034841593
-            self.SoftEn_MEAN_d = train_stats['SoftEn_MEAN_d']# 0.13952574 #0.085331
-            self.SoftEn_STD_d = train_stats['SoftEn_STD_d']#0.03168533 #0.022258
-            # self.Temp_MEAN_d =  0.84158579 #0.80703
-            # self.Temp_STD_d = 0.01058592 #0.035887
-            self.SoftEn_MEAN_rgbd = train_stats['SoftEn_MEAN_rgbd']#0.05217332 #0.085331
-            self.SoftEn_STD_rgbd = train_stats['SoftEn_STD_rgbd']#0.01356846 #0.022258
-            # self.Temp_MEAN_rgb_rgbd = train_stats['Temp_MEAN_rgb_rgbd']#0.80496331 #0.789093009
-            # self.Temp_STD_rgb_rgbd = train_stats['Temp_STD_rgb_rgbd']#0.02468624 #0.016560384
-            # self.Temp_MEAN_rgbd =  0.84158579 #0.80703
-            # self.Temp_STD_rgbd = 0.01058592 #0.035887
-        else:
-            print('Invalid modality')
+    def __init__(self,train_stats):
+        super(GlobalScaling, self).__init__()
+        self.MI_MEAN_rgb = train_stats['MI_MEAN_rgb']# 0.01635716 #0.010646423
+        self.MI_STD_rgb = train_stats['MI_STD_rgb']#0.00688986 #0.004948631
+        self.PreEn_MEAN_rgb = train_stats['PreEn_MEAN_rgb']#0.16158119 #0.098073044 
+        self.PreEn_STD_rgb = train_stats['PreEn_STD_rgb']#0.03454985 #0.031052864
+        self.SoftEn_MEAN_rgb = train_stats['SoftEn_MEAN_rgb']#0.10871122 #0.072535
+        self.SoftEn_STD_rgb = train_stats['SoftEn_STD_rgb']#0.02284632 #0.024109
+        # self.Temp_MEAN_rgb = 0.80496331 #0.789093009
+        # self.Temp_STD_rgb = 0.02468624 #0.016560384
+        self.MI_MEAN_d = train_stats['MI_MEAN_d']#0.02271291 #0.015116896
+        self.MI_STD_d = train_stats['MI_STD_d']#0.01019019 #0.00831911
+        self.PreEn_MEAN_d = train_stats['PreEn_MEAN_d']#0.20687151 #0.119714723 
+        self.PreEn_STD_d = train_stats['PreEn_STD_d']#0.04621102 #0.034841593
+        self.SoftEn_MEAN_d = train_stats['SoftEn_MEAN_d']# 0.13952574 #0.085331
+        self.SoftEn_STD_d = train_stats['SoftEn_STD_d']#0.03168533 #0.022258
+        # self.Temp_MEAN_d =  0.84158579 #0.80703
+        # self.Temp_STD_d = 0.01058592 #0.035887
+        self.SoftEn_MEAN_rgbd = train_stats['SoftEn_MEAN_rgbd']#0.05217332 #0.085331
+        self.SoftEn_STD_rgbd = train_stats['SoftEn_STD_rgbd']#0.01356846 #0.022258
+        # self.Temp_MEAN_rgb_rgbd = train_stats['Temp_MEAN_rgb_rgbd']#0.80496331 #0.789093009
+        # self.Temp_STD_rgb_rgbd = train_stats['Temp_STD_rgb_rgbd']#0.02468624 #0.016560384
+        # self.Temp_MEAN_rgbd =  0.84158579 #0.80703
+        # self.Temp_STD_rgbd = 0.01058592 #0.035887
         
     def forward(self, entropy, mutual_info, modality,mode='mixed'):
 
-         if modality == 'rgb': 
+        if modality == 'rgb': 
             MI_MEAN = self.MI_MEAN_rgb# 0.01635716 #0.010646423
             MI_STD = self.MI_STD_rgb#0.00688986 #0.004948631
 
@@ -334,29 +331,29 @@ class GlobalScaling(nn.Module):
             PreEn_MEAN = self.PreEn_MEAN_d#0.20687151 #0.119714723 
             PreEn_STD = self.PreEn_STD_d#0.04621102 #0.034841593
 
-            SoftEn_MEAN = self.SoftEn_MEAN# 0.13952574 #0.085331
-            SoftEn_STD = self.SoftEn_STD#0.03168533 #0.022258
+            SoftEn_MEAN = self.SoftEn_MEAN_d# 0.13952574 #0.085331
+            SoftEn_STD = self.SoftEn_STD_d#0.03168533 #0.022258
 
             # self.Temp_MEAN =  0.84158579 #0.80703
             # self.Temp_STD = 0.01058592 #0.035887
 
         elif modality == 'rgbd':
-            SoftEn_MEAN = self.SoftEn_MEAN#0.05217332 #0.085331
-            SoftEn_STD = self.SoftEn_STD#0.01356846 #0.022258
+            SoftEn_MEAN = self.SoftEn_MEAN_rgbd#0.05217332 #0.085331
+            SoftEn_STD = self.SoftEn_STD_rgbd#0.01356846 #0.022258
             # self.Temp_MEAN_rgb = self.Temp_MEAN_rgb#0.80496331 #0.789093009
             # self.Temp_STD_rgb = self.Temp_STD_rgb#0.02468624 #0.016560384
 
         if mode == "MI":
             STD_MEAN = torch.max(torch.zeros_like(mutual_info.mean((1,2))),mutual_info.mean((1,2)) - MI_MEAN - MI_STD)+MI_MEAN
-            DR = self.MI_MEAN/STD_MEAN.unsqueeze(-1).unsqueeze(-1).unsqueeze(-1)
+            DR = MI_MEAN/STD_MEAN.unsqueeze(-1).unsqueeze(-1).unsqueeze(-1)
 
         elif mode == 'PreEn':
             STD_MEAN = torch.max(torch.zeros_like(entropy.mean((1,2))),entropy.mean((1,2)) - PreEn_MEAN - PreEn_STD)+PreEn_MEAN
-            DR = self.PreEn_MEAN/STD_MEAN.unsqueeze(-1).unsqueeze(-1).unsqueeze(-1)
+            DR = PreEn_MEAN/STD_MEAN.unsqueeze(-1).unsqueeze(-1).unsqueeze(-1)
 
         elif mode == "SoftEn":
             STD_MEAN = torch.max(torch.zeros_like(entropy.mean((1,2))),entropy.mean((1,2)) - SoftEn_MEAN - SoftEn_STD)+SoftEn_MEAN
-            DR = self.SoftEn_MEAN/STD_MEAN.unsqueeze(-1).unsqueeze(-1).unsqueeze(-1)
+            DR = SoftEn_MEAN/STD_MEAN.unsqueeze(-1).unsqueeze(-1).unsqueeze(-1)
 
         elif mode == "AveTemp":
             STD_MEAN = torch.min(torch.zeros_like(temp1.mean((1,2))), temp1.mean((1,2))+ Temp_STD - Temp_MEAN ) + Temp_MEAN

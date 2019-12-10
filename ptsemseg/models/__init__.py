@@ -21,6 +21,7 @@ def get_model(name,
               dropoutP=0.5,
               full_mcdo=False,
               in_channels=3,
+              backbone='segnet',
               device="cpu"):
     model = _get_model_instance(name)
 
@@ -60,7 +61,7 @@ def get_model(name,
         model = model(n_classes, use_class=False)
 
     elif name == "SSMA":
-        model = model(backbone='segnet', output_stride=16, n_classes=n_classes, sync_bn=True, freeze_bn=False)
+        model = model(backbone=backbone, output_stride=16, n_classes=n_classes, sync_bn=True, freeze_bn=False)
     elif name == "shared_SSMA":
         model = model(backbone='segnet', output_stride=16, n_classes=n_classes, sync_bn=True, freeze_bn=False)
     elif name == "joint_SSMA":
@@ -91,7 +92,7 @@ def _get_model_instance(name):
             "robust_SSMA" : robust_SSMA,
             "DeepLab": DeepLab,
             "fusenet": FuseNet,
-            "tempnet": TempNet,
+            # "tempnet": TempNet,
         }[name]
     except:
         raise ("Model {} not available".format(name))

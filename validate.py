@@ -55,7 +55,7 @@ def validate(cfg, writer, logger, logdir):
     # Setup Meters
     val_loss_meter = {m: {env: averageMeter() for env in loaders['val'].keys()} for m in cfg["models"].keys()}
 
-    scale_logits = GlobalScaling(cfg['scaling_module'],cfg['training_stats'])
+    scale_logits = GlobalScaling(cfg['training_stats'])
 
     # set seeds for training
     models = {}
@@ -71,6 +71,7 @@ def validate(cfg, writer, logger, logdir):
                                   mcdo_passes=attr['mcdo_passes'],
                                   dropoutP=attr['dropoutP'],
                                   full_mcdo=attr['full_mcdo'],
+                                  backbone=attr['backbone'],
                                   device=device).to(device)
 
         models[model] = torch.nn.DataParallel(models[model], device_ids=range(torch.cuda.device_count()))
@@ -218,10 +219,10 @@ def validate(cfg, writer, logger, logdir):
                 gt = labels_val
                 e, _ = mutualinfo_entropy(outputs.unsqueeze(-1))
                 if i_val % cfg["training"]["png_frames"] == 0:
-                    plotPrediction(logdir, cfg, n_classes, i, i_val, k, inputs_display, pred, gt)
+                    plotPrediction(logdir, cfg, n_classes, 0, i_val, k, inputs_display, pred, gt)
                     labels = ['entropy', 'probability']
                     values = [e, prob]
-                    plotEverything(logdir, i, i_val, k + "/fused", values, labels)
+                    plotEverything(logdir, 0, i_val, k + "/fused", values, labels)
 
                     for m in cfg["models"].keys():
                         prob,pred_m = torch.nn.Softmax(dim=1)(mean[m]).max(1)
@@ -231,8 +232,8 @@ def validate(cfg, writer, logger, logdir):
                         # else:
                         labels = ['mutual info', 'entropy', 'probability']
                         values = [mutual_info[m], entropy[m], prob]
-                        plotPrediction(logdir, cfg, n_classes, i, i_val, k + "/" + m, inputs_display, pred_m, gt)
-                        plotEverything(logdir, i, i_val, k + "/" + m, values, labels)
+                        plotPrediction(logdir, cfg, n_classes, 0, i_val, k + "/" + m, inputs_display, pred_m, gt)
+                        plotEverything(logdir, 0, i_val, k + "/" + m, values, labels)
 
                 running_metrics_val[k].update(gt.data.cpu().numpy(), pred.cpu().numpy())
                 #import ipdb;ipdb.set_trace()
@@ -245,18 +246,18 @@ def validate(cfg, writer, logger, logdir):
 
         for m in cfg["models"].keys():
             for k in loaders['val'].keys():
-                writer.add_scalar('loss/val_loss/{}/{}'.format(m, k), val_loss_meter[m][k].avg, i + 1)
-                logger.info("%s %s Iter %d Loss: %.4f" % (m, k, i + 1, val_loss_meter[m][k].avg))
+                writer.add_scalar('loss/val_loss/{}/{}'.format(m, k), val_loss_meter[m][k].avg, 1)
+                logger.info("%s %s Iter %d Loss: %.4f" % (m, k, 1, val_loss_meter[m][k].avg))
 
     for env, valloader in loaders['val'].items():
         score, class_iou = running_metrics_val[env].get_scores()
         for k, v in score.items():
             logger.info('{}: {}'.format(k, v))
-            writer.add_scalar('val_metrics/{}/{}'.format(env, k), v, i + 1)
+            writer.add_scalar('val_metrics/{}/{}'.format(env, k), v,  1)
 
         for k, v in class_iou.items():
             logger.info('{}: {}'.format(k, v))
-            writer.add_scalar('val_metrics/{}/cls_{}'.format(env, k), v, i + 1)
+            writer.add_scalar('val_metrics/{}/cls_{}'.format(env, k), v, 1)
 
         for m in cfg["models"].keys():
             val_loss_meter[m][env].reset()

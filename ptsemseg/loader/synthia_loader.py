@@ -181,7 +181,7 @@ class synthiaLoader(data.Dataset):
                             files = files[:n_train]
                         if self.split == 'recal':
                             files = files[n_train:n_train+n_recal]
-                        if self.split == 'valid':
+                        if self.split == 'val':
                             files = files[n_train+n_recal:n_train+n_recal+n_valid]
                         if self.split == 'test':
                             files = files[n_train+n_recal+n_valid:]
@@ -190,7 +190,6 @@ class synthiaLoader(data.Dataset):
                         for file_path in files:
                             self.imgs[comb_modal].append(file_path)
                             self.dgrd[comb_modal].append(degradation)
-        
         
         
         if not self.imgs[self.image_modes[0]]:

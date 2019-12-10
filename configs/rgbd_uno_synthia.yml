@@ -1,0 +1,72 @@
+id: rgbd_train_synthia #rgbd_NoisyOr_SSMA_RGB_D #rgbd_NoisyOr_T000+T050_pretrain_1_val #rgbd_NoisyOr_T000+T050_val # rgbd_Compnet_T000+T050_val
+models:
+    rgb:
+        arch: DeepLab
+        backbone: resnet
+        resume: /home/jtian73/pytorch-semseg/checkpoint/synthia-seq/rgb/rgb_DeepLab_synthia_best_model.pkl #/home/jtian73/fusion_backup/runs/configs/experiments/icra_configs/rgbd_TempNet_T000+T050_pretrain_1/rgb_tempnet_airsim_100000_model.pkl
+    d:
+        arch: DeepLab
+        backbone: resnet
+        resume: /home/jtian73/pytorch-semseg/checkpoint/synthia-seq/d/d_DeepLab_synthia_best_model.pkl #/home/jtian73/fusion_backup/runs/configs/experiments/icra_configs/rgbd_TempNet_T000+T050_pretrain_1/d_tempnet_airsim_100000_model.pkl
+    # rgbd:
+    #     arch: SSMA
+    #     resume: /home/wcheung8/pytorch-semseg/runs/synthia-seq/segnet/SSMA/best_model/rgbd_SSMA_synthia_best_model.pkl #/home/jtian73/fusion_backup/runs/configs/experiments/fusion/SSMA/SSMA_T000+T050/best_model/rgbd_SSMA_airsim_best_model.pkl
+        
+fusion: Noisy-Or  #Noisy-Or   #Stacked-Noisy-Or  #Noisy-Or # #{None,SoftmaxMultiply}
+scaling_module: None #GlobalScaling #GlobalScaling
+scaling_metrics: SoftEn #Mixed #AveTemp  #SoftEn #MI 
+save_stats: True
+data:
+    dataset: synthia
+    train_split: train
+    train_subsplit: ['SYNTHIA-SEQS-05-DAWN',
+                   'SYNTHIA-SEQS-05-SUMMER',
+                   'SYNTHIA-SEQS-05-NIGHT', 
+                   'SYNTHIA-SEQS-05-SUNSET',]
+    train_reduction: 1.0    
+    val_split: val
+    val_subsplit: ['SYNTHIA-SEQS-05-DAWN',
+                   'SYNTHIA-SEQS-05-SUMMER',
+                   'SYNTHIA-SEQS-05-NIGHT', 
+                   'SYNTHIA-SEQS-05-SUNSET',
+                  ]    
+    val_reduction: 1.0
+    img_rows: 1280
+    img_cols: 760
+    path: /home/jtian73/datasets/synthia-seq/ ##datasets/airsim_data_async #../../ros/data/airsim_03-30-2019/airsim_data_async
+    noisy_type: None 
+training:
+    weight: None
+    train_iters: 100000
+    batch_size: 2
+    val_interval: 10000 #5000
+    save_iters: 10000
+    n_workers: 4
+    print_interval: 50
+    png_frames: 50 #5000
+    optimizer:
+        name: 'adam'
+        lr: 1.0e-5
+    loss:
+        name: 'cross_entropy'
+        size_average: True
+    lr_schedule:
+    resume: None
+
+training_stats: 
+    MI_MEAN_rgb: 0.01635716
+    MI_STD_rgb: 0.00688986
+    PreEn_MEAN_rgb: 0.16158119
+    PreEn_STD_rgb: 0.03454985
+    SoftEn_MEAN_rgb: 0.10871122
+    SoftEn_STD_rgb: 0.02284632
+
+    MI_MEAN_d: 0.02271291
+    MI_STD_d: 0.01019019
+    PreEn_MEAN_d: 0.20687151
+    PreEn_STD_d: 0.04621102
+    SoftEn_MEAN_d: 0.13952574
+    SoftEn_STD_d: 0.03168533
+
+    SoftEn_MEAN_rgbd: 0.05217332
+    SoftEn_STD_rgbd: 0.01356846

@@ -2,8 +2,8 @@ import torch.nn as nn
 from torch.autograd import Variable
 
 from .fusion.fusion import *
-from ptsemseg.models.recalibrator import *
 from ptsemseg.utils import mutualinfo_entropy
+from .utils import * 
 
 
 class segnet_mcdo(nn.Module):
@@ -51,12 +51,6 @@ class segnet_mcdo(nn.Module):
 
 
         self.softmaxMCDO = torch.nn.Softmax(dim=1)
-
-        if freeze_seg:
-            for layer in self.layers.values():
-                for param in layer.parameters():
-                    param.requires_grad = False
-
 
         for k, v in self.layers.items():
             setattr(self, k, v)
@@ -110,65 +104,65 @@ class segnet_mcdo(nn.Module):
 
         l2.bias.data = l1.bias.data
 
-    # def forward(self, inputs, mcdo=True):
+    def _forward(self, inputs, mcdo=True):
 
-    #     if self.freeze_seg:
-    #         self.eval()
+        # if self.freeze_seg:
+        #     self.eval()
 
-    #     if self.full_mcdo:
-    #         down1, indices_1, unpool_shape1 = self.layers["down1"](inputs, MCDO=mcdo)
-    #         down2, indices_2, unpool_shape2 = self.layers["down2"](down1, MCDO=mcdo)
-    #     else:
-    #         down1, indices_1, unpool_shape1 = self.layers["down1"](inputs)
-    #         down2, indices_2, unpool_shape2 = self.layers["down2"](down1)
+        if self.full_mcdo:
+            down1, indices_1, unpool_shape1 = self.layers["down1"](inputs, MCDO=mcdo)
+            down2, indices_2, unpool_shape2 = self.layers["down2"](down1, MCDO=mcdo)
+        else:
+            down1, indices_1, unpool_shape1 = self.layers["down1"](inputs)
+            down2, indices_2, unpool_shape2 = self.layers["down2"](down1)
 
-    #     down3, indices_3, unpool_shape3 = self.layers["down3"](down2, MCDO=mcdo)
-    #     down4, indices_4, unpool_shape4 = self.layers["down4"](down3, MCDO=mcdo)
-    #     down5, indices_5, unpool_shape5 = self.layers["down5"](down4, MCDO=mcdo)
+        down3, indices_3, unpool_shape3 = self.layers["down3"](down2, MCDO=mcdo)
+        down4, indices_4, unpool_shape4 = self.layers["down4"](down3, MCDO=mcdo)
+        down5, indices_5, unpool_shape5 = self.layers["down5"](down4, MCDO=mcdo)
 
-    #     up5 = self.layers["up5"](down5, indices_5, unpool_shape5, MCDO=mcdo)
-    #     up4 = self.layers["up4"](up5, indices_4, unpool_shape4, MCDO=mcdo)
-    #     up3 = self.layers["up3"](up4, indices_3, unpool_shape3, MCDO=mcdo)
+        up5 = self.layers["up5"](down5, indices_5, unpool_shape5, MCDO=mcdo)
+        up4 = self.layers["up4"](up5, indices_4, unpool_shape4, MCDO=mcdo)
+        up3 = self.layers["up3"](up4, indices_3, unpool_shape3, MCDO=mcdo)
 
-    #     if self.full_mcdo:
-    #         up2 = self.layers["up2"](up3, indices_2, unpool_shape2, MCDO=mcdo)
-    #         up1 = self.layers["up1"](up2, indices_1, unpool_shape1, MCDO=mcdo)
-    #     else:
-    #         up2 = self.layers["up2"](up3, indices_2, unpool_shape2)
-    #         up1 = self.layers["up1"](up2, indices_1, unpool_shape1)
+        if self.full_mcdo:
+            up2 = self.layers["up2"](up3, indices_2, unpool_shape2, MCDO=mcdo)
+            up1 = self.layers["up1"](up2, indices_1, unpool_shape1, MCDO=mcdo)
+        else:
+            up2 = self.layers["up2"](up3, indices_2, unpool_shape2)
+            up1 = self.layers["up1"](up2, indices_1, unpool_shape1)
 
-    #     if self.temperatureScaling:
-    #         up1 = up1 / self.temperature
+        # if self.temperatureScaling:
+        #     up1 = up1 / self.temperature
 
-    #     # for param in self.parameters():
-    #     #     print(param.data)
+        # for param in self.parameters():
+        #     print(param.data)
 
-    #     return up1
+        return up1
 
-    # def forwardMCDO(self, inputs, mcdo=True):
-    #     with torch.no_grad():
-    #         for i in range(self.mcdo_passes):
-    #             if i == 0:
-    #                 x = self.forward(inputs,mcdo=mcdo).unsqueeze(-1)
-    #             else:
-    #                 x = torch.cat((x, self.forward(inputs).unsqueeze(-1)), -1)
-
-    #     mean = x.mean(-1)
-    #     variance = x.var(-1)
-
-    #     prob = self.softmaxMCDO(x)
-    #     entropy, mutual_info = mutualinfo_entropy(prob)  # (batch,512,512)
-    #     self.scale_logits = self._get_scale_module(scaling_module)
-
-    #     return mean, variance, entropy, mutual_info
-
-    def forward(self,inputs,mcdo=False):
+    def forwardMCDO(self, inputs, mcdo=True):
         with torch.no_grad():
             for i in range(self.mcdo_passes):
                 if i == 0:
-                    x = self.forward(inputs,mcdo=mcdo).unsqueeze(-1)
+                    x = self._forward(inputs,mcdo=mcdo).unsqueeze(-1)
                 else:
                     x = torch.cat((x, self.forward(inputs).unsqueeze(-1)), -1)
+
+        mean = x.mean(-1)
+        variance = x.var(-1)
+
+        prob = self.softmaxMCDO(x)
+        entropy, mutual_info = mutualinfo_entropy(prob)  # (batch,512,512)
+        self.scale_logits = self._get_scale_module(scaling_module)
+
+        return mean, variance, entropy, mutual_info
+
+    def forward(self,inputs,mcdo=True):
+        with torch.no_grad():
+            for i in range(self.mcdo_passes):
+                if i == 0:
+                    x = self._forward(inputs,mcdo=mcdo).unsqueeze(-1)
+                else:
+                    x = torch.cat((x, self._forward(inputs).unsqueeze(-1)), -1)
 
         mean = x.mean(-1)
         prob = self.softmaxMCDO(x)
@@ -177,8 +171,8 @@ class segnet_mcdo(nn.Module):
 
 
     def forward_SSMA(self, inputs, mcdo=True):
-        if self.freeze_seg:
-            self.eval()
+        # if self.freeze_seg:
+        #     self.eval()
 
         if self.full_mcdo:
             down1, indices_1, unpool_shape1 = self.layers["down1"](inputs, MCDO=mcdo)
@@ -211,7 +205,7 @@ class segnet_mcdo(nn.Module):
         with torch.no_grad():
             for i in range(self.mcdo_passes):
                 if i == 0:
-                    x = self.forward(inputs,mcdo=mcdo).unsqueeze(-1)
+                    x = self._forward(inputs,mcdo=mcdo).unsqueeze(-1)
                 else:
                     x = torch.cat((x, self.forward(inputs).unsqueeze(-1)), -1)
         return x

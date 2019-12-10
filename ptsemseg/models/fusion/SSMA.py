@@ -4,7 +4,7 @@ import torch.nn.functional as F
 from .sync_batchnorm.batchnorm import SynchronizedBatchNorm2d
 
 from ..segnet import segnet
-from .deeplab import DeepLab
+from ..deeplab import DeepLab
 from .decoder import build_decoder
 from .fusion import *
 from ptsemseg.utils import mutualinfo_entropy, plotEverything, plotPrediction
@@ -60,9 +60,9 @@ class SSMA(nn.Module):
         A, A_llf1, A_llf2, A_aspp = self.expert_A.forward_SSMA(input[:, :3, :, :])
         B, B_llf1, B_llf2, B_aspp = self.expert_B.forward_SSMA(input[:, 3:, :, :])
         # import pdb;pdb.set_trace()
-        fused_ASPP = self.SSMA_ASPP(A_aspp, B_aspp,DR)
-        fused_skip1 = self.SSMA_skip1(A_llf1, B_llf1,DR)
-        fused_skip2 = self.SSMA_skip2(A_llf2, B_llf2,DR)
+        fused_ASPP = self.SSMA_ASPP(A_aspp, B_aspp)
+        fused_skip1 = self.SSMA_skip1(A_llf1, B_llf1)
+        fused_skip2 = self.SSMA_skip2(A_llf2, B_llf2)
         x = self.decoder(fused_ASPP, fused_skip1, fused_skip2)
         
         prob = self.softmaxMCDO(x.unsqueeze(-1)) #[batch,classes,512,512]

@@ -4,7 +4,7 @@ import torch.nn.functional as F
 from .sync_batchnorm.batchnorm import SynchronizedBatchNorm2d
 
 from ..segnet import segnet
-from .deeplab import DeepLab
+from ..deeplab import DeepLab
 from .decoder import build_decoder
 from .fusion import *
 from ptsemseg.utils import mutualinfo_entropy, plotEverything, plotPrediction

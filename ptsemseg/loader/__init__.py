@@ -86,7 +86,7 @@ def get_loaders(name, cfg):
     v_loader = {env: data_loader(
         data_path,
         is_transform=True,
-        split="val", subsplits=[env], scale_quantity=cfg['data']['val_reduction'],
+        split=cfg['data']['val_split'], subsplits=[env], scale_quantity=cfg['data']['val_reduction'],
         img_size=(cfg['data']['img_rows'], cfg['data']['img_cols']), ) for env in cfg['data']['val_subsplit']}
 
     n_classes = int(t_loader.n_classes)

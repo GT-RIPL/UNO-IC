@@ -12,10 +12,11 @@ models:
     #     arch: SSMA
     #     resume: /home/wcheung8/pytorch-semseg/runs/synthia-seq/segnet/SSMA/best_model/rgbd_SSMA_synthia_best_model.pkl #/home/jtian73/fusion_backup/runs/configs/experiments/fusion/SSMA/SSMA_T000+T050/best_model/rgbd_SSMA_airsim_best_model.pkl
         
-fusion: Noisy-Or  #Noisy-Or   #Stacked-Noisy-Or  #Noisy-Or # #{None,SoftmaxMultiply}
+fusion: BayesianGMM  #Noisy-Or   #Stacked-Noisy-Or  #Noisy-Or # #{None,SoftmaxMultiply}
 scaling_module: None #GlobalScaling #GlobalScaling
 scaling_metrics: SoftEn #Mixed #AveTemp  #SoftEn #MI 
 save_stats: True
+save_dir: /home/jtian73/pytorch-semseg/
 data:
     dataset: synthia
     train_split: train
@@ -24,13 +25,13 @@ data:
                    'SYNTHIA-SEQS-05-NIGHT', 
                    'SYNTHIA-SEQS-05-SUNSET',]
     train_reduction: 1.0    
-    val_split: val
+    val_split: recal
     val_subsplit: ['SYNTHIA-SEQS-05-DAWN',
                    'SYNTHIA-SEQS-05-SUMMER',
                    'SYNTHIA-SEQS-05-NIGHT', 
                    'SYNTHIA-SEQS-05-SUNSET',
                   ]    
-    val_reduction: 1.0
+    val_reduction: 0.1
     img_rows: 1280
     img_cols: 760
     path: /home/jtian73/datasets/synthia-seq/ ##datasets/airsim_data_async #../../ros/data/airsim_03-30-2019/airsim_data_async
@@ -38,10 +39,10 @@ data:
 training:
     weight: None
     train_iters: 100000
-    batch_size: 2
+    batch_size: 4
     val_interval: 10000 #5000
     save_iters: 10000
-    n_workers: 4
+    n_workers: 8
     print_interval: 50
     png_frames: 50 #5000
     optimizer:

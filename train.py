@@ -223,7 +223,7 @@ def train(cfg, writer, logger, logdir):
             bs = cfg['training']['batch_size']
             images = {m: inputs[m][:bs, :, :, :] for m in cfg["models"].keys()}
             labels = labels[:bs, :, :]
-
+            import ipdb;ipdb.set_trace()
             if labels.shape[0] <= 1:
                 continue
 
@@ -246,7 +246,7 @@ def train(cfg, writer, logger, logdir):
                 else:
                     # print(images[m].shape)
                     outputs[m] = models[m](images[m])
-
+                
                 loss[m] = loss_fn(input=outputs[m], target=labels, weight=weight)
 
                 # import ipdb; ipdb.set_trace()

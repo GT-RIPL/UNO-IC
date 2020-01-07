@@ -45,7 +45,7 @@ class Decoder(nn.Module):
         x = F.interpolate(x, size=low_level_feat.size()[2:], mode='bilinear', align_corners=True)
         x = torch.cat((x, low_level_feat), dim=1)
         x = self.last_conv(x)
-
+        # import ipdb;ipdb.set_trace()
         return x
 
     def _init_weight(self):

@@ -41,7 +41,7 @@ class DeepLab(nn.Module):
         x = self.decoder(x, low_level_feat)
         x = F.interpolate(x, size=input.size()[2:], mode='bilinear', align_corners=True)
         x = x.unsqueeze(-1) #[batch,classes,760,1280,1]
-
+        # import ipdb;ipdb.set_trace()
         mean = x.mean(-1) #[batch,classes,760,1280]
     
         prob = torch.nn.Softmax(dim=1)(x) #[batch,classes,760,1280]

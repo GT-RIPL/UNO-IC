@@ -53,7 +53,7 @@ def validate(cfg, writer, logger, logdir):
     # Setup Metrics
     running_metrics_val = {env: runningScore(n_classes) for env in loaders['val'].keys()}
     # Setup Meters
-    # val_loss_meter = {m: {env: averageMeter() for env in loaders['val'].keys()} for m in cfg["models"].keys()}
+    val_loss_meter = {m: {env: averageMeter() for env in loaders['val'].keys()} for m in cfg["models"].keys()}
 
     scale_logits = GlobalScaling(cfg['training_stats'])
 
@@ -146,23 +146,6 @@ def validate(cfg, writer, logger, logdir):
             print("No checkpoint found at '{}'".format(model_pkl))
 
 
-    if cfg['fusion'] == "BayesianGMM":
-        mean_stats = {}
-        cov_stats = {}
-        det_cov = {}
-        inv_cov = {}
-
-        for m in cfg["models"].keys(): 
-            mean_stats[m] = torch.load(os.path.join(logdir,'stats',m,'mean.pkl'))
-            cov_stats[m] = torch.load(os.path.join(logdir,'stats',m,'cov.pkl'))
-            det_cov[m] = [torch.zeros((16,16)) for _ in range(16)]
-            inv_cov[m] = [torch.zeros((16,16)) for _ in range(16)]
-
-            for i in range(16):
-                if i != 13 and i != 14:
-                    mean_stats[m][i] = torch.tensor(mean_stats[m][i],device=device)
-                    det_cov[m][i] = torch.tensor(np.linalg.det(cov_stats[m][i]),device=device) 
-                    inv_cov[m][i] = torch.tensor(np.linalg.inv(cov_stats[m][i]),device=device)
     [models[m].eval() for m in models.keys()]
     #################################################################################
     # Validation
@@ -170,15 +153,15 @@ def validate(cfg, writer, logger, logdir):
     print("=" * 10, "VALIDATING", "=" * 10)
 
     with torch.no_grad():
+        length = np.zeros(n_classes)
+        mean_stats = {}
+        cov_stats = {}
+        length = {} 
+        for m in cfg["models"].keys():
+            mean_stats[m] = [torch.zeros(n_classes,1) for _ in range(n_classes)]
+            cov_stats[m] = [torch.zeros((n_classes,n_classes)) for _ in range(n_classes)]     
+            length[m] = np.zeros(n_classes)
         for k, valloader in loaders['val'].items():
-            if cfg["save_stats"]:
-                temp_dict_per_loader = {}
-                entropy_dict_per_loader = {}
-                MI_dict_per_loader = {}
-                for m in cfg["models"].keys():
-                    temp_dict_per_loader[m] = []
-                    entropy_dict_per_loader[m] = []
-                    MI_dict_per_loader[m]=[]
             for i_val, (input_list, labels_list) in tqdm(enumerate(valloader)):
                 #import ipdb;ipdb.set_trace()
                 inputs, labels = parseEightCameras(input_list['rgb'], labels_list, input_list['d'], device)
@@ -195,96 +178,32 @@ def validate(cfg, writer, logger, logdir):
 
                 # Run Models
                 mean = {}
-                entropy = {}
-                mutual_info = {}
-                val_loss = {}
-                entropy_ave = {}
-                MI_ave = {}
-                temp_ave = {}
-                DR = {}
+                
                 # Inference
                 for m in cfg["models"].keys():
-                    mean[m], entropy[m], mutual_info[m] = models[m](images_val[m])
-                    if cfg["models"][m]["arch"] == "DeepLab" or "Segnet":
-                        DR[m] = scale_logits(entropy[m],mutual_info[m],modality = m,mode=cfg['scaling_metrics'])
-                        mean[m] = mean[m] * DR[m]
-                    else:
-                        if 'rgb' not in DR:
-                            DR['rgb'] = 1
-                        if 'd' not in DR:
-                            DR['d'] = 1
-                        mean[m] = mean["rgbd"]*torch.min(DR['rgb'],DR['d'])
-                   
-                    entropy_ave[m] = entropy[m].mean((1,2))
-                    MI_ave[m] = mutual_info[m].mean((1,2))
-                # Fusion Type
-                if cfg['fusion'] == "BayesianGMM":
-                    outputs = fusion(cfg["fusion"],mean,cfg,det_cov = det_cov, inv_cov = inv_cov, mean_stats = mean_stats, device = device)
-                else:
-                    outputs = fusion(cfg["fusion"],mean,cfg)
-                import ipdb;ipdb.set_trace()
-                # aggregate training stats
-                if cfg["save_stats"]:
-                    for m in cfg["models"].keys():
-                        entropy_dict_per_loader[m].extend(entropy_ave[m].cpu().numpy().tolist())
-                        MI_dict_per_loader[m].extend(MI_ave[m].cpu().numpy().tolist())
-                        # if cfg["models"][m]["arch"] == "tempnet":
-                            # temp_dict_per_loader[m].extend(temp_ave[m].cpu().numpy().tolist())
-                
-                # plot ground truth vs mean/variance of outputs
-                if cfg['fusion'] != 'BayesianGMM':            
-                    outputs = outputs/outputs.sum(1).unsqueeze(1)
-                    prob, pred = outputs.max(1)
+                    mean[m], _, _ = models[m](images_val[m])     
+                    for i in range(n_classes):
+                        mask = labels != i
+                        length[m][i] += mask.sum()
+                        temp = mean[m].masked_fill(mask.unsqueeze(1),0).cpu()
+                        mean_stats[m][i] = mean_stats[m][i] + (temp.sum((0,2,3)).unsqueeze(1)  - mean_stats[m][i])/length[m][i]  
+                        temp_reshape = temp.transpose(0,1).reshape(n_classes,-1)
+                        # indices = temp_reshape.sum(1) != 0
+                            
+                        cov_stats[m][i] = cov_stats[m][i] + (torch.mm(temp_reshape,temp_reshape.T) - cov_stats[m][i])/length[m][i]
+                        import ipdb;ipdb.set_trace()
 
-                    gt = labels_val
-                    e, _ = mutualinfo_entropy(outputs.unsqueeze(-1))
-                    if i_val % cfg["training"]["png_frames"] == 0:
-                        plotPrediction(logdir, cfg, n_classes, 0, i_val, k, inputs_display, pred, gt)
-                        labels = ['entropy', 'probability']
-                        values = [e, prob]
-                        plotEverything(logdir, 0, i_val, k + "/fused", values, labels)
 
-                        for m in cfg["models"].keys():
-                            prob,pred_m = torch.nn.Softmax(dim=1)(mean[m]).max(1)
-                            # if cfg["models"][m]["arch"] == "tempnet":
-                            #     labels = ['mutual info', 'entropy', 'probability','temperature']
-                            #     values = [mutual_info[m], entropy[m], prob, temp_map[m]]
-                            # else:
-                            labels = ['mutual info', 'entropy', 'probability']
-                            values = [mutual_info[m], entropy[m], prob]
-                            plotPrediction(logdir, cfg, n_classes, 0, i_val, k + "/" + m, inputs_display, pred_m, gt)
-                            plotEverything(logdir, 0, i_val, k + "/" + m, values, labels)
 
-                    running_metrics_val[k].update(gt.data.cpu().numpy(), pred.cpu().numpy())
-                    #import ipdb;ipdb.set_trace()
-                else:
-                    _, pred = outputs.max(1)
-                    gt = labels_val
-                    running_metrics_val[k].update(gt.data.cpu().numpy(), pred.cpu().numpy())
-            if cfg["save_stats"]:
-                # if cfg["models"][m]["arch"] == "tempnet":
-                    # save_stats(logdir,temp_dict_per_loader,k,cfg,"_temp_")
-                save_stats(logdir,entropy_dict_per_loader,k,cfg,"_entropy_")
-                save_stats(logdir,MI_dict_per_loader,k,cfg,"_MutualInfo_")
+        for m in cfg["models"].keys():    
+            for i in range(n_classes):
+                cov_stats[m][i] = cov_stats[m][i] - torch.mm(mean_stats[m][i],mean_stats[m][i].T)
+            save_dir = os.path.join(logdir,'stats',m)
+            if not os.path.isdir(save_dir):
+                os.makedirs(save_dir)
+            torch.save(cov_stats[m], os.path.join(save_dir,'cov.pkl'))
+            torch.save(mean_stats[m], os.path.join(save_dir,'mean.pkl'))
 
-        # for m in cfg["models"].keys():
-        #     for k in loaders['val'].keys():
-        #         writer.add_scalar('loss/val_loss/{}/{}'.format(m, k), val_loss_meter[m][k].avg, 1)
-        #         logger.info("%s %s Iter %d Loss: %.4f" % (m, k, 1, val_loss_meter[m][k].avg))
-
-    for env, valloader in loaders['val'].items():
-        score, class_iou = running_metrics_val[env].get_scores()
-        for k, v in score.items():
-            logger.info('{}: {}'.format(k, v))
-            writer.add_scalar('val_metrics/{}/{}'.format(env, k), v,  1)
-
-        for k, v in class_iou.items():
-            logger.info('{}: {}'.format(k, v))
-            writer.add_scalar('val_metrics/{}/cls_{}'.format(env, k), v, 1)
-
-        # for m in cfg["models"].keys():
-        #     val_loss_meter[m][env].reset()
-        running_metrics_val[env].reset()
 
 
 if __name__ == "__main__":
@@ -366,6 +285,6 @@ if __name__ == "__main__":
     # validate base model
     validate(cfg, writer, logger, logdir)
 
-    print('done')
+    print('Done!!!')
     time.sleep(10)
     writer.close()

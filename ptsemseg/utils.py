@@ -678,3 +678,34 @@ def plotAll(logdir, i, i_val, k, plot,miou):
     plt.savefig("{}/{}_{}_all.png".format(path, i_val, i),dpi=300)
     plt.close(fig)
 
+
+class Confusion_Matrix():
+    def __init__(self,logdir,file_name = 'best_model'):
+        self.logdir = logdir
+        self.confusion_matrix = np.zeros((12,10))
+        self.file_name = file_name
+
+    def aggregate_stats(self,predicted,targets):
+        # predicted [batch,w,h]
+        # & targets [batch,num_class, w,h]
+        for i in range(targets.shape[1]):
+            mask = predicted == targets[:,i,:,:]
+
+        # for i in range(targets.shape[0]):
+        #     self.confusion_matrix[predicted[i],targets[i]] += 1
+
+    def compute_acc(self):  
+        self.confusion_matrix[-2,:] = (np.diag(self.confusion_matrix[:-2,:])/self.confusion_matrix[:-2,:].sum(0))*100
+        self.confusion_matrix[-1,-1] = (np.diag(self.confusion_matrix[:-2,:]).sum()/self.confusion_matrix[:-2,:].sum())*100
+        
+    def save(self):
+        row_label = ['plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck']
+        print(self.confusion_matrix)
+        if not os.path.isdir(self.logdir):
+            os.makedirs(self.logdir)
+        df = pd.DataFrame(self.confusion_matrix) 
+        df.to_excel (os.path.join(self.logdir,self.file_name + '.xlsx'), index = False, header=row_label)
+
+       
+    def print(self):
+        print(self.confusion_matrix)

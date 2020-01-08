@@ -381,7 +381,7 @@ class GlobalScaling(nn.Module):
         
 def compute_log_normal(inputs,det_cov,inv_cov,mean,cl):
         # inputs [batch,num_class,760,1280]
-        inputs = inputs.transpose(1,2).transpose(2,3).reshape(-1,19)
+        inputs = inputs.transpose(2,1).transpose(3,2).reshape(-1,19)
         cnst = torch.log(1/torch.sqrt((2*3.14)**10*det_cov[cl])) #float
         cnst2 = -inputs.sum(1) # batch
         temp = inputs - mean[cl].T # (batch,10)
@@ -416,7 +416,7 @@ def fusion(fusion_type,mean,cfg,**kargs):
         else:
             outputs = 1 - (1-soft)*(1 - torch.nn.Softmax(dim=1)(mean["rgb"])) * (1 - torch.nn.Softmax(dim=1)(mean["d"])) #[batch,11,512,512,1]
     elif cfg["fusion"] == "BayesianGMM":
-        outputs = torch.zeros((cfg['training']['batch_size'],19,cfg['data']['img_cols'],cfg['data']['img_rows'],1),device=kargs['device'])
+        outputs = torch.zeros((cfg['training']['batch_size'],16,cfg['data']['img_cols'],cfg['data']['img_rows'],1),device=kargs['device'])
         for m in cfg["models"].keys():     
             for cl in range(16):
                 if cl != 13 and cl != 14:

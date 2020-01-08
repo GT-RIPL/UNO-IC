@@ -185,14 +185,15 @@ def validate(cfg, writer, logger, logdir):
                     for i in range(16):
                         if i != 13 and i != 14:
                             mask = labels != i
-                            length[m][i] += (labels == i).sum()
+                            length_temp = (labels == i).sum()
+                            length[m][i] += length_temp
                             temp = mean[m].masked_fill(mask.unsqueeze(1),0).cpu()
-                            mean_stats[m][i] = mean_stats[m][i] + (temp.sum((0,2,3)).unsqueeze(1)  - mean_stats[m][i])/length[m][i]  
+                            mean_stats[m][i] = mean_stats[m][i] + (temp.sum((0,2,3)).unsqueeze(1)  - mean_stats[m][i]*length_temp)/length[m][i]  
                             
                             temp_reshape = temp.transpose(1,0).reshape(n_classes,-1) #(size,batch)
                             # indices = temp_reshape.sum(1) != 0
                                 
-                            cov_stats[m][i] = cov_stats[m][i] + (torch.mm(temp_reshape,temp_reshape.T) - cov_stats[m][i])/length[m][i]
+                            cov_stats[m][i] = cov_stats[m][i] + (torch.mm(temp_reshape,temp_reshape.T) - cov_stats[m][i]*length_temp)/length[m][i]
                 
 
 
@@ -287,5 +288,5 @@ if __name__ == "__main__":
     validate(cfg, writer, logger, logdir)
 
     print('Done!!!')
-    time.sleep(10)
+    # time.sleep(10)
     writer.close()

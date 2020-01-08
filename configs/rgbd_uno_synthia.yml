@@ -1,4 +1,4 @@
-id: rgbd_train_synthia #rgbd_NoisyOr_SSMA_RGB_D #rgbd_NoisyOr_T000+T050_pretrain_1_val #rgbd_NoisyOr_T000+T050_val # rgbd_Compnet_T000+T050_val
+id: rgbd_synthia_BayesianGMM #rgbd_NoisyOr_SSMA_RGB_D #rgbd_NoisyOr_T000+T050_pretrain_1_val #rgbd_NoisyOr_T000+T050_val # rgbd_Compnet_T000+T050_val
 models:
     rgb:
         arch: DeepLab
@@ -12,10 +12,10 @@ models:
     #     arch: SSMA
     #     resume: /home/wcheung8/pytorch-semseg/runs/synthia-seq/segnet/SSMA/best_model/rgbd_SSMA_synthia_best_model.pkl #/home/jtian73/fusion_backup/runs/configs/experiments/fusion/SSMA/SSMA_T000+T050/best_model/rgbd_SSMA_airsim_best_model.pkl
         
-fusion: BayesianGMM  #Noisy-Or   #Stacked-Noisy-Or  #Noisy-Or # #{None,SoftmaxMultiply}
+fusion: BayesianGMM #BayesianGMM  #Noisy-Or   #Stacked-Noisy-Or  #Noisy-Or # #{None,SoftmaxMultiply}
 scaling_module: None #GlobalScaling #GlobalScaling
 scaling_metrics: SoftEn #Mixed #AveTemp  #SoftEn #MI 
-save_stats: True
+save_stats: False
 save_dir: /home/jtian73/pytorch-semseg/
 data:
     dataset: synthia
@@ -44,7 +44,7 @@ training:
     save_iters: 10000
     n_workers: 8
     print_interval: 50
-    png_frames: 50 #5000
+    png_frames: 5 #5000
     optimizer:
         name: 'adam'
         lr: 1.0e-5

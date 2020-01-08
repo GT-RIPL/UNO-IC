@@ -219,10 +219,10 @@ def validate(cfg, writer, logger, logdir):
                     MI_ave[m] = mutual_info[m].mean((1,2))
                 # Fusion Type
                 if cfg['fusion'] == "BayesianGMM":
-                    outputs = fusion(cfg["fusion"],mean,cfg,det_cov = det_cov, inv_cov = inv_cov, mean_stats = mean_stats, device = device)
+                    outputs = fusion(cfg["fusion"],mean,cfg,det_cov = det_cov, inv_cov = inv_cov, mean_stats = mean_stats, device = device, batch_size = labels.shape[0] )
                 else:
                     outputs = fusion(cfg["fusion"],mean,cfg)
-                import ipdb;ipdb.set_trace()
+                # import ipdb;ipdb.set_trace()
                 # aggregate training stats
                 if cfg["save_stats"]:
                     for m in cfg["models"].keys():
@@ -254,13 +254,17 @@ def validate(cfg, writer, logger, logdir):
                             values = [mutual_info[m], entropy[m], prob]
                             plotPrediction(logdir, cfg, n_classes, 0, i_val, k + "/" + m, inputs_display, pred_m, gt)
                             plotEverything(logdir, 0, i_val, k + "/" + m, values, labels)
-
-                    running_metrics_val[k].update(gt.data.cpu().numpy(), pred.cpu().numpy())
-                    #import ipdb;ipdb.set_trace()
                 else:
                     _, pred = outputs.max(1)
+                    # import ipdb;ipdb.set_trace()
                     gt = labels_val
-                    running_metrics_val[k].update(gt.data.cpu().numpy(), pred.cpu().numpy())
+                    if i_val % cfg["training"]["png_frames"] == 0:
+                        plotPrediction(logdir, cfg, n_classes, 0, i_val, k, inputs_display, pred, gt)
+                        for m in cfg["models"].keys():
+                            _,pred_m = torch.nn.Softmax(dim=1)(mean[m]).max(1)
+                            plotPrediction(logdir, cfg, n_classes, 0, i_val, k + "/" + m, inputs_display, pred_m, gt)
+                    
+                running_metrics_val[k].update(gt.data.cpu().numpy(), pred.cpu().numpy())
             if cfg["save_stats"]:
                 # if cfg["models"][m]["arch"] == "tempnet":
                     # save_stats(logdir,temp_dict_per_loader,k,cfg,"_temp_")
@@ -273,14 +277,18 @@ def validate(cfg, writer, logger, logdir):
         #         logger.info("%s %s Iter %d Loss: %.4f" % (m, k, 1, val_loss_meter[m][k].avg))
 
     for env, valloader in loaders['val'].items():
-        score, class_iou = running_metrics_val[env].get_scores()
+        score, class_iou, class_acc = running_metrics_val[env].get_scores()
         for k, v in score.items():
             logger.info('{}: {}'.format(k, v))
             writer.add_scalar('val_metrics/{}/{}'.format(env, k), v,  1)
 
         for k, v in class_iou.items():
-            logger.info('{}: {}'.format(k, v))
-            writer.add_scalar('val_metrics/{}/cls_{}'.format(env, k), v, 1)
+            logger.info('cls_iou_{}: {}'.format(k, v))
+            writer.add_scalar('val_metrics/{}/cls_iou_{}'.format(env, k), v, 1)
+
+        for k, v in class_acc.items():
+            logger.info('cls_acc_{}: {}'.format(k, v))
+            writer.add_scalar('val_metrics/{}/cls_acc{}'.format(env, k), v, 1)
 
         # for m in cfg["models"].keys():
         #     val_loss_meter[m][env].reset()
@@ -367,5 +375,5 @@ if __name__ == "__main__":
     validate(cfg, writer, logger, logdir)
 
     print('done')
-    time.sleep(10)
+    # time.sleep(10)
     writer.close()

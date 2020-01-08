@@ -386,7 +386,7 @@ def compute_log_normal(inputs,det_cov,inv_cov,mean,cl):
         cnst2 = -inputs.sum(1) # batch
         temp = inputs - mean[cl].T # (batch,10)
         temp = cnst + cnst2 + -1/2 * (torch.mm(temp,inv_cov[cl]) * temp).sum(1)
-        temp = temp.reshape(-1,760,1280,1)
+        temp = temp.reshape(-1,760,1280)
         return temp
 
 def fusion(fusion_type,mean,cfg,**kargs):
@@ -416,11 +416,11 @@ def fusion(fusion_type,mean,cfg,**kargs):
         else:
             outputs = 1 - (1-soft)*(1 - torch.nn.Softmax(dim=1)(mean["rgb"])) * (1 - torch.nn.Softmax(dim=1)(mean["d"])) #[batch,11,512,512,1]
     elif cfg["fusion"] == "BayesianGMM":
-        outputs = torch.zeros((cfg['training']['batch_size'],16,cfg['data']['img_cols'],cfg['data']['img_rows'],1),device=kargs['device'])
+        outputs = torch.zeros((kargs['batch_size'],16,cfg['data']['img_cols'],cfg['data']['img_rows']),device=kargs['device'])
         for m in cfg["models"].keys():     
             for cl in range(16):
                 if cl != 13 and cl != 14:
-                    outputs[:,cl,:,:,:] += compute_log_normal(mean[m],kargs['det_cov'][m],kargs['inv_cov'][m],kargs['mean_stats'][m],cl)
+                    outputs[:,cl,:,:] += compute_log_normal(mean[m],kargs['det_cov'][m],kargs['inv_cov'][m],kargs['mean_stats'][m],cl) #[batch,11,512,512,1]
                 # else: 
                 #     outputs[:,cl,:,:,0] = -torch.inf
     else:

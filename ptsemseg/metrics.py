@@ -32,23 +32,24 @@ class runningScore(object):
             - fwavacc
         """
         hist = self.confusion_matrix
-        acc = np.diag(hist).sum() / hist.sum()
+        overall_acc = np.diag(hist).sum() / hist.sum()
         acc_cls = np.diag(hist) / hist.sum(axis=1)
-        acc_cls = np.nanmean(acc_cls)
+        mean_acc = np.nanmean(acc_cls)
         iu = np.diag(hist) / (hist.sum(axis=1) + hist.sum(axis=0) - np.diag(hist))
         mean_iu = np.nanmean(iu)
         freq = hist.sum(axis=1) / hist.sum()
         fwavacc = (freq[freq > 0] * iu[freq > 0]).sum()
         cls_iu = dict(zip(range(self.n_classes), iu))
-
+        cls_acc = dict(zip(range(self.n_classes), acc_cls))
         return (
             {
-                "Overall Acc: \t": acc,
-                "Mean Acc : \t": acc_cls,
+                "Overall Acc: \t": overall_acc,
+                "Mean Acc : \t": mean_acc,
                 "FreqW Acc : \t": fwavacc,
                 "Mean IoU : \t": mean_iu,
             },
             cls_iu,
+            cls_acc,
         )
 
     def reset(self):

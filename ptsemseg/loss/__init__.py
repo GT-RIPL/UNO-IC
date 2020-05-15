@@ -1,32 +1,29 @@
 import copy
 import logging
-import functools
-
-from ptsemseg.loss.loss import cross_entropy2d, negative_log_likelihood2d
-from ptsemseg.loss.loss import bootstrapped_cross_entropy2d
-from ptsemseg.loss.loss import multi_scale_cross_entropy2d
+from ptsemseg.loss.loss import *
 
 
 logger = logging.getLogger('ptsemseg')
 
-key2loss = {'cross_entropy': cross_entropy2d,
-            'negative_log_likelihood': negative_log_likelihood2d,
-            'bootstrapped_cross_entropy': bootstrapped_cross_entropy2d,
-            'multi_scale_cross_entropy': multi_scale_cross_entropy2d,}
+key2loss = {'CE': CrossEntropy,
+            'Focal': FocalLoss,
+            'LDAM': LDAMLoss}
 
-def get_loss_function(cfg):
+def get_loss_function(cfg,weights,cls_num_list):
     if cfg['training']['loss'] is None:
         logger.info("Using default cross entropy loss")
         return cross_entropy2d
-
     else:
         loss_dict = cfg['training']['loss']
         loss_name = loss_dict['name']
-        loss_params = {k:v for k,v in loss_dict.items() if k != 'name'}
-
+        loss_params = {k:v for k,v in loss_dict[loss_name].items()}
         if loss_name not in key2loss:
             raise NotImplementedError('Loss {} not implemented'.format(loss_name))
+        elif loss_name == 'LDAM':
+            loss_params['cls_num_list'] = cls_num_list
+        loss_params['weight'] = weights
+        
 
         logger.info('Using {} with {} params'.format(loss_name, 
                                                      loss_params))
-        return functools.partial(key2loss[loss_name], **loss_params)
+        return key2loss[loss_name](**loss_params)

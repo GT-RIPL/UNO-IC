@@ -19,8 +19,7 @@ import numpy as np
 import gc
 import pandas as pd
 from pandas import DataFrame
-
-from pandas import DataFrame
+import csv
 from collections import OrderedDict
 
 def recursive_glob(rootdir=".", suffix=""):
@@ -399,7 +398,7 @@ def plotPrediction(logdir, cfg, n_classes, i, i_val, k,inputs, pred, gt):
     if not os.path.exists(path):
         os.makedirs(path)
     plt.tight_layout()
-    plt.savefig("{}/{}_{}.png".format(path, i_val, i))
+    plt.savefig("{}/{}_{}.png".format(path, i_val, i),dpi=1200)
     plt.close('all')
 
 
@@ -491,7 +490,7 @@ def plotEverything(logdir, i, i_val, k, values, labels):
     if not os.path.exists(path):
         os.makedirs(path)
     fig.tight_layout()
-    plt.savefig("{}/{}_{}_everything.png".format(path, i_val, i))
+    plt.savefig("{}/{}_{}_everything.png".format(path, i_val, i),dpi=300)
     plt.close('all')
 
 def save_pred(logdir, loc, k, i_val, i, pred, mutual_info, entropy):
@@ -679,33 +678,61 @@ def plotAll(logdir, i, i_val, k, plot,miou):
     plt.close(fig)
 
 
-class Confusion_Matrix():
-    def __init__(self,logdir,file_name = 'best_model'):
-        self.logdir = logdir
-        self.confusion_matrix = np.zeros((12,10))
-        self.file_name = file_name
+class Confidence_Diagram():
+    def __init__(self):
+        # self.logdir = logdir
+        self.correct = np.zeros((10,19))
+        self.count = np.zeros((10,19))
+        self.confidence = np.zeros((10,19))
 
-    def aggregate_stats(self,predicted,targets):
+        # self.file_name = file_name
+
+    def aggregate_stats(self,prob,predicted,targets):
+        # prob [batch,w,h]
         # predicted [batch,w,h]
-        # & targets [batch,num_class, w,h]
-        for i in range(targets.shape[1]):
-            mask = predicted == targets[:,i,:,:]
-
-        # for i in range(targets.shape[0]):
-        #     self.confusion_matrix[predicted[i],targets[i]] += 1
-
-    def compute_acc(self):  
-        self.confusion_matrix[-2,:] = (np.diag(self.confusion_matrix[:-2,:])/self.confusion_matrix[:-2,:].sum(0))*100
-        self.confusion_matrix[-1,-1] = (np.diag(self.confusion_matrix[:-2,:]).sum()/self.confusion_matrix[:-2,:].sum())*100
+        # targets [batch, w,h]
         
-    def save(self):
-        row_label = ['plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck']
-        print(self.confusion_matrix)
-        if not os.path.isdir(self.logdir):
-            os.makedirs(self.logdir)
-        df = pd.DataFrame(self.confusion_matrix) 
-        df.to_excel (os.path.join(self.logdir,self.file_name + '.xlsx'), index = False, header=row_label)
+        bins = prob // 0.1 #[batch,w,h] confidence
+        bins = bins.masked_fill(bins == 10.,9)
+        # for i in range(targets.shape[1]):
+        #     mask = predicted == targets[:,i,:,:]
+
+        for i in np.linspace(0,9,10):
+            mask_bin = bins == i
+            for j in range(16):
+                mask_class = targets == j
+                self.correct[int(i),int(j)] += (predicted[mask_bin*mask_class] == targets[mask_bin*mask_class]).sum()
+                self.count[int(i),int(j)] += (mask_bin*mask_class).sum()
+                self.confidence[int(i),int(j)] +=  prob[mask_bin*mask_class].sum()
+        
+
+        
+        
+    def compute_ece(self):  
+        self.accuracy = self.correct/self.count
+        self.confidence = self.confidence/self.count
+        # import ipdb;ipdb.set_trace()
+        ratio = self.count/np.expand_dims(np.nansum(self.count,0),0)
+        self.ece_cls = np.nansum(ratio*abs(self.accuracy - self.confidence),0)
+        self.ece = np.sum(self.ece_cls)/14
+        
+    def save(self,logdir):
+        with open(os.path.join(logdir,'calibration.csv'), mode='w') as calibration:
+            writer = csv.writer(calibration, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+            # import ipdb;ipdb.set_trace()
+            writer.writerow(['mean accuracy per bin:']+(np.nansum(self.accuracy,1)/14).tolist())
+            writer.writerow(['ece per class:'] + self.ece_cls.tolist())
+            writer.writerow(['mean ece:',self.ece])
+
+        # logger.info('mean accuracy per bin:',np.nansum(self.accuracy,1)/14)
+        # logger.info('ece per class:',self.ece_cls)
+        # logger.info('mean ece:',self.ece)
+
+
 
        
     def print(self):
-        print(self.confusion_matrix)
+        print(np.nansum(self.accuracy,1)/14)
+        print(self.ece_cls)
+        print(self.ece)
+

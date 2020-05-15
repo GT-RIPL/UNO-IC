@@ -8,6 +8,12 @@ class runningScore(object):
     def __init__(self, n_classes):
         self.n_classes = n_classes
         self.confusion_matrix = np.zeros((n_classes, n_classes))
+        # self.classes = {'Void':4.24,'Sky':14.35,'Building':30.05,'Road':21.06,'Sidewalk':5.00,'Fence':4.31,'Vegetation':3.24,'Pole':1.50,'Car':9.19
+        #                 ,'Sign':0.43,'Pedestrian':0.56,'Bicycle':0.41,'Lanemarking':5.24,'Reserved':0,'Reserved':0,'Traffic_Light':0.409
+        #                 ,'Reserved':0,'Reserved':0}
+        self.classes = ['Void','Sky','Building','Road','Sidewalk','Fence','Vegetation','Pole','Car'
+                        ,'Sign','Pedestrian','Bicycle','Lanemarking','Reserved1','Reserved2','Traffic_Light'
+                        ,'Reserved3','Reserved4']
 
     def _fast_hist(self, label_true, label_pred, n_class):
         #import ipdb;ipdb.set_trace()
@@ -39,8 +45,10 @@ class runningScore(object):
         mean_iu = np.nanmean(iu)
         freq = hist.sum(axis=1) / hist.sum()
         fwavacc = (freq[freq > 0] * iu[freq > 0]).sum()
-        cls_iu = dict(zip(range(self.n_classes), iu))
-        cls_acc = dict(zip(range(self.n_classes), acc_cls))
+        cls_iu = dict(zip(self.classes, iu))
+        cls_acc = dict(zip(self.classes, acc_cls))
+        count = hist.sum(axis=0)/hist.sum()
+        # print(count*100)
         return (
             {
                 "Overall Acc: \t": overall_acc,
@@ -50,7 +58,10 @@ class runningScore(object):
             },
             cls_iu,
             cls_acc,
+            count
         )
+
+
 
     def reset(self):
         self.confusion_matrix = np.zeros((self.n_classes, self.n_classes))

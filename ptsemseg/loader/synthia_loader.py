@@ -23,74 +23,93 @@ import ptsemseg.augmentations.augmentations as aug
 
 """
 synthia-rand
-Class		R	G	B	ID
-void		0	0	0	0
-sky		70	130	180	1
-Building	70	70	70	2
-Road		128	64	128	3
-Sidewalk	244	35	232	4
-Fence		64	64	128	5
-Vegetation	107	142	35	6
-Pole		153	153	153	7
-Car		0	0	142	8
-Traffic sign	220	220	0	9
-Pedestrian	220	20	60	10
-Bicycle		119	11	32	11
-Motorcycle	0	0	230	12
-Parking-slot	250	170	160	13
-Road-work	128	64	64	14
-Traffic light	250	170	30	15
-Terrain		152	251	152	16
-Rider		255	0	0	17
-Truck		0	0	70	18
-Bus		0	60	100	19
-Train		0	80	100	20
-Wall		102	102	156	21
-Lanemarking	102	102	156	22
+Class       R   G   B   ID
+void        0   0   0   0
+sky     70  130 180 1
+Building    70  70  70  2
+Road        128 64  128 3
+Sidewalk    244 35  232 4
+Fence       64  64  128 5
+Vegetation  107 142 35  6
+Pole        153 153 153 7
+Car     0   0   142 8
+Traffic sign    220 220 0   9
+Pedestrian  220 20  60  10
+Bicycle     119 11  32  11
+Motorcycle  0   0   230 12
+Parking-slot    250 170 160 13
+Road-work   128 64  64  14
+Traffic light   250 170 30  15
+Terrain     152 251 152 16
+Rider       255 0   0   17
+Truck       0   0   70  18
+Bus     0   60  100 19
+Train       0   80  100 20
+Wall        102 102 156 21
+Lanemarking 102 102 156 22
 
 synthia-seq
-Class		R	G	B	ID
-Void		0 	0 	0	0
-Sky             128 	128 	128	1
-Building        128 	0 	0	2
-Road            128 	64 	128	3
-Sidewalk        0 	0 	192	4
-Fence           64 	64 	128	5
-Vegetation      128 	128 	0	6
-Pole            192 	192 	128	7
-Car             64 	0 	128	8
-Traffic Sign    192 	128 	128	9
-Pedestrian      64 	64 	0	10
-Bicycle         0 	128 	192	11
-Lanemarking	0	172 	0	12
-Reserved	- 	- 	-	13
-Reserved	- 	- 	-	14
-Traffic Light	0 	128 	128	15
+Class       R   G   B   ID
+Void        0   0   0   0
+Sky             128     128     128 1
+Building        128     0   0   2
+Road            128     64  128 3
+Sidewalk        0   0   192 4
+Fence           64  64  128 5
+Vegetation      128     128     0   6
+Pole            192     192     128 7
+Car             64  0   128 8
+Traffic Sign    192     128     128 9
+Pedestrian      64  64  0   10
+Bicycle         0   128     192 11
+Lanemarking 0   172     0   12
+Reserved    -   -   -   13
+Reserved    -   -   -   14
+Traffic Light   0   128     128 15
 
 """
 
 class synthiaLoader(data.Dataset):
 
+    # class_names = np.array([
+    #     "road",
+    #     "sidewalk",
+    #     "building",
+    #     "wall",
+    #     "fence",
+    #     "pole",
+    #     "light",
+    #     "sign",
+    #     "vegetation",
+    #     "terrain",
+    #     "sky",
+    #     "person",
+    #     "rider",
+    #     "car",
+    #     "truck",
+    #     "bus",
+    #     "train",
+    #     "motocycle",
+    #     "bicycle",
+    # ])
+
     class_names = np.array([
+        "void",
+        "sky",
+        "building",
         "road",
         "sidewalk",
-        "building",
-        "wall",
         "fence",
-        "pole",
-        "light",
-        "sign",
         "vegetation",
-        "terrain",
-        "sky",
-        "person",
-        "rider",
+        "pole",
         "car",
-        "truck",
-        "bus",
-        "train",
-        "motocycle",
+        "traffic sign",
+        "pedestrian",
         "bicycle",
+        "lanemarking",
+        "X",
+        "Y",
+        "traffic light"
     ])
     
     image_modes = ['RGB', 'Depth', 'GT/COLOR', 'GT/LABELS']
@@ -125,8 +144,7 @@ class synthiaLoader(data.Dataset):
         img_size=(512, 512),
         scale_quantity=1.0,      
         img_norm=True,
-        version='synthia-seq',   
-        augmentations=None,
+        version='synthia-seq'   
     ):
         """__init__
 
@@ -152,7 +170,6 @@ class synthiaLoader(data.Dataset):
         self.std = np.array(self.std_rgbd[version])
 
 
-
         # load RGB/Depth
         for subsplit in self.subsplits:
             if len(subsplit.split("__")) == 2:
@@ -168,25 +185,23 @@ class synthiaLoader(data.Dataset):
                         files = glob.glob(os.path.join(root,condition,comb_modal,side,comb_cam,'*.png'),recursive=True)
                         random.seed(0)
                         shuffle(files)
-                        
                         # print(os.path.join(root,condition,comb_modal,side,comb_cam,'*.png'))
                         # print(len(files))
                         n = len(files)
-                        n_train = int(0.6 * n)
-                        n_recal = int(0.1 * n)
+                        n_train = int(0.7 * n)
+                        #n_recal = int(0.1 * n)
                         n_valid = int(0.1 * n)
                         n_test = int(0.2 * n)
                         
                         if self.split == 'train':
+                            # import ipdb;ipdb.set_trace()
                             files = files[:n_train]
-                        if self.split == 'recal':
-                            files = files[n_train:n_train+n_recal]
+                        # if self.split == 'recal':
+                        #     files = files[n_train:n_train+n_recal]
                         if self.split == 'val':
-                            files = files[n_train+n_recal:n_train+n_recal+n_valid]
+                            files = files[n_train:n_train+n_valid]
                         if self.split == 'test':
-                            files = files[n_train+n_recal+n_valid:]
-                        
-                        
+                            files = files[n_train+n_valid:]
                         for file_path in files:
                             self.imgs[comb_modal].append(file_path)
                             self.dgrd[comb_modal].append(degradation)
@@ -194,7 +209,6 @@ class synthiaLoader(data.Dataset):
         
         if not self.imgs[self.image_modes[0]]:
             raise Exception("No files for split=[%s] found in %s" % (self.split, self.root))
-
         print("{} {}: Found {} Images".format(self.split,self.subsplits,len(self.imgs[self.image_modes[0]])))
         if scale_quantity != 1.0:
             for image_mode in self.image_modes:
@@ -292,22 +306,12 @@ class synthiaLoader(data.Dataset):
                 pixel_stats_summary[p][n]["mean"] = np.mean(pixel_stats[p][n])
                 pixel_stats_summary[p][n]["var"] = np.std(pixel_stats[p][n])
 
-        # print(pixel_stats_summary)
-
-
-
-        # for cam_pos in self.cam_pos:
-        #     for image_mode in self.image_modes:
-        #         for index in range(len(self.imgs[cam_pos][image_mode])):
-        #             print(index)
-
 
 
     def tuple_to_folder_name(self, path_tuple):
         start = path_tuple[1]
         end = path_tuple[2]
         path=str(start[0])+'_'+str(-start[1])+'__'+str(end[0])+'_'+str(-end[1])
-
         return path
 
 
@@ -392,49 +396,58 @@ class synthiaLoader(data.Dataset):
             # sample = aug.transform_ts({'image':img, 'aux':aux, 'label':lbl}, self.mean_rgb, self.mean_d, self.std_rgb, self.std_d)
 
         # return sample['image'], sample['label'], sample['aux'], sample['img_display'], sample['aux_display']
-
-        img = cv2.resize(img, (self.img_size[0], self.img_size[1]))  # uint8 with RGB mode
-        aux = cv2.resize(aux, (self.img_size[0], self.img_size[1]))  # uint8 with RGB mode
-        # img = img[:, :, ::-1]  # RGB -> BGR
-
-        img = img.astype(np.float64)
-        aux = aux.astype(np.float64)
         
-        img_display = img.copy()
-        aux_display = aux.copy()
+        if img.dtype == 'uint8':   
+            img = cv2.resize(img, (self.img_size[0], self.img_size[1]))  # uint8 with RGB mode
+            aux = cv2.resize(aux, (self.img_size[0], self.img_size[1]))  # uint8 with RGB mode
+            # img = img[:, :, ::-1]  # RGB -> BGR
 
-        if self.img_norm:
-            img = np.divide((img.astype(float) - self.mean[:3]),self.std[:3])
-            aux = np.divide((aux.astype(float) - self.mean[3:]),self.std[3:])
+            img = img.astype(np.float64)
+            aux = aux.astype(np.float64)
+            
+            img_display = img.copy()
+            aux_display = aux.copy()
 
-        # NHWC -> NCHW
-        img = img.transpose(2, 0, 1)
-        img_display = img_display.transpose(2, 0, 1)
+            if self.img_norm:
+                img = np.divide((img.astype(float) - self.mean[:3]),self.std[:3])
+                aux = np.divide((aux.astype(float) - self.mean[3:]),self.std[3:])
 
-        if not any(['depth_encoded'==mode for mode in self.image_modes]):
-            aux = aux.transpose(2, 0, 1)
-            aux_display = aux_display.transpose(2, 0, 1)
+            # NHWC -> NCHW
+            img = img.transpose(2, 0, 1)
+            img_display = img_display.transpose(2, 0, 1)
 
-        classes = np.unique(lbl)
-        lbl = lbl.astype(float)
-        lbl = cv2.resize(lbl, (self.img_size[0], self.img_size[1]), interpolation=cv2.INTER_NEAREST) #, "nearest", mode="F")
-        lbl = lbl.astype(int)
+            if not any(['depth_encoded'==mode for mode in self.image_modes]):
+                aux = aux.transpose(2, 0, 1)
+                aux_display = aux_display.transpose(2, 0, 1)
 
-        # if not np.all(classes == np.unique(lbl)):
-        #     print("WARN: resizing labels yielded fewer classes")
+            classes = np.unique(lbl)
+            lbl = lbl.astype(float)
+            lbl = cv2.resize(lbl, (self.img_size[0], self.img_size[1]), interpolation=cv2.INTER_NEAREST) #, "nearest", mode="F")
+            lbl = lbl.astype(int)
 
-        if not np.all(np.unique(lbl[lbl != self.ignore_index]) < self.n_classes):
-            print("after det", classes, np.unique(lbl))
-            raise ValueError("Segmentation map contained invalid class values")
-        
-        img = torch.from_numpy(img).float()
-        aux = torch.from_numpy(aux).float()
-        img_display = torch.from_numpy(img_display).float()
-        aux_display = torch.from_numpy(aux_display).float()
-        lbl = torch.from_numpy(lbl).long()
+            # if not np.all(classes == np.unique(lbl)):
+            #     print("WARN: resizing labels yielded fewer classes")
+
+            if not np.all(np.unique(lbl[lbl != self.ignore_index]) < self.n_classes):
+                print("after det", classes, np.unique(lbl))
+                raise ValueError("Segmentation map contained invalid class values")
+            
+            img = torch.from_numpy(img).float()
+            aux = torch.from_numpy(aux).float()
+            img_display = torch.from_numpy(img_display).float()
+            aux_display = torch.from_numpy(aux_display).float()
+            lbl = torch.from_numpy(lbl).long()
+        else:
+            import ipdb;ipdb.set_trace() 
 
         return img, lbl, aux, img_display, aux_display
 
+    # def get_cls_num_list(self):
+    #     cls_num_list = []
+    #     cls_num_dict = Counter(self.classes)
+    #     for k in range(max(self.classes)):
+    #         cls_num_list.append(cls_num_dict[k])
+    #     return cls_num_list
 
 if __name__ == "__main__":
     import torchvision

@@ -10,18 +10,20 @@ import numpy as np
 from torch.utils import data
 from tqdm import tqdm
 import cv2
+from numpy import linalg as LA 
 
 # from ptsemseg.process_img import generate_noise
 from ptsemseg.models import get_model
 from ptsemseg.loss import get_loss_function
 from ptsemseg.loader import get_loaders
-from ptsemseg.utils import get_logger, parseEightCameras, plotPrediction, plotMeansVariances, plotEntropy, plotMutualInfo, plotSpatial, save_pred, plotEverything,mutualinfo_entropy,save_stats,plotAll
+from ptsemseg.utils import Confidence_Diagram, get_logger, parseEightCameras, plotPrediction, plotMeansVariances, plotEntropy, plotMutualInfo, plotSpatial, save_pred, plotEverything,mutualinfo_entropy,save_stats,plotAll
 from ptsemseg.metrics import runningScore, averageMeter
 from ptsemseg.degredations import *
-from ptsemseg.models.fusion.fusion import *
+from ptsemseg.fusion import *
 from tensorboardX import SummaryWriter
 from functools import partial
 from collections import defaultdict
+
 
 
 def random_seed(seed_value, use_cuda):
@@ -55,7 +57,7 @@ def validate(cfg, writer, logger, logdir):
     # Setup Meters
     # val_loss_meter = {m: {env: averageMeter() for env in loaders['val'].keys()} for m in cfg["models"].keys()}
 
-    scale_logits = GlobalScaling(cfg['training_stats'])
+    fusion_scaling = GlobalScaling(cfg['training_stats'])
 
     # set seeds for training
     models = {}
@@ -77,24 +79,7 @@ def validate(cfg, writer, logger, logdir):
         models[model] = torch.nn.DataParallel(models[model], device_ids=range(torch.cuda.device_count()))
 
         # Load pretrained weights
-        # if str(attr['resume']) != "None" or str(attr['resume_temp']) != "None" :
         model_dict = models[model].state_dict()
-        
-        # model_pkl_dict = {}
-
-        # if attr['resume'] != "None":
-        #     model_pkl_dict["single"]= attr['resume']
-        #     #if attr['resume'] == 'same_yaml':
-        #     #    model_pkl = "{}/{}_pspnet_airsim_best_model.pkl".format(logdir, model)
-
-        # if attr['resume_temp'] != "None":
-        #     model_pkl_dict["temp"] = attr['resume_temp']
-
-        # if attr['resume_temp_d'] != "None":
-        #     model_pkl_dict["temp_d"] = attr['resume_temp_d']
-
-        # if attr['resume_temp_rgb'] != "None":
-        #     model_pkl_dict["temp_rgb"] = attr['resume_temp_rgb']
         model_pkl = attr['resume']
         # for model_key,model_pkl in model_pkl_dict.items():
         if os.path.isfile(model_pkl):
@@ -102,41 +87,14 @@ def validate(cfg, writer, logger, logdir):
                 "Loading model and optimizer from checkpoint '{}'".format(model_pkl)
             )
             checkpoint = torch.load(model_pkl)
-            pretrained_dict = torch.load(model_pkl)['model_state']
+            pretrained_dict = checkpoint['model_state']
             # pretrained_dict = {}
 
-            # if model_key == "temp":
-            #     for wieghts_key,weights in pretrained_dict_temp.items():
-            #         if wieghts_key.split('.')[1]=='segnet':
-            #             pretrained_dict[wieghts_key] = weights
-            #         else:
-            #             pretrained_dict['module.tempnet'+wieghts_key.split('module')[1]] = weights
-            # elif model_key == "comp":
-            #     for wieghts_key,weights in pretrained_dict_temp.items():
-            #         if wieghts_key.split('.')[1]=='segnet':
-            #             pretrained_dict[wieghts_key] = weights
-            #         else:
-            #             pretrained_dict['module.compnet'+wieghts_key.split('module')[1]] = weights 
-            # elif model_key == "temp_d":
-            #     for wieghts_key,weights in pretrained_dict_temp.items():
-            #         if wieghts_key.split('.')[1]!='segnet':
-            #             #pretrained_dict[wieghts_key] = weights
-            #         #else:
-            #             pretrained_dict['module.tempnet_d'+wieghts_key.split('module')[1]] = weights
-
-            # elif model_key == "temp_rgb":
-            #     for wieghts_key,weights in pretrained_dict_temp.items():
-            #         if wieghts_key.split('.')[1]!='segnet':
-            #             #pretrained_dict[wieghts_key] = weights
-            #         #else:
-            #             pretrained_dict['module.tempnet_rgb'+wieghts_key.split('module')[1]] = weights
-            # else:
-            # pretrained_dict = pretrained_dict_temp
             # 1. filter out unnecessary keys
             pretrained_dict = {k: v.resize_(model_dict[k].shape) for k, v in pretrained_dict.items() if (
                     k in model_dict)}  # and ((model!="fuse") or (model=="fuse" and not start_layer in k))}
             print("Model {} parameters,Loaded {} parameters".format(len(model_dict),len(pretrained_dict)))
-            #import ipdb;ipdb.set_trace()
+            # import ipdb;ipdb.set_trace()
             model_dict.update(pretrained_dict)
             models[model].load_state_dict(pretrained_dict, strict=False)
             logger.info("Loaded checkpoint '{}' (iter {})".format(model_pkl, checkpoint["epoch"]))
@@ -145,31 +103,54 @@ def validate(cfg, writer, logger, logdir):
             logger.info("No checkpoint found at '{}'".format(model_pkl))
             print("No checkpoint found at '{}'".format(model_pkl))
 
+    stats_dir = '/'.join(logdir.split('/')[:-1])
+    log_prior = torch.load(os.path.join(stats_dir,'stats','log_prior.pkl'))
+    prior = torch.tensor(log_prior).to('cuda').unsqueeze(0).unsqueeze(2).unsqueeze(3)
+    #if cfg['uncertainty']: #"BayesianGMM" or cfg['fusion'] == 'MixedGMM' or cfg['fusion'] == "FixedBayesianGMM"  or cfg['fusion'] == 'LinearGMM':
+    mean_stats = {}
+    cov_stats = {}
+    cov_fixed = {}
+    cov_fixed_inv = {}
+    cov_fixed_det = {}
+    det_cov = {}
+    inv_cov = {}
+    for m in cfg["models"].keys(): 
+        mean_stats[m] = torch.load(os.path.join(stats_dir,'stats',m,'mean.pkl'))
+        cov_stats[m] = torch.load(os.path.join(stats_dir,'stats',m,'cov.pkl'))
+        cov_fixed[m] = torch.load(os.path.join(stats_dir,'stats',m,'cov_fixed.pkl'))
+        
+        cov_fixed[m] = np.delete(cov_fixed[m],[13,14],0)
+        cov_fixed[m] = np.delete(cov_fixed[m],[13,14],1)
 
-    if cfg['fusion'] == "BayesianGMM":
-        mean_stats = {}
-        cov_stats = {}
-        det_cov = {}
-        inv_cov = {}
+        cov_fixed_inv[m] = torch.tensor(np.linalg.inv(cov_fixed[m]),device=device)
+        cov_fixed_det[m] = torch.tensor(np.linalg.det(cov_fixed[m]),device=device) 
 
-        for m in cfg["models"].keys(): 
-            mean_stats[m] = torch.load(os.path.join(logdir,'stats',m,'mean.pkl'))
-            cov_stats[m] = torch.load(os.path.join(logdir,'stats',m,'cov.pkl'))
-            det_cov[m] = [torch.zeros((16,16)) for _ in range(16)]
-            inv_cov[m] = [torch.zeros((16,16)) for _ in range(16)]
 
-            for i in range(16):
-                if i != 13 and i != 14:
-                    mean_stats[m][i] = torch.tensor(mean_stats[m][i],device=device)
-                    det_cov[m][i] = torch.tensor(np.linalg.det(cov_stats[m][i]),device=device) 
-                    inv_cov[m][i] = torch.tensor(np.linalg.inv(cov_stats[m][i]),device=device)
+        for i in range(16):
+            for j in range(2):
+                cov_stats[m][i] = np.delete(cov_stats[m][i],[13,14],j)
+            mean_stats[m][i] = np.delete(mean_stats[m][i],[13,14],0)
+
+
+        det_cov[m] = [torch.zeros((14,14)) for _ in range(16)]
+        inv_cov[m] = [torch.zeros((14,14)) for _ in range(16)]
+
+        for i in range(16):
+            if i != 13 and i != 14:
+                mean_stats[m][i] = torch.tensor(mean_stats[m][i],device=device)
+                det_cov[m][i] = torch.tensor(np.linalg.det(cov_stats[m][i]),device=device) 
+                inv_cov[m][i] = torch.tensor(np.linalg.inv(cov_stats[m][i]),device=device)
+
     [models[m].eval() for m in models.keys()]
     #################################################################################
     # Validation
     #################################################################################
     print("=" * 10, "VALIDATING", "=" * 10)
 
+    
+
     with torch.no_grad():
+        confidence = Confidence_Diagram()
         for k, valloader in loaders['val'].items():
             if cfg["save_stats"]:
                 temp_dict_per_loader = {}
@@ -180,7 +161,7 @@ def validate(cfg, writer, logger, logdir):
                     entropy_dict_per_loader[m] = []
                     MI_dict_per_loader[m]=[]
             for i_val, (input_list, labels_list) in tqdm(enumerate(valloader)):
-                #import ipdb;ipdb.set_trace()
+                # ipdb;ipdb.set_trace()
                 inputs, labels = parseEightCameras(input_list['rgb'], labels_list, input_list['d'], device)
                 inputs_display, _ = parseEightCameras(input_list['rgb_display'], labels_list, input_list['d_display'],
                                                       device)
@@ -205,79 +186,71 @@ def validate(cfg, writer, logger, logdir):
                 # Inference
                 for m in cfg["models"].keys():
                     mean[m], entropy[m], mutual_info[m] = models[m](images_val[m])
-                    if cfg["models"][m]["arch"] == "DeepLab" or "Segnet":
-                        DR[m] = scale_logits(entropy[m],mutual_info[m],modality = m,mode=cfg['scaling_metrics'])
-                        mean[m] = mean[m] * DR[m]
-                    else:
-                        if 'rgb' not in DR:
-                            DR['rgb'] = 1
-                        if 'd' not in DR:
-                            DR['d'] = 1
-                        mean[m] = mean["rgbd"]*torch.min(DR['rgb'],DR['d'])
-                   
-                    entropy_ave[m] = entropy[m].mean((1,2))
-                    MI_ave[m] = mutual_info[m].mean((1,2))
-                # Fusion Type
-                if cfg['fusion'] == "BayesianGMM":
-                    outputs = fusion(cfg["fusion"],mean,cfg,det_cov = det_cov, inv_cov = inv_cov, mean_stats = mean_stats, device = device, batch_size = labels.shape[0] )
-                else:
-                    outputs = fusion(cfg["fusion"],mean,cfg)
+                    if cfg['scaling']:
+                        if cfg["models"][m]["arch"] == "DeepLab" or "Segnet":
+                            DR[m] = fusion_scaling(entropy[m],mutual_info[m],modality = m,mode=cfg['scaling_metrics'])
+                            mean[m] = mean[m] * DR[m]
+                        else:
+                            if 'rgb' not in DR:
+                                DR['rgb'] = 1
+                            if 'd' not in DR:
+                                DR['d'] = 1
+                            mean[m] = mean["rgbd"]*torch.min(DR['rgb'],DR['d'])
+                        
+                entropy_ave[m] = entropy[m].mean((1,2))
+                
+                mean = uncertainty(mean,cfg,det_cov=det_cov,inv_cov=inv_cov,mean_stats=mean_stats,device=device,log_prior=prior)
+                mean = imbalance(mean,cfg,log_prior=log_prior)
+                outputs = fusion(mean,cfg)
+                
                 # import ipdb;ipdb.set_trace()
                 # aggregate training stats
                 if cfg["save_stats"]:
                     for m in cfg["models"].keys():
                         entropy_dict_per_loader[m].extend(entropy_ave[m].cpu().numpy().tolist())
-                        MI_dict_per_loader[m].extend(MI_ave[m].cpu().numpy().tolist())
-                        # if cfg["models"][m]["arch"] == "tempnet":
-                            # temp_dict_per_loader[m].extend(temp_ave[m].cpu().numpy().tolist())
-                
+                        # MI_dict_per_loader[m].extend(MI_ave[m].cpu().numpy().tolist())
+                        
                 # plot ground truth vs mean/variance of outputs
-                if cfg['fusion'] != 'BayesianGMM':            
-                    outputs = outputs/outputs.sum(1).unsqueeze(1)
-                    prob, pred = outputs.max(1)
+                # if cfg['fusion'] == None or cfg['fusion'] == "SoftmaxMultiply" or cfg['fusion'] == 'BayesianGMM' or cfg['fusion'] == 'FixedBayesianGMM' or cfg['fusion'] == 'LinearGMM' or cfg['fusion'] == 'MixedGMM':          
+                #     gt = labels_val
+                #     prob, pred = outputs.max(1)
+                #     confidence.aggregate_stats(prob,pred,gt)
+                #     # import ipdb;ipdb.set_trace()
+                    
+                #     if i_val % cfg["training"]["png_frames"] == 0:
+                #         plotPrediction(logdir, cfg, n_classes, 0, i_val, k, inputs_display, pred, gt)
+                #         for m in cfg["models"].keys():
+                #             _,pred_m = torch.nn.Softmax(dim=1)(mean[m]).max(1)
+                #             plotPrediction(logdir, cfg, n_classes, 0, i_val, k + "/" + m, inputs_display, pred_m, gt)  
+                #else:
+                    # outputs = outputs/outputs.sum(1).unsqueeze(1)
+                prob, pred = outputs.max(1)
+                gt = labels_val
+                confidence.aggregate_stats(prob,pred,gt)
+                e, _ = mutualinfo_entropy(outputs.unsqueeze(-1))
+                if i_val % cfg["training"]["png_frames"] == 0:
+                    plotPrediction(logdir, cfg, n_classes, 0, i_val, k, inputs_display, pred, gt)
+                    labels = ['entropy', 'probability']
+                    values = [e, prob]
+                    plotEverything(logdir, 0, i_val, k + "/fused", values, labels)
 
-                    gt = labels_val
-                    e, _ = mutualinfo_entropy(outputs.unsqueeze(-1))
-                    if i_val % cfg["training"]["png_frames"] == 0:
-                        plotPrediction(logdir, cfg, n_classes, 0, i_val, k, inputs_display, pred, gt)
-                        labels = ['entropy', 'probability']
-                        values = [e, prob]
-                        plotEverything(logdir, 0, i_val, k + "/fused", values, labels)
-
-                        for m in cfg["models"].keys():
-                            prob,pred_m = torch.nn.Softmax(dim=1)(mean[m]).max(1)
-                            # if cfg["models"][m]["arch"] == "tempnet":
-                            #     labels = ['mutual info', 'entropy', 'probability','temperature']
-                            #     values = [mutual_info[m], entropy[m], prob, temp_map[m]]
-                            # else:
-                            labels = ['mutual info', 'entropy', 'probability']
-                            values = [mutual_info[m], entropy[m], prob]
-                            plotPrediction(logdir, cfg, n_classes, 0, i_val, k + "/" + m, inputs_display, pred_m, gt)
-                            plotEverything(logdir, 0, i_val, k + "/" + m, values, labels)
-                else:
-                    _, pred = outputs.max(1)
-                    # import ipdb;ipdb.set_trace()
-                    gt = labels_val
-                    if i_val % cfg["training"]["png_frames"] == 0:
-                        plotPrediction(logdir, cfg, n_classes, 0, i_val, k, inputs_display, pred, gt)
-                        for m in cfg["models"].keys():
-                            _,pred_m = torch.nn.Softmax(dim=1)(mean[m]).max(1)
-                            plotPrediction(logdir, cfg, n_classes, 0, i_val, k + "/" + m, inputs_display, pred_m, gt)
+                    for m in cfg["models"].keys():
+                        prob,pred_m = torch.nn.Softmax(dim=1)(mean[m]).max(1)
+                        labels = ['mutual_info', 'entropy', 'probability']
+                        values = [mutual_info[m], entropy[m], prob]
+                        plotPrediction(logdir, cfg, n_classes, 0, i_val, k + "/" + m, inputs_display, pred_m, gt)
+                        plotEverything(logdir, 0, i_val, k + "/" + m, values, labels)
                     
                 running_metrics_val[k].update(gt.data.cpu().numpy(), pred.cpu().numpy())
             if cfg["save_stats"]:
-                # if cfg["models"][m]["arch"] == "tempnet":
-                    # save_stats(logdir,temp_dict_per_loader,k,cfg,"_temp_")
                 save_stats(logdir,entropy_dict_per_loader,k,cfg,"_entropy_")
-                save_stats(logdir,MI_dict_per_loader,k,cfg,"_MutualInfo_")
+                # save_stats(logdir,MI_dict_per_loader,k,cfg,"_MutualInfo_")
 
-        # for m in cfg["models"].keys():
-        #     for k in loaders['val'].keys():
-        #         writer.add_scalar('loss/val_loss/{}/{}'.format(m, k), val_loss_meter[m][k].avg, 1)
-        #         logger.info("%s %s Iter %d Loss: %.4f" % (m, k, 1, val_loss_meter[m][k].avg))
-
+        confidence.compute_ece()
+        confidence.save(logdir)
+        confidence.print()
     for env, valloader in loaders['val'].items():
-        score, class_iou, class_acc = running_metrics_val[env].get_scores()
+        score, class_iou, class_acc,count = running_metrics_val[env].get_scores()
         for k, v in score.items():
             logger.info('{}: {}'.format(k, v))
             writer.add_scalar('val_metrics/{}/{}'.format(env, k), v,  1)
@@ -290,8 +263,7 @@ def validate(cfg, writer, logger, logdir):
             logger.info('cls_acc_{}: {}'.format(k, v))
             writer.add_scalar('val_metrics/{}/cls_acc{}'.format(env, k), v, 1)
 
-        # for m in cfg["models"].keys():
-        #     val_loss_meter[m][env].reset()
+       
         running_metrics_val[env].reset()
 
 
@@ -306,10 +278,10 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
-        "--tag",
+        "--id",
         nargs="?",
         type=str,
-        default="",
+        default=None,
         help="Unique identifier for different runs",
     )
 
@@ -321,8 +293,17 @@ if __name__ == "__main__":
         help="Directory to rerun",
     )
 
-    args = parser.parse_args()
+    parser.add_argument(
+        "--beta",
+        nargs="?",
+        type=float,
+        default= None,
+        help="parameter for MixedBayesianGMM",
+    )
+    
 
+    args = parser.parse_args()
+    
     # cfg is a  with two-level dictionary ['training','data','model']['batch_size']
     if args.run != "":
 
@@ -348,13 +329,13 @@ if __name__ == "__main__":
     else:
         with open(args.config) as fp:
             cfg = defaultdict(lambda: None, yaml.load(fp))
-
-        logdir = "/".join(["runs"] + args.config.split("/")[1:])[:-4]+'/'+cfg['id']
+        if args.id:
+            cfg['id'] = args.id
+        logdir = "runs" +'/'+ args.config.split("/")[2]+'/'+cfg['id']
 
         # append tag
-        if args.tag:
-            logdir += "/" + args.tag
-
+        
+    # import ipdb;ipdb.set_trace()
     # baseline train (concatenation, warping baselines)
     writer = SummaryWriter(logdir)
     path = shutil.copy(args.config, logdir)
@@ -371,9 +352,12 @@ if __name__ == "__main__":
         with open(path, 'w') as modified:
             modified.write("seed: {}\n".format(seed) + data)
 
+    if args.beta != None:
+        cfg['beta'] = args.beta/100
+
     # validate base model
     validate(cfg, writer, logger, logdir)
 
     print('done')
-    # time.sleep(10)
+    time.sleep(10)
     writer.close()

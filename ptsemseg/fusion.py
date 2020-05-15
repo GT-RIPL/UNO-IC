@@ -385,160 +385,88 @@ def compute_log_normal(cfg,inputs,det_cov,inv_cov,mean,cl):
         inputs = inputs.transpose(2,1).transpose(3,2).reshape(-1,14)
         temp = inputs - mean[cl].T # (batch,10)
 
-        # temp1_max =  torch.max(inputs,dim=1,keepdim=True)[0]
-        # temp1 = torch.exp(inputs - temp1_max).sum(1)  
         cnst = -0.5*(14*np.log(2*3.14) + torch.log(det_cov[cl])) #float
         cnst2 = -inputs.sum(1) +  torch.logsumexp(inputs, 1, keepdim=False)*14#(torch.log(temp1)+temp1_max.squeeze())* 14# batch
-        
-        temp =  cnst + cnst2 + -1/2 * (torch.mm(temp,inv_cov[cl]) * temp).sum(1)
+        temp =  cnst-1/2 * (torch.mm(temp,inv_cov[cl]) * temp).sum(1)
         temp = temp.reshape(-1,cfg['data']['img_cols'],cfg['data']['img_rows'])
         # import ipdb;ipdb.set_trace()
         return temp
 
-def compute_log_normal_fixed(cfg,inputs,det_cov,inv_cov,mean,cl):
-        # inputs [batch,num_class,760,1280]
-        inputs = inputs.transpose(2,1).transpose(3,2).reshape(-1,14)
-        temp = inputs - mean[cl].T # (batch,10)
-        # temp1_max =  torch.max(inputs,dim=1,keepdim=True)[0]
-        # temp1 = torch.exp(inputs - temp1_max).sum(1)  
-        cnst = -0.5*(14*np.log(2*3.14) + torch.log(det_cov)) #float
-        cnst2 = -inputs.sum(1) +  torch.logsumexp(inputs, 1, keepdim=False)#(torch.log(temp1)+temp1_max.squeeze())* 14# batch
+# def compute_log_normal_fixed(cfg,inputs,det_cov,inv_cov,mean,cl):
+#         # inputs [batch,num_class,760,1280]
         
-        temp =  cnst + cnst2 + -1/2 * (torch.mm(temp,inv_cov) * temp).sum(1)
-        temp = temp.reshape(-1,cfg['data']['img_cols'],cfg['data']['img_rows'])
-        # import ipdb;ipdb.set_trace()
-        return temp
-
-# def compute_evidence(cfg,inputs,det_cov,inv_cov,mean,cl):
 #         inputs = inputs.transpose(2,1).transpose(3,2).reshape(-1,14)
 #         temp = inputs - mean[cl].T # (batch,10)
-#         temp =   -1/2 * (torch.mm(temp,inv_cov) * temp).sum(1)
+#         # temp1_max =  torch.max(inputs,dim=1,keepdim=True)[0]
+#         # temp1 = torch.exp(inputs - temp1_max).sum(1)  
+#         cnst = -0.5*(14*np.log(2*3.14) + torch.log(det_cov)) #float
+#         cnst2 = -inputs.sum(1) +  torch.logsumexp(inputs, 1, keepdim=False)#(torch.log(temp1)+temp1_max.squeeze())* 14# batch
+        
+#         temp =  cnst -1/2 * (torch.mm(temp,inv_cov) * temp).sum(1)
 #         temp = temp.reshape(-1,cfg['data']['img_cols'],cfg['data']['img_rows'])
 #         return temp
 
 
-def fusion(fusion_type,mean,cfg,**kargs):
-    if fusion_type== "None":
-        outputs = torch.nn.Softmax(dim=1)(mean[list(cfg["models"].keys())[0]])
-    elif fusion_type == "SoftmaxMultiply":
-        outputs = torch.nn.Softmax(dim=1)(mean["rgb"]) * torch.nn.Softmax(dim=1)(mean["d"])
-        if 'rgbd' in mean:
-            outputs = outputs * torch.nn.Softmax(dim=1)(mean["rgbd"])
-    elif fusion_type == "SoftmaxAverage":
-        outputs = torch.nn.Softmax(dim=1)(mean["rgb"]) + torch.nn.Softmax(dim=1)(mean["d"])
-        if 'rgbd' in mean:
-            outputs = outputs + torch.nn.Softmax(dim=1)(mean["rgbd"])
-    elif fusion_type == "Noisy-Or":
-        if 'rgbd' in mean:
-            outputs = 1 - (1 - torch.nn.Softmax(dim=1)(mean["rgb"])) * (1 - torch.nn.Softmax(dim=1)(mean["d"])) * (1 - torch.nn.Softmax(dim=1)(mean["rgbd"])) #[batch,11,512,512,1]
+
+def uncertainty(mean,cfg,**kargs):
+    outputs = {}
+    for m in cfg["models"].keys():
+        if not cfg['uncertainty']:
+            outputs[m] = torch.nn.Softmax(dim=1)(mean[m])
         else:
-            outputs = 1 - (1 - torch.nn.Softmax(dim=1)(mean["rgb"])) * (1 - torch.nn.Softmax(dim=1)(mean["d"])) #[batch,11,512,512,1]
-    elif fusion_type == "Stacked-Noisy-Or":
-        soft = torch.nn.Softmax(dim=1)(mean["rgb"]) * torch.nn.Softmax(dim=1)(mean["d"]) * torch.nn.Softmax(dim=1)(mean["rgbd"])#[batch,11,512,512,1]
-        soft = soft/soft.sum(1).unsqueeze(1)
+            log_liklihood = torch.zeros((mean[m].shape[0],mean[m].shape[1],cfg['data']['img_cols'],cfg['data']['img_rows']),device=kargs['device'])
+            mean_temp = np.delete(mean[m].cpu(),[13,14],1).to("cuda")
+            for cl in range(16):
+                if cl != 13 and cl != 14:
+                    log_liklihood[:,cl,:,:] = compute_log_normal(cfg,mean_temp,kargs['det_cov'][m],kargs['inv_cov'][m],kargs['mean_stats'][m],cl)#[batch,11,512,512,1]              
+
+            posterior = torch.nn.Softmax(dim=1)(mean[m])
+            likelihood = torch.exp(log_liklihood+kargs['log_prior'])#*posterior #*torch.exp()
+            # outputs[m] = joint/joint.sum(1).unsqueeze(1)
+            marginal = likelihood.sum(1).unsqueeze(1)
+            outputs[m] = posterior*marginal #
+            # outputs[m][:,13:15,:,:] = 0.0
+            # import ipdb;ipdb.set_trace()
+            # outputs[m] = outputs[m]/outputs[m].sum(1).unsqueeze(1)
+    return outputs
+
+def fusion(mean,cfg,**kargs):
+    if cfg["fusion"] == "None":
+        outputs = mean[list(cfg["models"].keys())[0]]
+    elif cfg["fusion"] == "SoftmaxMultiply":
+        outputs = mean["rgb"] * mean["d"]
         if 'rgbd' in mean:
-            outputs = 1 - (1-soft)*(1 - torch.nn.Softmax(dim=1)(mean["rgb"])) * (1 - torch.nn.Softmax(dim=1)(mean["d"])) * (1 - torch.nn.Softmax(dim=1)(mean["rgbd"])) #[batch,11,512,512,1]
+            outputs = outputs * mean["rgbd"]
+    elif cfg["fusion"] == "SoftmaxAverage":
+        outputs = mean["rgb"] + mean["d"]
+        if 'rgbd' in mean:
+            outputs = outputs + mean["rgbd"]
+    elif cfg["fusion"] == "Noisy-Or":
+        if 'rgbd' in mean:
+            outputs = 1 - (1 - mean["rgb"]) * (1 - mean["d"]) * (1 - mean["rgbd"]) #[batch,11,512,512,1]
         else:
-            outputs = 1 - (1-soft)*(1 - torch.nn.Softmax(dim=1)(mean["rgb"])) * (1 - torch.nn.Softmax(dim=1)(mean["d"])) #[batch,11,512,512,1]
-    
-    elif cfg["fusion"] == "ML":
+            outputs = 1 - (1 - mean["rgb"]) * (1 - mean["d"]) #[batch,11,512,512,1]
+    return outputs 
+
+
+def imbalance(mean,cfg,**kargs):
+    if not cfg["imbalance"]:
+        return mean
+    outputs = {}
+    for m in cfg["models"].keys():
         prior = torch.tensor(1/np.exp(kargs['log_prior'])).to('cuda').unsqueeze(0).unsqueeze(2).unsqueeze(3)
         prior[prior == float("inf")] = 0
-        outputs = torch.nn.Softmax(dim=1)(mean["rgb"]) * torch.nn.Softmax(dim=1)(mean["d"])
-        outputs = outputs/outputs.sum(1).unsqueeze(1)
+        # outputs = torch.nn.Softmax(dim=1)(mean["rgb"]) * torch.nn.Softmax(dim=1)(mean["d"])
+        # outputs = outputs/outputs.sum(1).unsqueeze(1)
         #rebalance_prior = [1/23]*19
         #rebalance_prior = np.array(rebalance_prior)
         #rebalance_prior[13:15] = 0
         #rebalance_prior[16:] = 0
         #rebalance_prior[10] = 10/23
         #outputs_temp = outputs*prior*torch.tensor(rebalance_prior).to('cuda').unsqueeze(0).unsqueeze(2).unsqueeze(3)
-        outputs_temp = outputs*prior
-        outputs_temp = outputs_temp/outputs_temp.sum(1).unsqueeze(1)
-        outputs = outputs**cfg['beta'] * outputs_temp**(1-cfg['beta'])
-        outputs = outputs/outputs.sum(1).unsqueeze(1)
-        
-    elif cfg["fusion"] == "LinearGMM":
-        outputs = torch.zeros((kargs['batch_size'],19,cfg['data']['img_cols'],cfg['data']['img_rows']),device=kargs['device'])
-        log_liklihood = torch.zeros((kargs['batch_size'],19,cfg['data']['img_cols'],cfg['data']['img_rows']),device=kargs['device'])
-        for m in cfg["models"].keys():  
-            log_posterior = F.log_softmax(mean[m],dim=1)   
-            mean[m] = np.delete(mean[m].cpu(),[13,14,16,17,18],1).to("cuda")
-            for cl in range(16):
-                if cl != 13 and cl != 14:
-                    log_liklihood[:,cl,:,:] = compute_log_normal(cfg,mean[m],kargs['det_cov'][m],kargs['inv_cov'][m],kargs['mean_stats'][m],cl) #+ kargs['log_prior'][cl]#[batch,11,512,512,1]  
-            log_evidence = torch.logsumexp(log_liklihood, 1, keepdim=True)
-            pseudo_log_posterior = log_liklihood - log_evidence
-            outputs += (cfg['beta']*torch.exp(log_posterior) + (1-cfg['beta'])*torch.exp(pseudo_log_posterior))/len(cfg["models"])
-        # outputs = torch.exp(outputs)
-        # outputs = outputs/outputs.sum(1).unsqueeze(1)
-
-    elif cfg["fusion"] == "BayesianGMM":
-        outputs = torch.zeros((kargs['batch_size'],19,cfg['data']['img_cols'],cfg['data']['img_rows']),device=kargs['device'])
-        log_liklihood = torch.zeros((kargs['batch_size'],19,cfg['data']['img_cols'],cfg['data']['img_rows']),device=kargs['device'])
-        log_joint = torch.zeros((kargs['batch_size'],19,cfg['data']['img_cols'],cfg['data']['img_rows']),device=kargs['device'])
-        # log_posterior = torch.zeros((kargs['batch_size'],19,cfg['data']['img_cols'],cfg['data']['img_rows']),device=kargs['device'])
-        log_posterior_d = torch.zeros((kargs['batch_size'],19,cfg['data']['img_cols'],cfg['data']['img_rows']),device=kargs['device'])
-        prior = torch.tensor(1/np.exp(kargs['log_prior'])).to('cuda').unsqueeze(0).unsqueeze(2).unsqueeze(3)
-        prior[prior == float("inf")] = 0
-        for m in cfg["models"].keys():  
-            log_posterior_d += F.log_softmax(mean[m],dim=1) 
-            #posterior = torch.nn.Softmax(dim=1)(mean[m]) * prior
-            #posterior = posterior/posterior.sum(1).unsqueeze(1)
-            #log_posterior += torch.log(posterior)
-            mean[m] = np.delete(mean[m].cpu(),[13,14,16,17,18],1).to("cuda")
-            for cl in range(16):
-                if cl != 13 and cl != 14:
-                    log_liklihood[:,cl,:,:] = compute_log_normal(cfg,mean[m],kargs['det_cov'][m],kargs['inv_cov'][m],kargs['mean_stats'][m],cl) + kargs['log_prior'][cl]#[batch,11,512,512,1]  
-            
-            log_joint += log_liklihood
-        log_evidence = torch.logsumexp(np.delete(log_joint.cpu(),[13,14,16,17,18],1).to("cuda"), 1, keepdim=True)
-        pseudo_log_posterior = log_joint - log_evidence
-        pseudo_log_posterior[:,13:15,:,:] = -1000
-        pseudo_log_posterior[:,16:19,:,:] = -1000
-        outputs = cfg['beta']/len(cfg["models"])*log_posterior_d + (1-cfg['beta'])*pseudo_log_posterior
-        outputs = torch.exp(outputs)
-        outputs = outputs/outputs.sum(1).unsqueeze(1)
-
-    elif cfg["fusion"] == "MixedGMM":
-        #outputs = torch.zeros((kargs['batch_size'],19,cfg['data']['img_cols'],cfg['data']['img_rows']),device=kargs['device'])
-        log_liklihood = torch.zeros((kargs['batch_size'],19,cfg['data']['img_cols'],cfg['data']['img_rows']),device=kargs['device'])
-        joint = torch.zeros((kargs['batch_size'],19,cfg['data']['img_cols'],cfg['data']['img_rows']),device=kargs['device'])
-        log_posterior = torch.zeros((kargs['batch_size'],19,cfg['data']['img_cols'],cfg['data']['img_rows']),device=kargs['device'])
-        for m in cfg["models"].keys():  
-            log_posterior += F.log_softmax(mean[m],dim=1) 
-            mean[m] = np.delete(mean[m].cpu(),[13,14,16,17,18],1).to("cuda")
-            for cl in range(16):
-                if cl != 13 and cl != 14:
-                    log_liklihood[:,cl,:,:] = compute_log_normal(cfg,mean[m],kargs['det_cov'][m],kargs['inv_cov'][m],kargs['mean_stats'][m],cl) #+ kargs['log_prior'][cl]#[batch,11,512,512,1]  
-            
-            log_evidence = torch.logsumexp(log_liklihood, 1, keepdim=True)
-            liklihood = torch.exp(log_liklihood-log_evidence) 
-            joint += liklihood
-        #log_evidence = torch.logsumexp(np.delete(log_joint.cpu(),[13,14,16,17,18],1).to("cuda"), 1, keepdim=True)
-        #pseudo_log_posterior = log_joint - log_evidence
-        #pseudo_log_posterior[:,13:15,:,:] = -1000
-        #pseudo_log_posterior[:,16:19,:,:] = -1000
-        outputs = cfg['beta']/len(cfg["models"])*log_posterior + (1-cfg['beta'])*torch.log(joint/len(cfg["models"])+ 1e-7)
-        outputs = torch.exp(outputs)
-        outputs = outputs/outputs.sum(1).unsqueeze(1)
-
-
-
-    elif cfg["fusion"] == "FixedBayesianGMM":
-        outputs = torch.zeros((kargs['batch_size'],19,cfg['data']['img_cols'],cfg['data']['img_rows']),device=kargs['device'])
-        log_liklihood = torch.zeros((kargs['batch_size'],19,cfg['data']['img_cols'],cfg['data']['img_rows']),device=kargs['device'])
-        for m in cfg["models"].keys():
-            log_posterior = F.log_softmax(mean[m],dim=1)        
-            mean[m] = np.delete(mean[m].cpu(),[13,14,16,17,18],1).to("cuda")
-            for cl in range(16):
-                if cl != 13 and cl != 14:
-                    log_liklihood[:,cl,:,:] += compute_log_normal_fixed(cfg,mean[m],kargs['det_cov'][m],kargs['inv_cov'][m],kargs['mean_stats'][m],cl) + kargs['log_prior'][cl] # 
-            import ipdb;ipdb.set_trace()
-            log_evidence = torch.logsumexp(log_liklihood, 1, keepdim=True)
-            outputs += cfg['beta']*log_posterior + (1-cfg['beta'])*(log_liklihood - log_evidence)
-        outputs = torch.exp(outputs)
-        outputs = outputs/outputs.sum(1).unsqueeze(1)
-
-    else:
-        print("Fusion Type Not Supported")
+        # mean[m] = torch.nn.Softmax(dim=1)(mean[m])
+        mean_temp = mean[m]*prior
+        mean_temp = mean_temp/mean_temp.sum(1).unsqueeze(1)
+        mean_temp = mean[m]**cfg['beta'] * mean_temp**(1-cfg['beta']) # why multiplication ????
+        outputs[m] = mean_temp/mean_temp.sum(1).unsqueeze(1)
     return outputs

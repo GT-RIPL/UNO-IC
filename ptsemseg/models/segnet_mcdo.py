@@ -157,12 +157,12 @@ class segnet_mcdo(nn.Module):
         return mean, variance, entropy, mutual_info
 
     def forward(self,inputs,mcdo=True):
-        with torch.no_grad():
-            for i in range(self.mcdo_passes):
-                if i == 0:
-                    x = self._forward(inputs,mcdo=mcdo).unsqueeze(-1)
-                else:
-                    x = torch.cat((x, self._forward(inputs).unsqueeze(-1)), -1)
+        #with torch.no_grad():
+        for i in range(self.mcdo_passes):
+            if i == 0:
+                x = self._forward(inputs,mcdo=mcdo).unsqueeze(-1)
+            else:
+                x = torch.cat((x, self._forward(inputs).unsqueeze(-1)), -1)
 
         mean = x.mean(-1)
         prob = self.softmaxMCDO(x)

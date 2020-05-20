@@ -25,11 +25,11 @@ class CrossEntropy(nn.Module):
         return loss
 
 
-def focal_loss(input_values, gamma):
-    """Computes the focal loss"""
-    p = torch.exp(-input_values)
-    loss = (1 - p) ** gamma * input_values
-    return loss.mean()
+# def focal_loss(input_values, gamma):
+#     """Computes the focal loss"""
+#     p = torch.exp(-input_values)
+#     loss = (1 - p) ** gamma * input_values
+#     return loss.mean()
 
 class FocalLoss(nn.Module):
     def __init__(self, weight=None, size_average = True, gamma=1):
@@ -50,7 +50,18 @@ class FocalLoss(nn.Module):
             input = F.upsample(input, size=(ht, wt), mode="bilinear", align_corners=True)
         input = input.transpose(1, 2).transpose(2, 3).contiguous().view(-1, c)
         target = target.view(-1)
-        return focal_loss(F.cross_entropy(input, target, reduction='none', weight=self.weight,size_average=self.size_average), self.gamma)
+
+        CE = F.cross_entropy(input, target, reduction='none')
+        p = torch.exp(-CE)
+        if self.weight is not None:
+            loss = (1 - p) ** self.gamma * self.weight[target] * CE
+        else: 
+            loss = (1 - p) ** self.gamma * CE
+        if self.size_average:
+            return loss.mean()
+        else:
+            return loss.sum()
+        # return focal_loss(F.cross_entropy(input, target, reduction='none', weight=self.weight,size_average=self.size_average), self.gamma)
 
 class LDAMLoss(nn.Module):
     

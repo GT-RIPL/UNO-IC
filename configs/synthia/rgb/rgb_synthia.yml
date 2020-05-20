@@ -42,7 +42,7 @@ data:
     val_reduction: 1.0
     img_rows: 768
     img_cols: 384
-    path: /home/jtian73/datasets/synthia-seq/ ##datasets/airsim_data_async #../../ros/data/airsim_03-30-2019/airsim_data_async
+    path: /datasets/synthia-seq/ #/home/jtian73/datasets/synthia-seq/ ##datasets/airsim_data_async #../../ros/data/airsim_03-30-2019/airsim_data_async
     noisy_type: None 
 training:
     seed: 1337
@@ -51,7 +51,7 @@ training:
     batch_size: 4
     val_interval: 10000 #5000
     save_iters: 10000
-    n_workers: 0
+    n_workers: 6
     print_interval: 50
     png_frames: 50 #5000
     optimizer:

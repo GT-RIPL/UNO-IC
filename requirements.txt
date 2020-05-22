@@ -1,2 +1,12 @@
+matplotlib==3.2.1
+scipy==1.4.1
+torch==1.4.0
+tqdm==4.46.0
 tensorboardX
+pyyaml
+pandas
+opencv-python
+scikit-image
 wand
+
+

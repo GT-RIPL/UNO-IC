@@ -161,7 +161,7 @@ class ResNet(nn.Module):
         #     if k in state_dict:
         #         model_dict[k] = v
         # state_dict.update(model_dict)
-
+        print('\n\n load parameters\n\n')
         model_dict = self.state_dict()
         pretrain_dict = {k: v for k, v in pretrain_dict.items() if k in model_dict and v.shape == model_dict[k].shape}
         model_dict.update(pretrain_dict) 
@@ -169,7 +169,7 @@ class ResNet(nn.Module):
         
         # self.load_state_dict(state_dict)
 
-def resnet18(output_stride, BatchNorm, pretrained=True):
+def resnet18(output_stride, BatchNorm, pretrained=False):
     r"""ResNet-18 model from
     `"Deep Residual Learning for Image Recognition" <https://arxiv.org/pdf/1512.03385.pdf>`_
 
@@ -180,7 +180,7 @@ def resnet18(output_stride, BatchNorm, pretrained=True):
     return ResNet('resnet18', Bottleneck, [2, 2, 2, 2], output_stride,BatchNorm,pretrained=pretrained)
 
 
-def resnet101(output_stride, BatchNorm, pretrained=True):
+def resnet101(output_stride, BatchNorm, pretrained=False):
     """Constructs a ResNet-101 model.
     Args:
         pretrained (bool): If True, returns a model pre-trained on ImageNet

@@ -47,7 +47,7 @@ data:
 training:
     seed: 1337
     reweight: False
-    train_iters: 250000
+    train_iters: 100000
     batch_size: 4
     val_interval: 10000 #5000
     save_iters: 10000
@@ -58,7 +58,7 @@ training:
         name: 'adam'
         lr: 1.0e-5
     loss:
-        name: 'CE' #CE,Focal,LDAM
+        name: 'LDAM' #CE,Focal,LDAM
         Focal:
             gamma: 1.0
             size_average: True

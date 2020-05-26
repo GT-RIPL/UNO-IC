@@ -47,7 +47,7 @@ data:
 training:
     seed: 1337
     reweight: False
-    train_iters: 250000
+    train_iters: 100000
     batch_size: 4
     val_interval: 10000 #5000
     save_iters: 10000

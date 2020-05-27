@@ -16,10 +16,12 @@ def get_loss_function(cfg,weights,cls_num_list):
     else:
         loss_dict = cfg['training']['loss']
         loss_name = loss_dict['name']
-        loss_params = {k:v for k,v in loss_dict[loss_name].items()}
         if loss_name not in key2loss:
             raise NotImplementedError('Loss {} not implemented'.format(loss_name))
-        elif loss_name == 'LDAM':
+
+        loss_params = {k:v for k,v in loss_dict[loss_name].items()}
+        
+        if loss_name == 'LDAM':
             loss_params['cls_num_list'] = cls_num_list
         loss_params['weight'] = weights
         

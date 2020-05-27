@@ -5,6 +5,7 @@ import torch.nn.functional as F
 
 class CrossEntropy(nn.Module):
     def __init__(self, weight=None, size_average=True):
+        super(CrossEntropy, self).__init__()
         self.weight = weight
         self.size_average = size_average
 

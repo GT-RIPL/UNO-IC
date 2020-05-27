@@ -7,7 +7,7 @@ from .sync_batchnorm.batchnorm import SynchronizedBatchNorm2d
 class Decoder(nn.Module):
     def __init__(self, num_classes, backbone, BatchNorm):
         super(Decoder, self).__init__()
-        if backbone == 'resnet' or backbone == 'drn':
+        if backbone == 'resnet101' or backbone == 'resnet18' or backbone == 'drn':
             low_level_inplanes = 256
             high_level_inplanes = 304
         elif backbone == 'xception':

@@ -124,7 +124,6 @@ def validate(cfg, logdir):
                                 mean_stats[m][i] = mean_stats[m][i] + (temp.sum((0,2,3)).unsqueeze(1)  - mean_stats[m][i]*length_temp)/length[m][i]  
                                 temp_reshape = temp.transpose(1,0).reshape(n_classes,-1) #(size,batch)
                                 # indices = temp_reshape.sum(1) != 0
-                                    
                                 cov_stats[m][i] = cov_stats[m][i] + (torch.mm(temp_reshape,temp_reshape.T) - cov_stats[m][i]*length_temp)/length[m][i]
         
         save_dir = os.path.join(logdir,'stats')
@@ -147,9 +146,10 @@ def validate(cfg, logdir):
         # stats_dir = '/'.join(logdir.split('/')[:-1])
         torch.save(log_prior, os.path.join(logdir,'stats','log_prior.pkl'))
         print(length[m]/length[m].sum())
+        print('saved prior at {}'.format(os.path.join(logdir,'stats','log_prior.pkl')))
 
 if __name__ == "__main__":
-    # python extract.py --config ./configs/synthia/rgbd_synthia.yml --save
+    # python extract.py --config ./configs/synthia/rgbd_synthia.yml --only_prior
     parser = argparse.ArgumentParser(description="config")
     parser.add_argument(
         "--config",
@@ -157,14 +157,6 @@ if __name__ == "__main__":
         type=str,
         default="configs/train/rgbd_BayesianSegnet_0.5_T000.yml",
         help="Configuration file to use",
-    )
-
-    parser.add_argument(
-        "--id",
-        nargs="?",
-        type=str,
-        default=None,
-        help="Unique identifier for different runs",
     )
 
     parser.add_argument(
@@ -183,8 +175,7 @@ if __name__ == "__main__":
 
     with open(args.config) as fp:
         cfg = defaultdict(lambda: None, yaml.load(fp))
-    if args.id:
-        cfg['id'] = args.id
+
     logdir = "runs" +'/'+ args.config.split("/")[2]#+'/'+cfg['id']
 
     # baseline train (concatenation, warping baselines)

@@ -3,11 +3,11 @@ models:
     rgb:
         arch: DeepLab
         backbone: resnet
-        resume: /home/jtian73/pytorch-semseg/checkpoint/synthia-seq/deeplab/unweighted/rgb/rgb_DeepLab_synthia_best_model.pkl #/home/jtian73/fusi11_backup/runs/configs/experiments/icra_configs/rgbd_TempNet_T000+T050_pretrain_1/rgb_tempnet_airsim_100000_model.pkl
-    d:
-        arch: DeepLab
-        backbone: resnet
-        resume: /home/jtian73/pytorch-semseg/checkpoint/synthia-seq/deeplab/unweighted/d/d_DeepLab_synthia_best_model.pkl #d_DeepLab_synthia_best_model.pkl #/home/jtian73/fusion_backup/runs/configs/experiments/icra_configs/rgbd_TempNet_T000+T050_pretrain_1/d_tempnet_airsim_100000_model.pkl
+        resume:  /home/jtian73/pytorch-semseg/runs/synthia/rgb_synthia_seq_focal_1/best_model/rgb_DeepLab_synthia_best_model.pkl  #/home/jtian73/pytorch-semseg/checkpoint/synthia-seq/deeplab/unweighted/rgb/rgb_DeepLab_synthia_best_model.pkl #/home/jtian73/fusi11_backup/runs/configs/experiments/icra_configs/rgbd_TempNet_T000+T050_pretrain_1/rgb_tempnet_airsim_100000_model.pkl
+    # d:
+    #     arch: DeepLab
+    #     backbone: resnet
+    #     resume: /home/jtian73/pytorch-semseg/checkpoint/synthia-seq/deeplab/unweighted/d/d_DeepLab_synthia_best_model.pkl #d_DeepLab_synthia_best_model.pkl #/home/jtian73/fusion_backup/runs/configs/experiments/icra_configs/rgbd_TempNet_T000+T050_pretrain_1/d_tempnet_airsim_100000_model.pkl
     # rgbd:
     #     arch: SSMA
     #     resume: /home/wcheung8/pytorch-stsiemseg/runs/synthia-seq/segnet/SSMA/best_model/rgbd_SSMA_synthia_best_model.pkl #/home/jtian73/fusion_backup/runs/configs/experiments/fusion/SSMA/SSMA_T000+T050/best_model/rgbd_SSMA_airsim_best_model.pkl
@@ -18,7 +18,7 @@ scaling_metrics: SoftEn #Mixed #AveTemp  #SoftEn #MI
 uncertainty: False
 imbalance: False #None #None ML  
 beta: 0.6
-fusion: SoftmaxAverage #Noisy-Or   #Stacked-Noisy-Or  #Noisy-Or # #{None,SoftmaxMultiply} SoftmaxAverage
+fusion: None #Noisy-Or   #Stacked-Noisy-Or  #Noisy-Or # #{None,SoftmaxMultiply} SoftmaxAverage
 
 save_stats: False
 save_dir: /home/jtian73/pytorch-semseg/
@@ -32,23 +32,23 @@ data:
     train_reduction: 1.0
     val_split: test
     val_subsplit: [
-                   #'SYNTHIA-SEQS-05-DAWN',
-                   #'SYNTHIA-SEQS-05-SUMMER',
-                   #'SYNTHIA-SEQS-05-NIGHT', 
-                   #'SYNTHIA-SEQS-05-SUNSET',
+                   'SYNTHIA-SEQS-05-DAWN',
+                   'SYNTHIA-SEQS-05-SUMMER',
+                   'SYNTHIA-SEQS-05-NIGHT', 
+                   'SYNTHIA-SEQS-05-SUNSET',
                    #'SYNTHIA-SEQS-05-FOG',
                    #'SYNTHIA-SEQS-05-SPRING',
                    #'SYNTHIA-SEQS-05-FALL',
                    #'SYNTHIA-SEQS-05-WINTER',
                    #'SYNTHIA-SEQS-05-WINTERNIGHT',
-                   'SYNTHIA-SEQS-05-RAIN',
+                   #'SYNTHIA-SEQS-05-RAIN',
                    #'SYNTHIA-SEQS-05-RAINNIGHT',
                    #'SYNTHIA-SEQS-05-SOFTRAIN',
                   ]    
-    val_reduction: 0.1
+    val_reduction: 1.0
     img_rows: 768
     img_cols: 384
-    path: /home/jtian73/datasets/synthia-seq/ ##datasets/airsim_data_async #../../ros/data/airsim_03-30-2019/airsim_data_async
+    path: /datasets/synthia-seq/ ##datasets/airsim_data_async #../../ros/data/airsim_03-30-2019/airsim_data_async
     noisy_type: None 
 training:
     weight: None
@@ -56,7 +56,7 @@ training:
     batch_size: 16 #4
     val_interval: 10000 #5000
     save_iters: 10000
-    n_workers: 0
+    n_workers: 6
     print_interval: 5
     png_frames: 5 #5000
     optimizer:

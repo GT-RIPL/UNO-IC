@@ -134,7 +134,7 @@ def train(cfg, writer, logger, logdir):
     else:
         per_cls_weights = None 
         cls_num_list = None
-        
+    import ipdb;ipdb.set_trace()
     loss_fn = get_loss_function(cfg,weights=per_cls_weights,cls_num_list=cls_num_list)
     print("Using loss {}".format(loss_fn))
     i = start_iter

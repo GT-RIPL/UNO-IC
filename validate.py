@@ -106,40 +106,40 @@ def validate(cfg, writer, logger, logdir):
     stats_dir = '/'.join(logdir.split('/')[:-1])
     log_prior = torch.load(os.path.join(stats_dir,'stats','log_prior.pkl'))
     prior = torch.tensor(log_prior).to('cuda').unsqueeze(0).unsqueeze(2).unsqueeze(3)
-    if cfg['uncertainty']: #"BayesianGMM" or cfg['fusion'] == 'MixedGMM' or cfg['fusion'] == "FixedBayesianGMM"  or cfg['fusion'] == 'LinearGMM':
-        mean_stats = {}
-        cov_stats = {}
-        cov_fixed = {}
-        cov_fixed_inv = {}
-        cov_fixed_det = {}
-        det_cov = {}
-        inv_cov = {}
-        for m in cfg["models"].keys(): 
-            mean_stats[m] = torch.load(os.path.join(stats_dir,'stats',m,'mean.pkl'))
-            cov_stats[m] = torch.load(os.path.join(stats_dir,'stats',m,'cov.pkl'))
-            cov_fixed[m] = torch.load(os.path.join(stats_dir,'stats',m,'cov_fixed.pkl'))
-            
-            cov_fixed[m] = np.delete(cov_fixed[m],[13,14],0)
-            cov_fixed[m] = np.delete(cov_fixed[m],[13,14],1)
+    # if cfg['uncertainty']: #"BayesianGMM" or cfg['fusion'] == 'MixedGMM' or cfg['fusion'] == "FixedBayesianGMM"  or cfg['fusion'] == 'LinearGMM':
+    mean_stats = {}
+    cov_stats = {}
+    cov_fixed = {}
+    cov_fixed_inv = {}
+    cov_fixed_det = {}
+    det_cov = {}
+    inv_cov = {}
+    for m in cfg["models"].keys(): 
+        mean_stats[m] = torch.load(os.path.join(stats_dir,'stats',m,'mean.pkl'))
+        cov_stats[m] = torch.load(os.path.join(stats_dir,'stats',m,'cov.pkl'))
+        cov_fixed[m] = torch.load(os.path.join(stats_dir,'stats',m,'cov_fixed.pkl'))
+        
+        cov_fixed[m] = np.delete(cov_fixed[m],[13,14],0)
+        cov_fixed[m] = np.delete(cov_fixed[m],[13,14],1)
 
-            cov_fixed_inv[m] = torch.tensor(np.linalg.inv(cov_fixed[m]),device=device)
-            cov_fixed_det[m] = torch.tensor(np.linalg.det(cov_fixed[m]),device=device) 
-
-
-            for i in range(16):
-                for j in range(2):
-                    cov_stats[m][i] = np.delete(cov_stats[m][i],[13,14],j)
-                mean_stats[m][i] = np.delete(mean_stats[m][i],[13,14],0)
+        cov_fixed_inv[m] = torch.tensor(np.linalg.inv(cov_fixed[m]),device=device)
+        cov_fixed_det[m] = torch.tensor(np.linalg.det(cov_fixed[m]),device=device) 
 
 
-            det_cov[m] = [torch.zeros((14,14)) for _ in range(16)]
-            inv_cov[m] = [torch.zeros((14,14)) for _ in range(16)]
+        for i in range(16):
+            for j in range(2):
+                cov_stats[m][i] = np.delete(cov_stats[m][i],[13,14],j)
+            mean_stats[m][i] = np.delete(mean_stats[m][i],[13,14],0)
 
-            for i in range(16):
-                if i != 13 and i != 14:
-                    mean_stats[m][i] = torch.tensor(mean_stats[m][i],device=device)
-                    det_cov[m][i] = torch.tensor(np.linalg.det(cov_stats[m][i]),device=device) 
-                    inv_cov[m][i] = torch.tensor(np.linalg.inv(cov_stats[m][i]),device=device)
+
+        det_cov[m] = [torch.zeros((14,14)) for _ in range(16)]
+        inv_cov[m] = [torch.zeros((14,14)) for _ in range(16)]
+
+        for i in range(16):
+            if i != 13 and i != 14:
+                mean_stats[m][i] = torch.tensor(mean_stats[m][i],device=device)
+                det_cov[m][i] = torch.tensor(np.linalg.det(cov_stats[m][i]),device=device) 
+                inv_cov[m][i] = torch.tensor(np.linalg.inv(cov_stats[m][i]),device=device)
 
     [models[m].eval() for m in models.keys()]
     #################################################################################
@@ -151,6 +151,10 @@ def validate(cfg, writer, logger, logdir):
 
     with torch.no_grad():
         confidence = Confidence_Diagram()
+        if cfg["save_stats"]:
+            entropy_overall = {}
+            for m in cfg["models"].keys():
+                entropy_overall[m] = []
         for k, valloader in loaders['val'].items():
             if cfg["save_stats"]:
                 temp_dict_per_loader = {}
@@ -189,7 +193,7 @@ def validate(cfg, writer, logger, logdir):
                     if cfg['scaling']:
                         if cfg["models"][m]["arch"] == "DeepLab" or "Segnet":
                             DR[m] = fusion_scaling(entropy[m],mutual_info[m],modality = m,mode=cfg['scaling_metrics'])
-                            mean[m] = mean[m] * DR[m]
+                            mean[m] = mean[m] * DR[m]**2
                         else:
                             if 'rgb' not in DR:
                                 DR['rgb'] = 1
@@ -197,10 +201,10 @@ def validate(cfg, writer, logger, logdir):
                                 DR['d'] = 1
                             mean[m] = mean["rgbd"]*torch.min(DR['rgb'],DR['d'])
                         
-                entropy_ave[m] = entropy[m].mean((1,2))
+                    entropy_ave[m] = entropy[m].mean((1,2))
                 
-                if cfg['uncertainty']:
-                    mean = uncertainty(mean,cfg,det_cov=det_cov,inv_cov=inv_cov,mean_stats=mean_stats,device=device,log_prior=prior)
+                # if cfg['uncertainty']:
+                mean = uncertainty(mean,cfg,det_cov=det_cov,inv_cov=inv_cov,mean_stats=mean_stats,device=device,log_prior=prior)
                 mean = imbalance(mean,cfg,log_prior=log_prior)
                 outputs = fusion(mean,cfg)
                 
@@ -209,6 +213,7 @@ def validate(cfg, writer, logger, logdir):
                 if cfg["save_stats"]:
                     for m in cfg["models"].keys():
                         entropy_dict_per_loader[m].extend(entropy_ave[m].cpu().numpy().tolist())
+                        entropy_overall[m].extend(entropy_ave[m].cpu().numpy().tolist())
                         # MI_dict_per_loader[m].extend(MI_ave[m].cpu().numpy().tolist())
                         
                 # plot ground truth vs mean/variance of outputs
@@ -246,7 +251,7 @@ def validate(cfg, writer, logger, logdir):
             if cfg["save_stats"]:
                 save_stats(logdir,entropy_dict_per_loader,k,cfg,"_entropy_")
                 # save_stats(logdir,MI_dict_per_loader,k,cfg,"_MutualInfo_")
-
+        # import ipdb;ipdb.set_trace()
         confidence.compute_ece()
         confidence.save(logdir)
         confidence.print()

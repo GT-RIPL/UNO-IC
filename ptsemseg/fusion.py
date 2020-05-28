@@ -454,7 +454,7 @@ def imbalance(mean,cfg,**kargs):
         return mean
     outputs = {}
     for m in cfg["models"].keys():
-        prior = torch.tensor(1/np.exp(kargs['log_prior'])).to('cuda').unsqueeze(0).unsqueeze(2).unsqueeze(3)
+        prior = torch.tensor(1/np.exp(kargs['log_prior']),dtype = torch.float).to('cuda').unsqueeze(0).unsqueeze(2).unsqueeze(3)
         prior[prior == float("inf")] = 0
         # outputs = torch.nn.Softmax(dim=1)(mean["rgb"]) * torch.nn.Softmax(dim=1)(mean["d"])
         # outputs = outputs/outputs.sum(1).unsqueeze(1)
@@ -467,6 +467,6 @@ def imbalance(mean,cfg,**kargs):
         # mean[m] = torch.nn.Softmax(dim=1)(mean[m])
         mean_temp = mean[m]*prior
         mean_temp = mean_temp/mean_temp.sum(1).unsqueeze(1)
-        mean_temp = mean[m]**cfg['beta'] * mean_temp**(1-cfg['beta']) # why multiplication ????
+        mean_temp = mean[m]**(1-cfg['beta']) * mean_temp**cfg['beta'] # why multiplication ????
         outputs[m] = mean_temp/mean_temp.sum(1).unsqueeze(1)
     return outputs

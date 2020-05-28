@@ -5,7 +5,7 @@ tqdm==4.46.0
 tensorboardX
 pyyaml
 pandas
-opencv-python
+opencv
 scikit-image
 wand
 

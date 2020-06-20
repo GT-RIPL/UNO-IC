@@ -6,7 +6,6 @@ from .sync_batchnorm.batchnorm import SynchronizedBatchNorm2d
 from ..segnet import segnet
 from ..deeplab import DeepLab
 from .decoder import build_decoder
-from .fusion import *
 from ptsemseg.utils import mutualinfo_entropy, plotEverything, plotPrediction
 from ptsemseg.models.utils import *
 import torchvision.models as models

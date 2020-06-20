@@ -5,7 +5,6 @@ from .fusion.sync_batchnorm.batchnorm import SynchronizedBatchNorm2d
 from .fusion.aspp import build_aspp
 from .fusion.decoder import build_decoder
 from .fusion.backbone import build_backbone
-from .fusion.fusion import *
 from ptsemseg.utils import mutualinfo_entropy, plotEverything, plotPrediction
 
 class DeepLab(nn.Module):
@@ -41,14 +40,11 @@ class DeepLab(nn.Module):
         x = self.decoder(x, low_level_feat)
         x = F.interpolate(x, size=input.size()[2:], mode='bilinear', align_corners=True)
         x = x.unsqueeze(-1) #[batch,classes,760,1280,1]
-        # import ipdb;ipdb.set_trace()
         mean = x.mean(-1) #[batch,classes,760,1280]
-    
         prob = torch.nn.Softmax(dim=1)(x) #[batch,classes,760,1280]
         prob = prob.masked_fill(prob < 1e-9, 1e-9)
         entropy,mutual_info = mutualinfo_entropy(prob)#(batch,760,1280)
-        # import ipdb;ipdb.set_trace()
-        return mean, entropy, mutual_info
+        return mean, entropy
 
 
 

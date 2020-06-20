@@ -597,7 +597,7 @@ def mutual_information(pred):
 
 
 def mutualinfo_entropy(pred):
-    # pred [batch,11,512,512]
+    # pred [batch,11,512,512,num_passes]
     # return [batch,512,512]
     MI = []
     PEtropy = []
@@ -727,12 +727,35 @@ class Confidence_Diagram():
         # logger.info('mean accuracy per bin:',np.nansum(self.accuracy,1)/14)
         # logger.info('ece per class:',self.ece_cls)
         # logger.info('mean ece:',self.ece)
-
-
-
        
     def print(self):
         print(np.nansum(self.accuracy,1)/14)
         print(self.ece_cls)
         print(self.ece)
+
+    def load_model(model,attr):
+        if str(attr['resume']) is not None:
+            model_pkl = attr['resume']
+            if os.path.isfile(model_pkl):
+                logger.info(
+                    "Loading model and optimizer from checkpoint '{}'".format(model_pkl)
+                )
+                checkpoint = torch.load(model_pkl)
+                pretrained_dict = checkpoint['model_state']
+                model_dict = model.state_dict()
+                # 1. filter out unnecessary keys
+                pretrained_dict = {k: v.resize_(model_dict[k].shape) for k, v in pretrained_dict.items() if (
+                        k in model_dict)}   
+                # 2. overwrite entries in the existing state dict
+                model_dict.update(pretrained_dict)
+                # 3. load the new state dict
+                model.load_state_dict(pretrained_dict, strict=False)
+                # resume iterations only if specified
+                if cfg['training']['resume_iteration']:
+                    start_iter = checkpoint["epoch"]
+                print("Loaded checkpoint '{}' (iter {})".format(model_pkl, checkpoint["epoch"]))
+            else:
+                print("No checkpoint found at '{}'".format(model_pkl))
+                exit()
+        return model
 

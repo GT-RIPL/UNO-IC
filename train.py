@@ -9,7 +9,6 @@ import shutil
 import torch
 import random
 import argparse
-
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 
@@ -21,12 +20,13 @@ from ptsemseg.metrics import runningScore, averageMeter
 from ptsemseg.schedulers import get_scheduler
 from ptsemseg.optimizers import get_optimizer
 from ptsemseg.degredations import *
-from tensorboardX import SummaryWriter
+from ptsemseg.utils import bn_update, mem_report
+from ptsemseg.core import fusion
 
+from tensorboardX import SummaryWriter
 from functools import partial
 from collections import defaultdict
 import time
-from ptsemseg.utils import bn_update, mem_report
 
 global logdir, cfg, n_classes, i, i_val, k
 
@@ -60,63 +60,44 @@ def train(cfg, writer, logger, logdir):
     running_metrics_val = {env: runningScore(n_classes) for env in loaders['val'].keys()}
     # Setup Meters
     val_loss_meter = {env: averageMeter() for env in loaders['val'].keys()}
-    variance_meter = {env: averageMeter() for env in loaders['val'].keys()} 
     entropy_meter = {env: averageMeter() for env in loaders['val'].keys()} 
-    mutual_info_meter = {env: averageMeter() for env in loaders['val'].keys()}
     time_meter = averageMeter()
 
-    # set seeds for training
     start_iter = 0
     best_iou = -100.0
-    attr = defaultdict(lambda: None, attr)
-    models = get_model(name=attr['arch'],
-                              n_classes=n_classes,
-                              input_size=(cfg['data']['img_rows'], cfg['data']['img_cols']),
-                              in_channels=attr['in_channels'],
-                              mcdo_passes=attr['mcdo_passes'],
-                              dropoutP=attr['dropoutP'],
-                              full_mcdo=attr['full_mcdo'],
-                              backbone=attr['backbone'],
-                              device=device).to(device)
+    models = {}
+    for m,attr in cfg['models'].items()
+        attr = defaultdict(lambda: None, attr)
+        models[m] = get_model(name=attr['arch'],
+                                  n_classes=n_classes,
+                                  input_size=(cfg['data']['img_rows'], cfg['data']['img_cols']),
+                                  in_channels=attr['in_channels'],
+                                  mcdo_passes=attr['mcdo_passes'],
+                                  dropoutP=attr['dropoutP'],
+                                  full_mcdo=attr['full_mcdo'],
+                                  backbone=attr['backbone'],
+                                  device=device).to(device)
+        models[m] = torch.nn.DataParallel(models[m], device_ids=range(torch.cuda.device_count()))
+        models[m] = load_model(attr,models[m])
+
+    all_models = torch.nn.ModuleList(models[m] for m in models.keys())
+    # Setup tempnet 
+    if cfg['tempnet']['is_training']:
+        tempnet = TempNet().to(device)
+        tempnet = torch.nn.DataParallel(tempnet, device_ids=range(torch.cuda.device_count()))
+        tempnet = load_model(cfg['tempnet'],tempnet)
+        all_models = all_models + [tempnet]
 
     # Setup optimizer, lr_scheduler and loss function
     optimizer_cls = get_optimizer(cfg)
     optimizer_params = {k: v for k, v in cfg['training']['optimizer'].items()
                         if k != 'name'}
-
-    optimizers = optimizer_cls(models.parameters(), **optimizer_params)
+    if cfg['tempnet']['is_training']:                    
+        optimizers = optimizer_cls(tempnet.parameters(), **optimizer_params)
+    else:
+        optimizers = optimizer_cls(all_models.parameters(), **optimizer_params)
     logger.info("Using optimizer {}".format(optimizers))
-    models = torch.nn.DataParallel(models, device_ids=range(torch.cuda.device_count()))
-
     schedulers = get_scheduler(optimizers, cfg['training']['lr_schedule'])
-
-    
-
-    # Load pretrained weights
-    if str(attr['resume']) != "None":
-        model_pkl = attr['resume']
-
-        if os.path.isfile(model_pkl):
-            logger.info(
-                "Loading model and optimizer from checkpoint '{}'".format(model_pkl)
-            )
-            checkpoint = torch.load(model_pkl)
-            pretrained_dict = checkpoint['model_state']
-            model_dict = models[model].state_dict()
-            # 1. filter out unnecessary keys
-            pretrained_dict = {k: v.resize_(model_dict[k].shape) for k, v in pretrained_dict.items() if (
-                    k in model_dict)}  # and ((model!="fuse") or (model=="fuse" and not start_layer in k))}
-            # 2. overwrite entries in the existing state dict
-            model_dict.update(pretrained_dict)
-            # 3. load the new state dict
-            models.load_state_dict(pretrained_dict, strict=False)
-            # resume iterations only if specified
-            if cfg['training']['resume_iteration']:
-                start_iter = checkpoint["epoch"]
-            print("Loaded checkpoint '{}' (iter {})".format(model_pkl, checkpoint["epoch"]))
-        else:
-            print("No checkpoint found at '{}'".format(model_pkl))
-            exit()
 
 
     # setup weight for unbalanced dataset
@@ -134,11 +115,8 @@ def train(cfg, writer, logger, logdir):
     else:
         per_cls_weights = None 
         cls_num_list = None
-    import ipdb;ipdb.set_trace()
     loss_fn = get_loss_function(cfg,weights=per_cls_weights,cls_num_list=cls_num_list)
-    import ipdb;ipdb.set_trace()
     
-    # print("Using loss {}".format(loss_fn))
     i = start_iter
     print("Beginning Training at iteration: {}".format(i))
     while i <= cfg["training"]["train_iters"]:
@@ -148,17 +126,12 @@ def train(cfg, writer, logger, logdir):
         print("=" * 10, "TRAINING", "=" * 10)
         for (input_list, labels_list) in loaders['train']:
 
-            
-            # if cfg['data']['dataset'] == 'synthia' or cfg['data']['dataset'] == 'airsim':
             # Read batch from only one camera
             inputs, labels = parseEightCameras(input_list['rgb'], labels_list, input_list['d'], device)
             bs = cfg['training']['batch_size']
-            images = inputs[model][:bs, :, :, :]
-            labels = labels[:bs, :, :]
-            # else:
-            #     images = input_list.cuda() 
-            #     labels = labels_list.cuda()
-
+            # images = inputs[m][:bs, :, :, :]
+            # labels = labels[:bs, :, :]
+            
             if labels.shape[0] <= 1:
                 continue
 
@@ -168,12 +141,22 @@ def train(cfg, writer, logger, logdir):
             optimizers.zero_grad()
             models.train()
 
+            mean = {}
             # Run Models
-            outputs,_,_ = models(images) #images: [2,3,512,512]
-            loss = loss_fn(outputs, labels) #labels [2,512,512]
+            for m in models.keys():
+                mean[m],_,_ = models(inputs[m]) #images: [2,3,512,512]
+
+            if cfg['tempnet']['is_training']:
+                temperature = tempnet(torch.cat((softmax(mean['rgb']),softmax(mean['d'])),1))
+                for idx,m in enumerate(models.keys()):
+                    mean[m] = mean[m].detach() * temperature[:,idx,None,:,:]
+                outputs = fusion(mean,cfg)
+            loss = loss_fn(outputs, labels, cfg) #labels [2,512,512]
             loss.backward()
             optimizers.step()
             time_meter.update(time.time() - start_ts)
+
+
             if (i + 1) % cfg['training']['print_interval'] == 0:
                 # for m in cfg["models"].keys():
                 fmt_str = "Iter [{:d}/{:d}]  Loss {}: {:.4f}  Time/Image: {:.4f}"

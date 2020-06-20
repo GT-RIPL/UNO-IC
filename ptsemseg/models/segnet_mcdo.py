@@ -1,7 +1,5 @@
 import torch.nn as nn
 from torch.autograd import Variable
-
-from .fusion.fusion import *
 from ptsemseg.utils import mutualinfo_entropy
 from .utils import * 
 

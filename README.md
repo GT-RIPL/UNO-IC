@@ -48,10 +48,10 @@ val_split: val
 ```
 - Run `python extract.py --config ./configs/synthia/eval/rgbd_synthia.yml`
 
-- Statistics will be saved in foler `pytorch-semseg/runs/sythia/stats`
+- Statistics will be saved in foler `./runs/sythia/stats`
 
 2. Run inference
-- Assign  `test` to `val_split` and comment/uncomment `val_subsplit` to test on your selected conditions.
+- Assign  `test` to `val_split` and comment/uncomment attributes of `val_subsplit` to test on your selected conditions.
 ```yaml
 val_split: test 
 ```

@@ -37,7 +37,7 @@ $ mkdir -p ./checkpoint/synthia-seq/deeplab/
 
 ## Inference
 1. Extract training entropy statistics for uncertainty scaling and label priors for imbalance calibration.
-- assign `val` to `val_split` in the evaluation configuration file (`./configs/eval/rgbd_synthia.yml`)
+- Assign `val` to `val_split` in the evaluation configuration file (`./configs/eval/rgbd_synthia.yml`)
 ```yaml
 val_split: val
     val_subsplit: [
@@ -58,10 +58,12 @@ val_split: test
 - Run `python validate.py --config ./configs/synthia/eval/rgbd_synthia.yml` 
 - Qulitative and quatitative results will be saved in `runs/synthia/rgbd_synthia`
 
-## Apply additional degredations
-- We apply the photorealitic degredations from this [repo](https://github.com/hendrycks/robustness)
+## Apply additional degradations
+- We apply the photorealitic degradations from this [repo](https://github.com/hendrycks/robustness)
 - Please make the following modification in the configuration file to apply additional degradations.
-`SYNTHIA-SEQS-05-DAWN__{'channel':'rgb','type':'defocusBlur','value':'3'}"` 
+```
+SYNTHIA-SEQS-05-DAWN__{'channel':'rgb','type':'defocusBlur','value':'3'}"
+```
 - Applicable degradation type: 
 ```
 gaussianNoise, shotNoise, impulseNoise, defocusBlur, glassBlur, motionBlur

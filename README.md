@@ -13,7 +13,7 @@ path: /datasets/synthia-seq/
 
 ## Create conda environment
 ```
-conda env create -f environment.yaml
+conda env create -f requirements.yaml
 conda activate uno
 ```
 
@@ -57,6 +57,17 @@ val_split: test
 ```
 - Run `python validate.py --config ./configs/synthia/eval/rgbd_synthia.yml` 
 - Qulitative and quatitative results will be saved in `runs/synthia/rgbd_synthia`
+
+## Apply additional degredations
+- We apply the photorealitic degredations from this [repo](https://github.com/hendrycks/robustness)
+- Please make the following modification in the configuration file to apply additional degradations.
+`SYNTHIA-SEQS-05-DAWN__{'channel':'rgb','type':'defocusBlur','value':'3'}"` 
+- Applicable degradation type: 
+```
+gaussianNoise, shotNoise, impulseNoise, defocusBlur, glassBlur, motionBlur
+zoomBlur, snow, frost, fog, brightness, contrast, elastic, pixelate
+```
+- Degradation value ranges from 1 to 5
 
 ## Key functions
 - Uncertainty Scaling: assign `True` to `uncertainty:` in the evaluation configuration file

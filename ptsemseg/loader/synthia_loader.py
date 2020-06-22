@@ -71,28 +71,6 @@ Traffic Light   0   128     128 15
 
 class synthiaLoader(data.Dataset):
 
-    # class_names = np.array([
-    #     "road",
-    #     "sidewalk",
-    #     "building",
-    #     "wall",
-    #     "fence",
-    #     "pole",
-    #     "light",
-    #     "sign",
-    #     "vegetation",
-    #     "terrain",
-    #     "sky",
-    #     "person",
-    #     "rider",
-    #     "car",
-    #     "truck",
-    #     "bus",
-    #     "train",
-    #     "motocycle",
-    #     "bicycle",
-    # ])
-
     class_names = np.array([
         "void",
         "sky",
@@ -119,22 +97,13 @@ class synthiaLoader(data.Dataset):
     split_subdirs = {}
     ignore_index = 0
     mean_rgbd = {
-        # "airsim": [41.454376, 46.093113, 42.958637, 4.464941, 5.1877136, 167.58365] # joint 000 050 fog
-        # "synthia-rand": [36.8617, 42.363132, 38.955276, 4.8034225, 4.503343, 167.34187] # 000 fog
         "synthia-seq": [55.09944,  62.203827, 71.23802 , 130.35643,1.8075644,15.805721] # synthia-seq
-    }  # pascal mean for PSPNet and ICNet pre-trained model
-
+    } 
     std_rgbd = {
-        # "airsim": [37.94737, 37.26296, 36.74846, 22.874805, 28.264046, 39.39389] # joint 000 050 fog
-        # "synthia": [47.416595,48.246918,47.81453, 23.966692, 25.054394, 41.507214] # 000 fog
         "synthia-seq": [49.56111,  51.497387, 55.363934 , 46.930763, 10.479317, 34.19771] # synthia-seq   
     }
     
-    # mean_rgb = [36.8617, 42.363132, 38.955276]
-    # mean_d =  [4.8034225, 4.503343, 167.34187]
-
-    # std_rgb =  [47.416595,48.246918,47.81453] 
-    # std_d =  [23.966692, 25.054394, 41.507214] 
+   
     def __init__(
         self,
         root,
@@ -178,7 +147,6 @@ class synthiaLoader(data.Dataset):
             else:
                 condition = subsplit
                 degradation = None
-
             for comb_modal in self.image_modes:
                 for comb_cam in self.cam_pos:
                     for side in self.sides:
@@ -349,7 +317,6 @@ class synthiaLoader(data.Dataset):
         degradation = self.dgrd['RGB'][index]
         if not degradation is None:
             img, depth = self.degradation(degradation, img, depth)
-
         if self.is_transform:
             img, lbl, depth, img_display, depth_display = self.transform(img, lbl, depth)
         input_list['rgb'].append(img)
@@ -359,14 +326,12 @@ class synthiaLoader(data.Dataset):
         
         lbl_list.append(lbl)
         
-
         return input_list, lbl_list
 
 
     def degradation(self, degradation, img, depth):
 
         degradation = yaml.load((degradation))
-
         if degradation['type'] in key2deg.keys():
             if "rgb" in degradation['channel']:
                 img = key2deg[degradation['type']](img, int(degradation['value']))
@@ -380,66 +345,53 @@ class synthiaLoader(data.Dataset):
 
     def transform(self, img, lbl, aux):
         """transform
-
         :param img:
         :param lbl:
         """
-        # img = Image.fromarray(img, 'RGB')
-        # aux = Image.fromarray(aux, 'RGB')
-        # lbl = Image.fromarray(lbl)
+
         
-        # if self.split == 'train' or self.split == 'recal':
-            # sample = aug.transform_tr({'image':img, 'aux':aux, 'label':lbl}, self.mean_rgb, self.mean_d, self.std_rgb, self.std_d)
-        # if self.split == 'val':
-            # sample = aug.transform_val({'image':img, 'aux':aux, 'label':lbl}, self.mean_rgb, self.mean_d, self.std_rgb, self.std_d)
-        # if self.split == 'test':
-            # sample = aug.transform_ts({'image':img, 'aux':aux, 'label':lbl}, self.mean_rgb, self.mean_d, self.std_rgb, self.std_d)
+        # if img.dtype == 'uint8':   
+        img = cv2.resize(img, (self.img_size[0], self.img_size[1]))  # uint8 with RGB mode
+        aux = cv2.resize(aux, (self.img_size[0], self.img_size[1]))  # uint8 with RGB mode
+        # img = img[:, :, ::-1]  # RGB -> BGR
 
-        # return sample['image'], sample['label'], sample['aux'], sample['img_display'], sample['aux_display']
+        img = img.astype(np.float64)
+        aux = aux.astype(np.float64)
         
-        if img.dtype == 'uint8':   
-            img = cv2.resize(img, (self.img_size[0], self.img_size[1]))  # uint8 with RGB mode
-            aux = cv2.resize(aux, (self.img_size[0], self.img_size[1]))  # uint8 with RGB mode
-            # img = img[:, :, ::-1]  # RGB -> BGR
+        img_display = img.copy()
+        aux_display = aux.copy()
 
-            img = img.astype(np.float64)
-            aux = aux.astype(np.float64)
-            
-            img_display = img.copy()
-            aux_display = aux.copy()
+        if self.img_norm:
+            img = np.divide((img.astype(float) - self.mean[:3]),self.std[:3])
+            aux = np.divide((aux.astype(float) - self.mean[3:]),self.std[3:])
 
-            if self.img_norm:
-                img = np.divide((img.astype(float) - self.mean[:3]),self.std[:3])
-                aux = np.divide((aux.astype(float) - self.mean[3:]),self.std[3:])
+        # NHWC -> NCHW
+        img = img.transpose(2, 0, 1)
+        img_display = img_display.transpose(2, 0, 1)
 
-            # NHWC -> NCHW
-            img = img.transpose(2, 0, 1)
-            img_display = img_display.transpose(2, 0, 1)
+        if not any(['depth_encoded'==mode for mode in self.image_modes]):
+            aux = aux.transpose(2, 0, 1)
+            aux_display = aux_display.transpose(2, 0, 1)
 
-            if not any(['depth_encoded'==mode for mode in self.image_modes]):
-                aux = aux.transpose(2, 0, 1)
-                aux_display = aux_display.transpose(2, 0, 1)
+        classes = np.unique(lbl)
+        lbl = lbl.astype(float)
+        lbl = cv2.resize(lbl, (self.img_size[0], self.img_size[1]), interpolation=cv2.INTER_NEAREST) #, "nearest", mode="F")
+        lbl = lbl.astype(int)
 
-            classes = np.unique(lbl)
-            lbl = lbl.astype(float)
-            lbl = cv2.resize(lbl, (self.img_size[0], self.img_size[1]), interpolation=cv2.INTER_NEAREST) #, "nearest", mode="F")
-            lbl = lbl.astype(int)
+        # if not np.all(classes == np.unique(lbl)):
+        #     print("WARN: resizing labels yielded fewer classes")
 
-            # if not np.all(classes == np.unique(lbl)):
-            #     print("WARN: resizing labels yielded fewer classes")
-
-            if not np.all(np.unique(lbl[lbl != self.ignore_index]) < self.n_classes):
-                print("after det", classes, np.unique(lbl))
-                raise ValueError("Segmentation map contained invalid class values")
-            
-            img = torch.from_numpy(img).float()
-            aux = torch.from_numpy(aux).float()
-            img_display = torch.from_numpy(img_display).float()
-            aux_display = torch.from_numpy(aux_display).float()
-            lbl = torch.from_numpy(lbl).long()
-        else:
-            import ipdb;ipdb.set_trace() 
-
+        if not np.all(np.unique(lbl[lbl != self.ignore_index]) < self.n_classes):
+            print("after det", classes, np.unique(lbl))
+            raise ValueError("Segmentation map contained invalid class values")
+        
+        img = torch.from_numpy(img).float()
+        aux = torch.from_numpy(aux).float()
+        img_display = torch.from_numpy(img_display).float()
+        aux_display = torch.from_numpy(aux_display).float()
+        lbl = torch.from_numpy(lbl).long()
+        # else:
+        #     import ipdb;ipdb.set_trace() 
         return img, lbl, aux, img_display, aux_display
 
     # def get_cls_num_list(self):

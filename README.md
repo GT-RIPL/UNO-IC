@@ -1,5 +1,5 @@
 # UNO-IC (This repo implements the uncertainty-aware noisy-or fusion and imbalance calibration algorithm)
-<img src="teaser/pytorch-logo-dark.png" width="10%"> [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) 
 
 ## Prerequisites
 - Python 3.6
@@ -13,6 +13,19 @@
 - Extract the zip / tar and modify the path appropriately in your `config.yml`
 ```yaml
 path: /datasets/synthia-seq/
+```
+
+## Getting Started
+
+### Create conda environment
+```
+conda create -n uno python=3.6
+source actviate uno
+```
+
+### Install the required packages
+```
+pip install -r requirements.txt
 ```
 
 ## Training (not ready yet)

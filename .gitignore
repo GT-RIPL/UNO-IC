@@ -3,7 +3,6 @@
 
 # Dataset Directory
 /datasets/
-/checkpoint/synthia-seq/deeplab/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

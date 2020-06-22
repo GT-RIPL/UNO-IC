@@ -1,31 +1,20 @@
 # UNO-IC (This repo implements the uncertainty-aware noisy-or fusion and imbalance calibration algorithm)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) 
 
-## Prerequisites
-- Python 3.6
-- Pytorch 1.1.0 
-- Other required packages in `requirement.txt`
 
 ## Download Synthia dataset
 
 - The model uses the SEQS-05 Sythian-seq collections [here](http://synthia-dataset.net/downloads/)
-- Using different collections might require modifications to the dataloader. Please check the specific datastructure and labels.
-- Extract the zip / tar and modify the path appropriately in your `config.yml`
+- Using different collections might require modifications to the dataloader. Please check the specific data structure and labels.
+- Extract the zip / tar and modify the path appropriately in your `./configs/eval/rgbd_synthia.yml`
 ```yaml
 path: /datasets/synthia-seq/
 ```
 
-## Getting Started
-
-### Create conda environment
+## Create conda environment
 ```
-conda create -n uno python=3.6
-source actviate uno
-```
-
-### Install the required packages
-```
-pip install -r requirements.txt
+conda env create -f environment.yaml
+conda activate uno
 ```
 
 ## Training (not ready yet)
@@ -44,7 +33,7 @@ data:
 
 ## Inference
 1. Extract training entropy statistics for uncertainty scaling and label priors for imbalance calibration.
-- assign `val` to `val_split` in the evaluation configuration file
+- assign `val` to `val_split` in the evaluation configuration file (`./configs/eval/rgbd_synthia.yml`)
 ```yaml
 val_split: val
     val_subsplit: [

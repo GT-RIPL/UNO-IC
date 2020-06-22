@@ -114,6 +114,8 @@ if __name__ == "__main__":
         cfg = defaultdict(lambda: None, yaml.load(fp))
 
     logdir = "runs" +'/'+ args.config.split("/")[2]
+    if not os.path.exists(  logdir):
+        os.makedirs(logdir)
     path = shutil.copy(args.config, logdir)
     validate(cfg,logdir)
     print('Done!!!')

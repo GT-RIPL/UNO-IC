@@ -179,6 +179,8 @@ if __name__ == "__main__":
     if args.id:
         cfg['id'] = args.id
     logdir = "runs" +'/'+ args.config.split("/")[2]+'/'+cfg['id']
+    if not os.path.exists(logdir):
+        os.makedirs(logdir)
     writer = SummaryWriter(logdir)
     logger = get_logger(logdir)
     path = shutil.copy(args.config, logdir)

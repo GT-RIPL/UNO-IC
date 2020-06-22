@@ -17,7 +17,7 @@ conda env create -f environment.yaml
 conda activate uno
 ```
 
-## Training (not ready yet)
+## Pre-trained Models 
 - We train the model using four conditions. 
 ```yaml
 data:
@@ -30,6 +30,10 @@ data:
 ```
 - Pretrained RGB and D models are provided [here](https://drive.google.com/file/d/1tlHa0PF5nK0SS1gPuTCKBz1yC4Q_ARIS/view?usp=sharing)
 - Download and save the pretrained models to `./checkpoint/synthia-seq/deeplab/` 
+```
+$ mkdir -p ./checkpoint/synthia-seq/deeplab/
+```
+
 
 ## Inference
 1. Extract training entropy statistics for uncertainty scaling and label priors for imbalance calibration.
@@ -42,18 +46,17 @@ val_split: val
                   'SYNTHIA-SEQS-05-NIGHT', 
                   'SYNTHIA-SEQS-05-SUNSET', ]
 ```
-- Run `extract.py`
-`python extract.py --config ./configs/synthia/eval/rgbd_synthia.yml`
+- Run `python extract.py --config ./configs/synthia/eval/rgbd_synthia.yml`
 
 - Statistics will be saved in foler `pytorch-semseg/runs/sythia/stats`
 
 2. Run inference
-- Change `val_split` to `test` and comment/uncomment to test on your selected conditions.
+- Assign  `test` to `val_split` and comment/uncomment `val_subsplit` to test on your selected conditions.
 ```yaml
 val_split: test 
 ```
-- Run `validate.py`
-`python validate.py --config ./configs/synthia/eval/rgbd_synthia.yml` 
+- Run `python validate.py --config ./configs/synthia/eval/rgbd_synthia.yml` 
+- Qulitative and quatitative results will be saved in `runs/synthia/rgbd_synthia`
 
 3. Key functions
 - Uncertainty Scaling: assign `True` to `uncertainty:` in the evaluation configuration file

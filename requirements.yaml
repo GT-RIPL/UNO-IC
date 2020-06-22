@@ -7,6 +7,7 @@ channels:
 dependencies:
   - python=3.6
   - scikit-learn=0.22.1
+  - scikit-image
   - scipy=1.4.1
   - matplotlib=3.2.1=0
   - matplotlib-base=3.2.1
@@ -15,4 +16,8 @@ dependencies:
   - tensorboardx=2.0
   - pytorch=1.5.0
   - torchvision=0.6.0
+  - pyyaml
+  - tqdm
+  - pandas
+  - wand
 

@@ -1,5 +1,6 @@
 #event file
 *.ripl-w1
+train.py
 
 # Dataset Directory
 /datasets/

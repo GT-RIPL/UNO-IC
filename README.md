@@ -21,7 +21,7 @@ git checkout segmentation
 - This code is built upon the implementation from [Pytorch-semseg](https://github.com/meetshah1995/pytorch-semseg).
 
 ## Citation
-If you find this repository useful, please cite our paper:
+If you find this repository useful, please cite our paper(s):
 
 ```
 @inproceedings{tian2019uno,

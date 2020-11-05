@@ -10,7 +10,6 @@ This repo implements two algoritms.
 
 ## Acknowledgments
 - This work was supported by ONR grant N00014-18-1-2829.
-- This code is built upon the implementation from [Pytorch-semseg](https://github.com/meetshah1995/pytorch-semseg).
 
 ## Citation
 If you find this repository useful, please cite our paper(s):

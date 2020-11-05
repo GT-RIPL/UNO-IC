@@ -1,0 +1,77 @@
+id: rgbd_synthia 
+models: 
+    rgb:
+        arch: DeepLab
+        backbone: resnet101
+        resume:  /home/jtian73/pytorch-semseg/checkpoint/synthia-seq/deeplab/unweighted/rgb/rgb_DeepLab_synthia_best_model.pkl 
+    d:
+        arch: DeepLab
+        backbone: resnet101
+        resume: /home/jtian73/pytorch-semseg/checkpoint/synthia-seq/deeplab/unweighted/d/d_DeepLab_synthia_best_model.pkl 
+
+tempnet:
+    is_training: False
+    resume:        
+
+uncertainty: True 
+imbalance: 
+    beta: 0.4 
+fusion: None  #Noisy-Or   #Stacked-Noisy-Or  #Noisy-Or # #{None,SoftmaxMultiply} SoftmaxAverage
+
+save_stats: False
+save_dir: /home/jtian73/pytorch-semseg/
+data:
+    dataset: synthia
+    train_split: train
+    train_subsplit: ['SYNTHIA-SEQS-05-DAWN',
+                   'SYNTHIA-SEQS-05-SUMMER',
+                   'SYNTHIA-SEQS-05-NIGHT', 
+                   'SYNTHIA-SEQS-05-SUNSET',]
+    train_reduction: 1.0
+    val_split: val
+    val_subsplit: [
+                  'SYNTHIA-SEQS-05-DAWN',
+                  'SYNTHIA-SEQS-05-SUMMER',
+                  'SYNTHIA-SEQS-05-NIGHT', 
+                  'SYNTHIA-SEQS-05-SUNSET',
+                #   'SYNTHIA-SEQS-05-FOG',
+                #   'SYNTHIA-SEQS-05-SPRING',
+                #   'SYNTHIA-SEQS-05-FALL',
+                #   'SYNTHIA-SEQS-05-WINTER',
+                #   'SYNTHIA-SEQS-05-WINTERNIGHT',
+                #   'SYNTHIA-SEQS-05-RAIN',
+                #   'SYNTHIA-SEQS-05-RAINNIGHT',
+                #   'SYNTHIA-SEQS-05-SOFTRAIN',
+                  ]    
+    val_reduction: 1.0
+    img_rows: 768
+    img_cols: 384
+    path: /datasets/synthia-seq/ ##datasets/airsim_data_async #../../ros/data/airsim_03-30-2019/airsim_data_async
+    noisy_type: None 
+training:
+    weight: None
+    train_iters: 100000
+    batch_size: 2 #4
+    val_interval: 10000 #5000
+    save_iters: 10000
+    n_workers: 0
+    print_interval: 5
+    png_frames: 5 #5000
+    optimizer:
+        name: 'adam'
+        lr: 1.0e-5
+    loss:
+        name: 'cross_entropy'
+        size_average: True
+    lr_schedule:
+    resume: None
+
+uncertainty_stats: 
+    SoftEn_MEAN_rgb: 0.04231352970404819 
+    SoftEn_STD_rgb: 0.024074038238440242  
+
+    SoftEn_MEAN_d: 0.04663354425592563 
+    SoftEn_STD_d: 0.023968079441267425  
+
+    SoftEn_MEAN_rgbd: 0.05217332
+    SoftEn_STD_rgbd: 0.01356846

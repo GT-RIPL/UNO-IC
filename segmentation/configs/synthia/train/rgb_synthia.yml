@@ -1,0 +1,72 @@
+id: RGB_synthia_seq_CE_resnet18_DAWN #rgb_synthia_seq_LDAM_05 #rgb_synthia_seq_focal_1 #
+models: 
+    rgb:
+        arch: DeepLab
+        backbone: resnet18
+        resume: None #/home/jtian73/pytorch-semseg/checkpoint/synthia-seq/unweighted/rgb/rgb_DeepLab_synthia_best_model.pkl #/home/jtian73/fusion_backup/runs/configs/experiments/icra_configs/rgbd_TempNet_T000+T050_pretrain_1/rgb_tempnet_airsim_100000_model.pkl
+        # arch: segnet_mcdo
+        # in_channels: 3
+        # start_layer: down1
+        # end_layer: up1
+        # mcdo_passes: 1
+        # dropoutP: 0.5
+        # full_mcdo: False
+        # reduction: 1.0
+        # resume: None
+
+save_stats: False
+save_dir: /home/jtian/pytorch-semseg/
+data:
+    dataset: synthia
+    train_split: train
+    train_subsplit: ['SYNTHIA-SEQS-05-DAWN',]
+                   #'SYNTHIA-SEQS-05-SUMMER',
+                   #'SYNTHIA-SEQS-05-NIGHT', 
+                   #'SYNTHIA-SEQS-05-SUNSET',]
+    train_reduction: 1.0
+    val_split: val
+    val_subsplit: [
+                   'SYNTHIA-SEQS-05-DAWN',
+                   #'SYNTHIA-SEQS-05-SUMMER',
+                   #'SYNTHIA-SEQS-05-NIGHT', 
+                   #'SYNTHIA-SEQS-05-SUNSET',
+                   #'SYNTHIA-SEQS-05-FOG',
+                   #'SYNTHIA-SEQS-05-SPRING',
+                   #'SYNTHIA-SEQS-05-FALL',
+                   #'SYNTHIA-SEQS-05-WINTER',
+                   #'SYNTHIA-SEQS-05-WINTERNIGHT',
+                   #'SYNTHIA-SEQS-05-RAIN',
+                   #'SYNTHIA-SEQS-05-RAINNIGHT',
+                   #'SYNTHIA-SEQS-05-SOFTRAIN',
+                  ]    
+    val_reduction: 1.0
+    img_rows: 768
+    img_cols: 384
+    path: /datasets/synthia-seq/ #/home/jtian73/datasets/synthia-seq/ ##datasets/airsim_data_async #../../ros/data/airsim_03-30-2019/airsim_data_async
+    noisy_type: None 
+training:
+    seed: 1337
+    reweight: False
+    train_iters: 100000
+    batch_size: 4
+    val_interval: 10000 #5000
+    save_iters: 10000
+    n_workers: 6
+    print_interval: 50
+    png_frames: 50 #5000
+    optimizer:
+        name: 'adam'
+        lr: 1.0e-5
+    loss:
+        name: 'LDAM' #CE,Focal,LDAM
+        Focal:
+            gamma: 1.0
+            size_average: True
+        LDAM:
+            s: 30
+            max_m: 0.5
+            size_average: True
+        CE:
+            size_average: True
+    lr_schedule:
+    resume: None

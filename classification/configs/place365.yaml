@@ -1,0 +1,36 @@
+id: CrossEntropy
+model: 
+  arch: resnet152
+
+data:
+    name: place365
+    root: /datasets/Place365/
+    image_size: 224
+    train:
+        ann_file: /datasets/Place365/Places_LT_v2/Places_LT_train.txt
+        phase: train
+    val: 
+        ann_file: /datasets/Place365/Places_LT_v2/Places_LT_test.txt
+        phase: test
+    
+training:
+    seed: #1994
+    train_epoch: 20
+    batch_size: 128
+    print_interval: 100
+    n_workers: 6
+    reweight: False
+    optimizer:
+        name: sgd
+        lr:  0.005 
+        weight_decay: 5.0e-4
+        momentum: 0.9
+    loss:
+        name:  CrossEntropy
+        Focal: 
+             gamma: 1.0
+        CrossEntropy:
+    lr_schedule:
+    resume: ./runs/place365/resnet152/CrossEntropy/ckpt.best.pth.tar
+test:
+    beta: 0.0

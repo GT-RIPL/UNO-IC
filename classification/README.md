@@ -3,7 +3,7 @@
 
 ## Download Place365 dataset
 - Note: This dataset is not used in the main paper. However, it is also widely used in imbalanced classification. 
-- The model uses Place365 small images (256 * 256) [here](http://places2.csail.mit.edu/download.html/)
+- The model uses Place365 small images (256 * 256) [here](http://places2.csail.mit.edu/download.html)
 - Download the Place365-LT splits text file here [here](https://drive.google.com/file/d/14UrlzxUi12JJIX2U8NE6GFgUhsSvrUHm/view?usp=sharing). The splits are created by [liuziwei7](https://github.com/zhmiao/OpenLongTailRecognition-OLTR) 
 - Extract the zip / tar and modify the path appropriately in your `./configs/place365.yml`
 ```yaml

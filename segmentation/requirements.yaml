@@ -1,4 +1,4 @@
-name: uno
+name: uno-ic
 channels:
   - pytorch
   - anaconda

@@ -4,7 +4,7 @@
 
 ## Download Synthia dataset
 
-- The model uses the SEQS-05 Sythian-seq collections [here](http://synthia-dataset.net/downloads/)
+- The model uses the SEQS-05 Sythia-seq collections [here](http://synthia-dataset.net/downloads/)
 - Using different collections might require modifications to the dataloader. Please check the specific data structure and labels.
 - Extract the zip / tar and modify the path appropriately in your `./configs/eval/rgbd_synthia.yml`
 ```yaml
@@ -14,7 +14,7 @@ path: /datasets/synthia-seq/
 ## Create conda environment
 ```
 conda env create -f requirements.yaml
-conda activate uno
+conda activate uno-ic
 ```
 
 ## Pre-trained Models 
@@ -89,6 +89,13 @@ If you find this repository useful, please cite our paper:
     title={UNO: Uncertainty-aware Noisy-Or Multimodal Fusion for Unanticipated Input Degradation},
     author={Junjiao Tian, Wesley Cheung,  Nathaniel Glaser, Yen-Cheng Liu, and Zsolt Kira},
     booktitle={Proceedings of the  IEEE International Conference on Robotics and Automation (ICRA)},
+    year={2020}
+}
+
+@inproceedings{tian2020posterior,
+    title={Posterior Re-calibration for Imbalanced Datasets},
+    author={Junjiao Tian, Yen-Cheng Liu,  Nathaniel Glaser, Yen-Chang Hsu, and Zsolt Kira},
+    booktitle={Proceedings of the 34th Conference on Neural Information Processing Systems},
     year={2020}
 }
 ```

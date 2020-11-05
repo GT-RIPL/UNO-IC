@@ -3,17 +3,9 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) 
 
 This repo implements two algoritms.
-1. The imbalance clibration algorithm for image classification.
-2. The uncertainty-aware noisy-or multi-modal fusion and imbalance calibration algorithm for semantic segmentation, UNO-IC. 
+1. The imbalance clibration (IC) algorithm for image classification. Please go to the classification folder IC. 
+2. The uncertainty-aware noisy-or multi-modal fusion and imbalance calibration (UNO-IC) algorithm for semantic segmentation, UNO-IC. Please go to the segmentation folder for UNO-IC.
 
-## Imbalanced Image Classification
-```
-git checkout classification
-```
-## Robust Multi-Modal Fusion for Semantic Segmentation
-```
-git checkout segmentation
-```
 
 
 ## Acknowledgments

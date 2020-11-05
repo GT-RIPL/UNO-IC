@@ -1,4 +1,4 @@
-# Rrior Rebalancing (This repo implements the imbalance calibration algorithm)
+# Prior Rebalancing (This repo implements the imbalance calibration algorithm)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) 
 
 ## Download Place365 dataset
@@ -22,7 +22,7 @@ data:
 ## Create conda environment
 ```
 conda env create -f requirements.yaml
-conda activate rebalancing
+conda activate ic
 ```
 
 ## Training a CrossEntropy Baseline 

@@ -10,8 +10,8 @@ data:
         ann_file: /datasets/Place365/Places_LT_v2/Places_LT_train.txt
         phase: train
     val: 
-        ann_file: /datasets/Place365/Places_LT_v2/Places_LT_test.txt
-        phase: test
+        ann_file: /datasets/Place365/Places_LT_v2/Places_LT_val.txt
+        phase: val
     
 training:
     seed: #1994
@@ -31,6 +31,6 @@ training:
              gamma: 1.0
         CrossEntropy:
     lr_schedule:
-    resume: ./runs/place365/resnet152/CrossEntropy/ckpt.best.pth.tar
+    resume: #./runs/place365/resnet152/CrossEntropy/ckpt.best.pth.tar
 test:
     beta: 0.0

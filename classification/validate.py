@@ -14,8 +14,6 @@ import torch.backends.cudnn as cudnn
 
 from models import get_model
 from loader import get_loader
-from optimizers import get_optimizer
-from loss import get_loss_function
 from utils import save_checkpoint, AverageMeter, accuracy, get_logger
 from rebalancing import prior_recbalancing
 

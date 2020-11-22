@@ -67,7 +67,7 @@ python validate.py --config ./configs/place365.yaml
 - We provide a pretrained model [here](https://drive.google.com/file/d/1RNviW12oj5Dw32MxvCWHZfoe6LjlMWAl/view?usp=sharing).
 - Download the pretrained model and modify the `resume` to point to the correct path.
 ```yaml 
-resume: ../runs/place365/resnet152/CrossEntropy/ckpt.best.pth.tar 
+resume: ./runs/place365/resnet152/CrossEntropy/ckpt.best.pth.tar 
 ```
 
 ## Performance

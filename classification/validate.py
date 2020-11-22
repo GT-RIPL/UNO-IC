@@ -70,40 +70,43 @@ def train(cfg, logger, logdir):
             )
         else:
             logger.info("No checkpoint found at '{}'".format(cfg["training"]["resume"]))
-    
+            print("No checkpoint found at '{}'".format(cfg["training"]["resume"]))
+            exit()
+    else:
+        logger.info("Please speicfy a checkpoint")
+        print("Please speicfy a checkpoint")
+        exit()
+    ##================== Evaluation ============================
+    s_prior = np.array(t_loader.get_cls_num_list())
+    s_prior = torch.tensor(s_prior/s_prior.sum()).cuda()  
+    eval_top1 = AverageMeter('Acc@1', ':6.2f')
+    eval_top5 = AverageMeter('Acc@5', ':6.2f')
+    model.eval()
+    with torch.no_grad():
+        for i, (input, target) in enumerate(valloader):
 
-    
-        ##================== Evaluation ============================
-        s_prior = np.array(t_loader.get_cls_num_list())
-        s_prior = torch.tensor(s_prior/s_prior.sum()).cuda()  
-        eval_top1 = AverageMeter('Acc@1', ':6.2f')
-        eval_top5 = AverageMeter('Acc@5', ':6.2f')
-        model.eval()
-        with torch.no_grad():
-            for i, (input, target) in enumerate(valloader):
+            input = input.to(device)
+            target = target.to(device)
+            logit = model(input)
+            # import ipdb;ipdb.set_trace()
+            prob = prior_recbalancing(logit,cfg['test']['beta'],s_prior)
 
-                input = input.to(device)
-                target = target.to(device)
-                logit = model(input)
-                # import ipdb;ipdb.set_trace()
-                prob = prior_recbalancing(logit,cfg['test']['beta'],s_prior)
+            acc1, acc5 = accuracy(prob, target, topk=(1, 5))
 
-                acc1, acc5 = accuracy(prob, target, topk=(1, 5))
+            eval_top1.update(acc1[0], input.size(0))
+            eval_top5.update(acc5[0], input.size(0))
+            
+            if i % cfg["training"]["print_interval"] == 0:
+                output = ('Test: [{0}/{1}]\t' 
+                          'Prec@1 {top1.avg:.3f}\t'
+                          'Prec@5 {top5.avg:.3f}'.format(
+                    i, len(valloader), top1=eval_top1, top5=eval_top5))  # TODO
+                print(output)
 
-                eval_top1.update(acc1[0], input.size(0))
-                eval_top5.update(acc5[0], input.size(0))
-                
-                if i % cfg["training"]["print_interval"] == 0:
-                    output = ('Test: [{0}/{1}]\t' 
-                              'Prec@1 {top1.avg:.3f}\t'
-                              'Prec@5 {top5.avg:.3f}'.format(
-                        i, len(valloader), top1=eval_top1, top5=eval_top5))  # TODO
-                    print(output)
-
-        output = ('validation Results: Prec@1 {top1.avg:.3f} Prec@5 {top5.avg:.3f}'
-                .format(top1=eval_top1, top5=eval_top5))
-        logger.info(output + '\n')
-        print(output)
+    output = ('validation Results: Prec@1 {top1.avg:.3f} Prec@5 {top5.avg:.3f}'
+            .format(top1=eval_top1, top5=eval_top5))
+    logger.info(output + '\n')
+    print(output)
             
 
 

@@ -26,7 +26,6 @@ def train(cfg, logger, logdir):
     # Setup Dataloader
     data_loader = get_loader(cfg["data"]["name"])
 
-   
     tloader_params = {k: v for k, v in cfg["data"]["train"].items()}
     tloader_params.update({'root':cfg["data"]["root"]})
 

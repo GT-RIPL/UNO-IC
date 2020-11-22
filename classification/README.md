@@ -26,7 +26,7 @@ conda activate ic
 ```
 
 ## Training a CrossEntropy Baseline 
-- We use 4 RTX 2080 Ti machines to the model.
+- We use 4 RTX 2080 Ti machines to train the model.
 ```
 python train.py --config ./configs/place365.yaml   
 ```

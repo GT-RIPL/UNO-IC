@@ -5,7 +5,7 @@ import shutil
 import torch
 import random
 import argparse
-import numpy as np1	
+import numpy as np
 
 from torch.utils import data
 from tqdm import tqdm

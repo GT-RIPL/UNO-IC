@@ -9,7 +9,6 @@ import numpy as np
 
 from torch.utils import data
 from tqdm import tqdm
-import csv
 from tensorboardX import SummaryWriter
 import torch.nn.functional as F
 import torch.backends.cudnn as cudnn

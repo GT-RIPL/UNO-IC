@@ -43,7 +43,7 @@ val:
         ann_file: /datasets/Place365/Places_LT_v2/Places_LT_val.txt
         phase: val
 ```
-- Try different `beta` under `test` and run the inference script.
+- Assign different `beta` to `test` in the configuration file and run the inference script.
 ```yaml
 test:
     beta: 1.0  
@@ -52,8 +52,8 @@ test:
 python validate.py --config ./configs/place365.yaml   
 ```
 3. Test on the test split using the selected beta.
-- Assign `test` to `phase` in the configuration file (`./configs/place365.yml`)
-- Change `ann_file` to test
+- Assign `test` to `phase` in the configuration file (`./configs/place365.yml`).
+- Change `ann_file` to test.
 ```yaml
 val: 
         ann_file: /datasets/Place365/Places_LT_v2/Places_LT_test.txt
